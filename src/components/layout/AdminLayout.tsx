@@ -1,8 +1,8 @@
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { toggleSidebar } from '@/store/slices/uiSlice';
 import { logout } from '@/store/slices/authSlice';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
 	Home,
@@ -13,6 +13,7 @@ import {
 	Settings,
 	ChevronDown,
 	LogOut,
+	X,
 } from 'lucide-react';
 
 export function AdminLayout() {
@@ -21,6 +22,9 @@ export function AdminLayout() {
 	const { user } = useAppSelector((state) => state.auth);
 	const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 	const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+	const [sidebarExpanded, setSidebarExpanded] = useState(false);
+	const sidebarRef = useRef<HTMLElement>(null);
+	const navigate = useNavigate();
 
 	const handleLogout = () => {
 		dispatch(logout());
@@ -37,53 +41,89 @@ export function AdminLayout() {
 
 	const isActive = (path: string) => location.pathname === path;
 
+	// Sidebar hover behavior - expand on hover, collapse on leave
+	useEffect(() => {
+		const sidebar = sidebarRef.current;
+		if (!sidebar) return;
+
+		const handleMouseEnter = (e: MouseEvent) => {
+			e.stopPropagation();
+			setSidebarExpanded(true);
+		};
+
+		const handleMouseLeave = (e: MouseEvent) => {
+			e.stopPropagation();
+			setSidebarExpanded(false);
+		};
+
+		// Use mouseenter/mouseleave for better hover detection
+		sidebar.addEventListener('mouseenter', handleMouseEnter);
+		sidebar.addEventListener('mouseleave', handleMouseLeave);
+
+		return () => {
+			sidebar.removeEventListener('mouseenter', handleMouseEnter);
+			sidebar.removeEventListener('mouseleave', handleMouseLeave);
+		};
+	}, []);
+
 	return (
-		<div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+		<div
+			className={`min-h-screen ${sidebarExpanded ? 'sidebar-expanded' : ''}`}
+			style={
+				{
+					background: 'linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%)',
+					'--sidebar-width': sidebarExpanded ? '280px' : '90px',
+				} as React.CSSProperties
+			}
+		>
 			{/* Top Navbar */}
-			<nav className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-50">
-				<div className="flex items-center justify-between h-full px-6">
-					<div className="flex items-center gap-4">
-						<img src="/logo.png" alt="X-TRIM FIT GYM" className="h-10" />
+			<nav className="top-navbar fixed top-0 left-0 right-0 h-20 bg-[rgba(19,22,31,0.95)] backdrop-blur-[12px] border-b border-[rgba(255,255,255,0.08)] z-50">
+				<div className="flex items-center justify-between h-full px-10">
+					<div className="logo flex items-center gap-3 h-10">
+						<img
+							src="/logo.png"
+							alt="X-TRIM FIT GYM"
+							className="h-full w-auto object-contain cursor-pointer"
+							onClick={() => navigate('/dashboard')}
+						/>
 					</div>
-					<div className="flex items-center gap-4">
+					<div className="nav-right flex items-center gap-4">
 						<div className="relative">
 							<button
 								onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-								className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+								className="user-profile flex items-center gap-3 px-2 py-2.5 rounded-xl bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)]"
 							>
-								<div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold">
+								<div className="user-avatar w-9 h-9 rounded-[10px] bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)] flex items-center justify-center font-bold text-white text-sm">
 									{user?.firstName?.[0] || 'A'}
 									{user?.lastName?.[0] || 'D'}
 								</div>
-								<div className="text-left hidden md:block">
-									<h4 className="font-semibold text-sm">
+								<div className="user-info text-left hidden md:block">
+									<h4 className="text-sm font-semibold text-[var(--text-primary)]">
 										{user?.firstName} {user?.lastName}
 									</h4>
-									<p className="text-xs text-gray-500 dark:text-gray-400">
-										System Administrator
-									</p>
+									<p className="text-xs text-[var(--text-secondary)]">System Administrator</p>
 								</div>
-								<ChevronDown className="w-4 h-4" />
+								<ChevronDown className="w-4 h-4 text-[var(--text-secondary)]" />
 							</button>
 							{profileDropdownOpen && (
-								<div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2">
+								<div className="dropdown-menu absolute right-0 top-full mt-2 w-56 bg-[var(--bg-darker)] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.1)] py-2 opacity-100 visible transform-none">
 									<Link
 										to="/settings"
-										className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+										className="dropdown-item flex items-center gap-3 px-5 py-3 text-[var(--text-secondary)] text-sm hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--primary-yellow)] hover:pl-6"
 										onClick={() => setProfileDropdownOpen(false)}
 									>
-										<Settings className="w-4 h-4" />
+										<Settings className="w-5 h-5" />
 										<span>Settings</span>
 									</Link>
-									<div className="border-t border-gray-200 dark:border-gray-700 my-2" />
+									<div className="dropdown-divider h-px bg-[rgba(255,255,255,0.08)] my-1" />
 									<button
 										onClick={() => {
 											setLogoutModalOpen(true);
 											setProfileDropdownOpen(false);
 										}}
-										className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-red-600 dark:text-red-400"
+										className="dropdown-item w-full flex items-center gap-3 px-5 py-3 text-[var(--text-secondary)] text-sm hover:bg-[rgba(255,255,255,0.05)] hover:text-[#EF4444] hover:pl-6"
 									>
-										<LogOut className="w-4 h-4" />
+										<LogOut className="w-5 h-5" />
 										<span>Logout</span>
 									</button>
 								</div>
@@ -94,23 +134,19 @@ export function AdminLayout() {
 			</nav>
 
 			{/* Sidebar */}
-			<aside className="fixed left-0 top-16 bottom-0 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto z-40">
-				<nav className="p-4">
-					<ul className="space-y-2">
+			<aside ref={sidebarRef} className={`sidebar ${sidebarExpanded ? 'expanded' : ''}`}>
+				<nav>
+					<ul className="sidebar-menu">
 						{navItems.map((item) => {
 							const Icon = item.icon;
 							return (
 								<li key={item.path}>
 									<Link
 										to={item.path}
-										className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-											isActive(item.path)
-												? 'bg-primary text-primary-foreground'
-												: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-										}`}
+										className={`sidebar-menu a ${isActive(item.path) ? 'active' : ''}`}
 									>
 										<Icon className="w-5 h-5" />
-										<span className="font-medium">{item.label}</span>
+										<span>{item.label}</span>
 									</Link>
 								</li>
 							);
@@ -120,54 +156,46 @@ export function AdminLayout() {
 			</aside>
 
 			{/* Main Content */}
-			<main className="ml-64 mt-16 p-6">
+			<main className="main-content">
 				<Outlet />
 			</main>
 
 			{/* Logout Modal */}
-			{logoutModalOpen && (
-				<div
-					className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-					onClick={() => setLogoutModalOpen(false)}
-				>
-					<div
-						className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4"
-						onClick={(e) => e.stopPropagation()}
-					>
-						<div className="text-center mb-6">
-							<div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-								<LogOut className="w-8 h-8 text-red-600 dark:text-red-400" />
-							</div>
-							<h3 className="text-xl font-semibold mb-2">Are you sure you want to logout?</h3>
-							<p className="text-gray-600 dark:text-gray-400">
-								You'll need to log in again to access your admin account.
-							</p>
+			<div
+				className={`modal-overlay ${logoutModalOpen ? 'active' : ''}`}
+				onClick={() => setLogoutModalOpen(false)}
+			>
+				<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+					<div className="modal-body">
+						<div className="modal-logout-icon">
+							<LogOut className="w-10 h-10" />
 						</div>
-						<div className="flex gap-3">
-							<Button
-								variant="outline"
-								className="flex-1"
+						<h3 className="modal-logout-title">Are you sure you want to logout?</h3>
+						<p className="modal-logout-text">
+							You'll need to log in again to access your admin account.
+						</p>
+						<div className="modal-logout-actions">
+							<button
+								type="button"
+								className="btn-secondary"
 								onClick={() => setLogoutModalOpen(false)}
 							>
+								<X className="w-4 h-4" />
 								Cancel
-							</Button>
-							<Button variant="destructive" className="flex-1" onClick={handleLogout}>
+							</button>
+							<button type="button" className="btn-primary" onClick={handleLogout}>
 								<LogOut className="w-4 h-4" />
 								Yes, Logout
-							</Button>
+							</button>
 						</div>
 					</div>
 				</div>
-			)}
+			</div>
 
 			{/* Click outside to close dropdown */}
 			{profileDropdownOpen && (
-				<div
-					className="fixed inset-0 z-30"
-					onClick={() => setProfileDropdownOpen(false)}
-				/>
+				<div className="fixed inset-0 z-30" onClick={() => setProfileDropdownOpen(false)} />
 			)}
 		</div>
 	);
 }
-

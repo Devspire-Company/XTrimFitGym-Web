@@ -4,14 +4,14 @@ const config: CodegenConfig = {
 	schema: 'http://localhost:4000/graphql',
 	documents: ['src/**/*.{ts,tsx}', 'src/**/*.graphql'],
 	generates: {
-		'./src/lib/graphql/generated/': {
+		'./src/graphql/generated/': {
 			preset: 'client',
 			plugins: [],
 			presetConfig: {
 				gqlTagName: 'gql',
 			},
 		},
-		'./src/lib/graphql/generated/types.ts': {
+		'./src/graphql/generated/types.ts': {
 			plugins: ['typescript', 'typescript-operations'],
 			config: {
 				scalars: {

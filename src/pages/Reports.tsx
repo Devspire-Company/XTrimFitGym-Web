@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { mockMembers, mockCoaches, mockMembershipPlans } from '@/lib/mock/data';
 import {
 	Chart as ChartJS,
@@ -28,6 +28,10 @@ ChartJS.register(
 );
 
 export function ReportsPage() {
+	useEffect(() => {
+		document.title = 'Reports & Analytics - X-TRIM FIT GYM';
+	}, []);
+
 	const members = Object.values(mockMembers);
 	const coaches = Object.values(mockCoaches);
 	const plans = mockMembershipPlans;
@@ -83,7 +87,7 @@ export function ReportsPage() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-3xl font-bold flex items-center gap-2">
-						<BarChart3 className="w-8 h-8" />
+						<BarChart3 className="w-8 h-8" color="var(--primary-yellow)" />
 						Reports & Analytics
 					</h1>
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -126,22 +130,28 @@ export function ReportsPage() {
 
 			{/* Charts */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-					<h2 className="text-xl font-semibold mb-4">Revenue Trends</h2>
+				<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+					<h2 className="text-xl font-semibold mb-4 text-[var(--text-primary)] font-['Poppins']">
+						Revenue Trends
+					</h2>
 					<div className="h-64">
 						<Line data={revenueData} options={{ maintainAspectRatio: false }} />
 					</div>
 				</div>
-				<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-					<h2 className="text-xl font-semibold mb-4">Membership Distribution</h2>
+				<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+					<h2 className="text-xl font-semibold mb-4 text-[var(--text-primary)] font-['Poppins']">
+						Membership Distribution
+					</h2>
 					<div className="h-64">
 						<Doughnut data={membershipData} options={{ maintainAspectRatio: false }} />
 					</div>
 				</div>
 			</div>
 
-			<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-				<h2 className="text-xl font-semibold mb-4">Member Growth</h2>
+			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+				<h2 className="text-xl font-semibold mb-4 text-[var(--text-primary)] font-['Poppins']">
+					Member Growth
+				</h2>
 				<div className="h-64">
 					<Bar data={memberGrowthData} options={{ maintainAspectRatio: false }} />
 				</div>
@@ -164,21 +174,25 @@ function SummaryCard({
 	changeType: 'positive' | 'negative' | 'neutral';
 }) {
 	return (
-		<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-			<div className="flex items-center justify-between mb-4">
-				<div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-					<Icon className="w-6 h-6 text-primary" />
+		<div className="stat-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+			<div className="flex items-center justify-between mb-6">
+				<div className="stat-icon w-14 h-14 rounded-[14px] bg-gradient-to-br from-[rgba(249,197,19,0.15)] to-[rgba(228,30,38,0.1)] flex items-center justify-center text-[1.6rem] text-[var(--primary-yellow)]">
+					<Icon className="w-6 h-6" />
 				</div>
 			</div>
-			<h3 className="text-sm text-gray-600 dark:text-gray-400 mb-1">{title}</h3>
-			<div className="text-2xl font-bold mb-2">{value}</div>
+			<h3 className="text-[0.85rem] font-medium text-[var(--text-secondary)] mb-2 uppercase">
+				{title}
+			</h3>
+			<div className="stat-value text-[2.2rem] font-bold text-[var(--text-primary)] mb-2 font-['Poppins']">
+				{value}
+			</div>
 			<div
-				className={`text-sm ${
+				className={`stat-change text-[0.8rem] font-semibold flex items-center gap-1 ${
 					changeType === 'positive'
-						? 'text-green-600 dark:text-green-400'
+						? 'text-[var(--primary-yellow)]'
 						: changeType === 'negative'
-							? 'text-red-600 dark:text-red-400'
-							: 'text-gray-600 dark:text-gray-400'
+							? 'text-[#EF4444]'
+							: 'text-[var(--text-secondary)]'
 				}`}
 			>
 				{change}
@@ -186,4 +200,3 @@ function SummaryCard({
 		</div>
 	);
 }
-

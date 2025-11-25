@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { mockMembershipPlans, type MockMembershipPlan } from '@/lib/mock/data';
 import { Button } from '@/components/ui/button';
 import { Plus, Eye, Edit, Trash2, CreditCard, Crown } from 'lucide-react';
 
 export function MembershipsPage() {
+	useEffect(() => {
+		document.title = 'Membership Management - X-TRIM FIT GYM';
+	}, []);
 	const [selectedPlan, setSelectedPlan] = useState<MockMembershipPlan | null>(null);
 	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
@@ -14,7 +17,7 @@ export function MembershipsPage() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-3xl font-bold flex items-center gap-2">
-						<CreditCard className="w-8 h-8" />
+						<CreditCard className="w-8 h-8" color="var(--primary-yellow)" />
 						Membership Management
 					</h1>
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -27,80 +30,101 @@ export function MembershipsPage() {
 				</Button>
 			</div>
 
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+			<div className="plans-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 				{plans.map((plan) => {
 					const isFeatured = plan.count > 0;
 					return (
 						<div
 							key={plan.id}
-							className={`bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border-2 ${
-								isFeatured ? 'border-primary' : 'border-gray-200 dark:border-gray-700'
+							className={`plan-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] p-8 backdrop-blur-[10px] ${
+								isFeatured
+									? 'featured border-2 border-[var(--primary-yellow)] shadow-[0_0_30px_rgba(249,197,19,0.2)]'
+									: ''
 							}`}
 						>
-							<div className="flex items-center justify-between mb-4">
-								<div className="flex items-center gap-2">
+							<div className="plan-header flex items-center justify-between mb-6">
+								<div className="plan-name-section flex-1">
 									{isFeatured && (
-										<span className="px-2 py-1 text-xs rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center gap-1">
+										<span className="plan-badge inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider mb-3 bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]">
 											<Crown className="w-3 h-3" />
 											Popular
 										</span>
 									)}
-									<h3 className="text-xl font-bold">{plan.name}</h3>
+									<h3 className="plan-name text-[1.75rem] font-bold text-[var(--text-primary)] mb-2 font-['Poppins']">
+										{plan.name}
+									</h3>
 								</div>
 								<span
-									className={`px-2 py-1 text-xs rounded-full ${
+									className={`plan-status-badge px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
 										plan.status === 'Active'
-											? 'bg-green-100 dark:bg-green-900 text-green-800'
-											: 'bg-gray-100 dark:bg-gray-700'
+											? 'active bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
+											: 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
 									}`}
 								>
 									{plan.status}
 								</span>
 							</div>
-							<div className="mb-4">
-								<span className="text-3xl font-bold">₱{plan.price.toLocaleString()}</span>
-								<span className="text-gray-600 dark:text-gray-400">/{plan.duration.toLowerCase()}</span>
+							<div className="plan-price flex items-baseline gap-2 mb-4">
+								<span className="plan-price-value text-[2.5rem] font-bold text-[var(--primary-yellow)] font-['Poppins']">
+									₱{plan.price.toLocaleString()}
+								</span>
+								<span className="plan-price-period text-base text-[var(--text-secondary)] font-medium">
+									/{plan.duration.toLowerCase()}
+								</span>
 							</div>
-							<p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{plan.description}</p>
-							<ul className="space-y-2 mb-6">
+							<p className="plan-description text-sm text-[var(--text-secondary)] mb-6 leading-relaxed">
+								{plan.description}
+							</p>
+							<ul className="plan-features space-y-3 mb-6">
 								{plan.features.map((feature, idx) => (
-									<li key={idx} className="flex items-center gap-2 text-sm">
-										<span className="text-green-600">✓</span>
+									<li
+										key={idx}
+										className="flex items-center gap-3 text-sm text-[var(--text-secondary)] py-3 border-b border-[rgba(255,255,255,0.05)] last:border-0"
+									>
+										<span className="text-[var(--primary-yellow)] text-xs w-5 flex-shrink-0">
+											✓
+										</span>
 										<span>{feature}</span>
 									</li>
 								))}
 							</ul>
-							<div className="flex items-center justify-between mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-								<div>
-									<div className="text-2xl font-bold">{plan.count}</div>
-									<div className="text-xs text-gray-600 dark:text-gray-400">Active Members</div>
+							<div className="plan-stats flex gap-4 mb-6 p-4 bg-[rgba(255,255,255,0.02)] rounded-xl">
+								<div className="plan-stat flex-1 text-center">
+									<span className="plan-stat-value block text-2xl font-bold text-[var(--primary-yellow)] mb-1">
+										{plan.count}
+									</span>
+									<span className="plan-stat-label text-xs text-[var(--text-secondary)] uppercase tracking-wider">
+										Active Members
+									</span>
 								</div>
-								<div>
-									<div className="text-2xl font-bold">₱{(plan.price * plan.count).toLocaleString()}</div>
-									<div className="text-xs text-gray-600 dark:text-gray-400">Monthly Revenue</div>
+								<div className="plan-stat flex-1 text-center">
+									<span className="plan-stat-value block text-2xl font-bold text-[var(--primary-yellow)] mb-1">
+										₱{(plan.price * plan.count).toLocaleString()}
+									</span>
+									<span className="plan-stat-label text-xs text-[var(--text-secondary)] uppercase tracking-wider">
+										Monthly Revenue
+									</span>
 								</div>
 							</div>
-							<div className="flex gap-2">
-								<Button
-									variant="outline"
-									size="sm"
-									className="flex-1"
+							<div className="plan-actions flex gap-3">
+								<button
 									onClick={() => {
 										setSelectedPlan(plan);
 										setIsViewModalOpen(true);
 									}}
+									className="btn-small btn-view flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(59,130,246,0.15)] text-[#3B82F6] border border-[rgba(59,130,246,0.3)] flex items-center justify-center gap-2"
 								>
 									<Eye className="w-4 h-4" />
 									View
-								</Button>
-								<Button variant="outline" size="sm" className="flex-1">
+								</button>
+								<button className="btn-small btn-edit flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)] flex items-center justify-center gap-2">
 									<Edit className="w-4 h-4" />
 									Edit
-								</Button>
-								<Button variant="outline" size="sm" className="flex-1">
+								</button>
+								<button className="btn-small btn-delete flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] flex items-center justify-center gap-2">
 									<Trash2 className="w-4 h-4" />
 									Delete
-								</Button>
+								</button>
 							</div>
 						</div>
 					);
@@ -144,4 +168,3 @@ export function MembershipsPage() {
 		</div>
 	);
 }
-

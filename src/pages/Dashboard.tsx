@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { gql } from '@apollo/client';
 import { Link } from 'react-router';
@@ -24,6 +25,10 @@ const GET_DASHBOARD_STATS = gql`
 `;
 
 export function DashboardPage() {
+	useEffect(() => {
+		document.title = 'Admin Dashboard - X-TRIM FIT GYM';
+	}, []);
+
 	const dispatch = useAppDispatch();
 	const { data, loading, error } = useQuery(GET_DASHBOARD_STATS, {
 		errorPolicy: 'all',
@@ -68,10 +73,11 @@ export function DashboardPage() {
 	return (
 		<div className="space-y-6">
 			{/* Welcome Section */}
-			<div className="relative rounded-lg overflow-hidden bg-gradient-to-r from-primary/10 to-primary/5 p-8">
-				<div className="relative z-10">
-					<h1 className="text-3xl font-bold mb-2">Welcome Back, Admin!</h1>
-					<p className="text-gray-600 dark:text-gray-400">
+			<div className="welcome-section relative rounded-[20px] overflow-hidden p-10">
+				<div className="welcome-bg-image"></div>
+				<div className="welcome-content relative z-10">
+					<h1 className="text-[2.2rem] font-bold mb-2 gradient-text">Welcome Back, Admin!</h1>
+					<p className="text-[var(--text-secondary)] text-[1.05rem]">
 						Manage your gym operations, members, coaches, and track your business performance.
 					</p>
 				</div>
@@ -110,9 +116,9 @@ export function DashboardPage() {
 			</div>
 
 			{/* Quick Actions */}
-			<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-				<h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-					<span>⚡</span> Quick Actions
+			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+				<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+					<span className="text-[var(--primary-yellow)]">⚡</span> Quick Actions
 				</h2>
 				<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 					<QuickActionButton href="/members" icon={Users} label="Add Member" />
@@ -127,70 +133,74 @@ export function DashboardPage() {
 				{/* Left Column */}
 				<div className="lg:col-span-2 space-y-6">
 					{/* Recent Members */}
-					<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-						<div className="flex items-center justify-between mb-4">
-							<h2 className="text-xl font-semibold flex items-center gap-2">
-								<Users className="w-5 h-5" />
+					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+						<div className="section-header flex items-center justify-between mb-6 pb-4 border-b border-[rgba(255,255,255,0.08)]">
+							<h2 className="text-xl font-semibold flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+								<Users className="w-5 h-5 text-[var(--primary-yellow)]" />
 								Recent Members
 							</h2>
 							<Link
 								to="/members"
-								className="text-sm text-primary hover:underline flex items-center gap-1"
+								className="view-all text-sm text-[var(--primary-yellow)] font-medium flex items-center gap-1"
 							>
 								View All <span>→</span>
 							</Link>
 						</div>
-						<div className="space-y-3">
+						<div className="space-y-4">
 							{recentMembers.map((member) => (
 								<div
 									key={member.id}
-									className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+									className="member-item flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
 								>
-									<div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold">
+									<div className="member-avatar w-12 h-12 rounded-full bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)] flex items-center justify-center font-semibold text-white text-base flex-shrink-0">
 										{member.avatar}
 									</div>
-									<div className="flex-1">
-										<h3 className="font-medium">{member.name}</h3>
-										<p className="text-sm text-gray-600 dark:text-gray-400">
+									<div className="member-info flex-1">
+										<h3 className="font-semibold text-[var(--text-primary)] mb-1">{member.name}</h3>
+										<p className="text-sm text-[var(--text-secondary)]">
 											{member.membership} Member • Joined {member.joinDate}
 										</p>
 									</div>
-									<button className="text-sm text-primary hover:underline">View</button>
+									<button className="btn-small text-sm text-[var(--primary-yellow)] bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] px-4 py-2 rounded-lg font-semibold">
+										View
+									</button>
 								</div>
 							))}
 						</div>
 					</div>
 
 					{/* Coaches */}
-					<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-						<div className="flex items-center justify-between mb-4">
-							<h2 className="text-xl font-semibold flex items-center gap-2">
-								<UserCog className="w-5 h-5" />
+					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+						<div className="section-header flex items-center justify-between mb-6 pb-4 border-b border-[rgba(255,255,255,0.08)]">
+							<h2 className="text-xl font-semibold flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+								<UserCog className="w-5 h-5 text-[var(--primary-yellow)]" />
 								Coaches
 							</h2>
 							<Link
 								to="/coaches"
-								className="text-sm text-primary hover:underline flex items-center gap-1"
+								className="view-all text-sm text-[var(--primary-yellow)] font-medium flex items-center gap-1"
 							>
 								View All <span>→</span>
 							</Link>
 						</div>
-						<div className="space-y-3">
+						<div className="space-y-4">
 							{coaches.map((coach) => (
 								<div
 									key={coach.id}
-									className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+									className="coach-item flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
 								>
-									<div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold">
+									<div className="coach-avatar w-12 h-12 rounded-full bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)] flex items-center justify-center font-semibold text-white text-base flex-shrink-0">
 										{coach.avatar}
 									</div>
-									<div className="flex-1">
-										<h3 className="font-medium">{coach.name}</h3>
-										<p className="text-sm text-gray-600 dark:text-gray-400">
+									<div className="coach-info flex-1">
+										<h3 className="font-semibold text-[var(--text-primary)] mb-1">{coach.name}</h3>
+										<p className="text-sm text-[var(--text-secondary)]">
 											{coach.specialization} • {coach.yearsExperience} years experience
 										</p>
 									</div>
-									<button className="text-sm text-primary hover:underline">View</button>
+									<button className="btn-small text-sm text-[var(--primary-yellow)] bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] px-4 py-2 rounded-lg font-semibold">
+										View
+									</button>
 								</div>
 							))}
 						</div>
@@ -200,18 +210,20 @@ export function DashboardPage() {
 				{/* Right Column */}
 				<div className="space-y-6">
 					{/* Revenue Overview */}
-					<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-						<h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-							<span>📈</span> Revenue Overview
+					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+						<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+							<span className="text-[var(--primary-yellow)]">📈</span> Revenue Overview
 						</h2>
 						<div className="space-y-4">
 							<div className="flex items-center justify-between">
-								<span className="text-gray-600 dark:text-gray-400">Total Revenue</span>
-								<span className="text-lg font-semibold">₱{monthlyRevenue.toLocaleString()}</span>
+								<span className="text-[var(--text-secondary)]">Total Revenue</span>
+								<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+									₱{monthlyRevenue.toLocaleString()}
+								</span>
 							</div>
 							<div className="flex items-center justify-between">
-								<span className="text-gray-600 dark:text-gray-400">Avg. per Member</span>
-								<span className="text-lg font-semibold">
+								<span className="text-[var(--text-secondary)]">Avg. per Member</span>
+								<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
 									₱{activeSubscriptions > 0 ? Math.round(monthlyRevenue / activeSubscriptions) : 0}
 								</span>
 							</div>
@@ -219,30 +231,39 @@ export function DashboardPage() {
 					</div>
 
 					{/* Membership Distribution */}
-					<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-						<h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-							<span>📊</span> Membership Distribution
+					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+						<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+							<span className="text-[var(--primary-yellow)]">📊</span> Membership Distribution
 						</h2>
-						<div className="space-y-3">
+						<div className="membership-distribution space-y-3">
 							{Object.entries(membershipDistribution).map(([name, count]) => {
 								const percentage = totalMembers > 0 ? Math.round((count / totalMembers) * 100) : 0;
 								return (
-									<div key={name} className="flex items-center justify-between">
-										<div className="flex items-center gap-2">
+									<div
+										key={name}
+										className="membership-item flex items-center justify-between p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
+									>
+										<div className="membership-info flex items-center gap-3">
 											<div
-												className={`w-3 h-3 rounded-full ${
+												className={`membership-color w-4 h-4 rounded ${
 													name === 'Student'
-														? 'bg-yellow-500'
+														? 'bg-[var(--primary-gray)]'
 														: name === 'PROMO Student'
-															? 'bg-orange-500'
-															: 'bg-blue-500'
+															? 'bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)]'
+															: 'bg-gradient-to-br from-[#8B4513] to-[#A0522D]'
 												}`}
 											/>
-											<span className="text-sm">{name}</span>
+											<span className="membership-name font-medium text-[var(--text-primary)]">
+												{name}
+											</span>
 										</div>
-										<div className="flex items-center gap-2">
-											<span className="font-medium">{count}</span>
-											<span className="text-sm text-gray-600 dark:text-gray-400">{percentage}%</span>
+										<div className="membership-stats flex flex-col items-end gap-1">
+											<span className="membership-count font-bold text-[var(--text-primary)] font-['Poppins']">
+												{count}
+											</span>
+											<span className="membership-percentage text-sm text-[var(--text-secondary)]">
+												{percentage}%
+											</span>
 										</div>
 									</div>
 								);
@@ -269,21 +290,25 @@ function StatCard({
 	changeType: 'positive' | 'negative' | 'neutral';
 }) {
 	return (
-		<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-			<div className="flex items-center justify-between mb-4">
-				<div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-					<Icon className="w-6 h-6 text-primary" />
+		<div className="stat-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+			<div className="flex items-center justify-between mb-6">
+				<div className="stat-icon w-14 h-14 rounded-[14px] bg-gradient-to-br from-[rgba(249,197,19,0.15)] to-[rgba(228,30,38,0.1)] flex items-center justify-center text-[1.6rem] text-[var(--primary-yellow)]">
+					<Icon className="w-6 h-6" />
 				</div>
 			</div>
-			<h3 className="text-sm text-gray-600 dark:text-gray-400 mb-1">{title}</h3>
-			<div className="text-2xl font-bold mb-2">{value}</div>
+			<h3 className="text-[0.85rem] font-medium text-[var(--text-secondary)] mb-2 uppercase">
+				{title}
+			</h3>
+			<div className="stat-value text-[2.2rem] font-bold text-[var(--text-primary)] mb-2 font-['Poppins']">
+				{value}
+			</div>
 			<div
-				className={`text-sm ${
+				className={`stat-change text-[0.8rem] font-semibold flex items-center gap-1 ${
 					changeType === 'positive'
-						? 'text-green-600 dark:text-green-400'
+						? 'text-[var(--primary-yellow)]'
 						: changeType === 'negative'
-							? 'text-red-600 dark:text-red-400'
-							: 'text-gray-600 dark:text-gray-400'
+							? 'text-[#EF4444]'
+							: 'text-[var(--text-secondary)]'
 				}`}
 			>
 				{change}
@@ -304,11 +329,10 @@ function QuickActionButton({
 	return (
 		<Link
 			to={href}
-			className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+			className="quick-action-btn flex flex-row items-center justify-center gap-3 p-5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] text-[var(--text-primary)] text-[0.9rem] font-medium"
 		>
-			<Icon className="w-6 h-6 text-primary" />
-			<span className="text-sm font-medium">{label}</span>
+			<Icon className="w-5 h-5 text-[var(--primary-yellow)] flex-shrink-0" />
+			<span className="whitespace-nowrap">{label}</span>
 		</Link>
 	);
 }
-
