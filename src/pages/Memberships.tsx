@@ -1,16 +1,180 @@
 import { useState, useEffect } from 'react';
-import { mockMembershipPlans, type MockMembershipPlan } from '@/lib/mock/data';
+import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { Plus, Eye, Edit, Trash2, CreditCard, Crown } from 'lucide-react';
+import { MembershipFormModal, type MembershipFormData } from '@/components/modals/MembershipFormModal';
+import { MembershipViewModal } from '@/components/modals/MembershipViewModal';
+import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
+import { SuccessModal } from '@/components/modals/SuccessModal';
+import {
+	GET_ALL_MEMBERSHIPS,
+	CREATE_MEMBERSHIP,
+	UPDATE_MEMBERSHIP,
+	DELETE_MEMBERSHIP,
+} from '@/graphql/operations/index';
+import type { Membership } from '@/graphql/generated/types';
+import { useAppDispatch } from '@/store/hooks';
+import { addToast } from '@/store/slices/uiSlice';
 
 export function MembershipsPage() {
 	useEffect(() => {
 		document.title = 'Membership Management - X-TRIM FIT GYM';
 	}, []);
-	const [selectedPlan, setSelectedPlan] = useState<MockMembershipPlan | null>(null);
-	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
-	const plans = Object.values(mockMembershipPlans);
+	const dispatch = useAppDispatch();
+	const [selectedPlan, setSelectedPlan] = useState<Membership | null>(null);
+	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+	const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+	const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+	const [successMessage, setSuccessMessage] = useState('');
+	const [isEditMode, setIsEditMode] = useState(false);
+
+	// GraphQL queries and mutations
+	const { data, loading, error, refetch } = useQuery(GET_ALL_MEMBERSHIPS, {
+		errorPolicy: 'none',
+	});
+
+	const [createMembership, { loading: creating }] = useMutation(CREATE_MEMBERSHIP, {
+		onCompleted: () => {
+			setSuccessMessage('Membership plan created successfully!');
+			setIsSuccessModalOpen(true);
+			setIsFormModalOpen(false);
+			refetch();
+			dispatch(addToast({ type: 'success', message: 'Membership plan created!' }));
+		},
+		onError: (error) => {
+			dispatch(addToast({ type: 'error', message: error.message }));
+		},
+	});
+
+	const [updateMembership, { loading: updating }] = useMutation(UPDATE_MEMBERSHIP, {
+		onCompleted: () => {
+			setSuccessMessage('Membership plan updated successfully!');
+			setIsSuccessModalOpen(true);
+			setIsFormModalOpen(false);
+			refetch();
+			dispatch(addToast({ type: 'success', message: 'Membership plan updated!' }));
+		},
+		onError: (error) => {
+			dispatch(addToast({ type: 'error', message: error.message }));
+		},
+	});
+
+	const [deleteMembership, { loading: deleting }] = useMutation(DELETE_MEMBERSHIP, {
+		onCompleted: () => {
+			setSuccessMessage('Membership plan deleted successfully!');
+			setIsSuccessModalOpen(true);
+			setIsDeleteModalOpen(false);
+			setSelectedPlan(null);
+			refetch();
+			dispatch(addToast({ type: 'success', message: 'Membership plan deleted!' }));
+		},
+		onError: (error) => {
+			dispatch(addToast({ type: 'error', message: error.message }));
+		},
+	});
+
+	const handleCreatePlan = () => {
+		setIsEditMode(false);
+		setSelectedPlan(null);
+		setIsFormModalOpen(true);
+	};
+
+	const handleEditPlan = (plan: Membership) => {
+		setIsEditMode(true);
+		setSelectedPlan(plan);
+		setIsFormModalOpen(true);
+		setIsViewModalOpen(false);
+	};
+
+	const handleDeletePlan = (plan: Membership) => {
+		setSelectedPlan(plan);
+		setIsDeleteModalOpen(true);
+		setIsViewModalOpen(false);
+	};
+
+	const handleFormSubmit = (formData: MembershipFormData) => {
+		if (isEditMode && selectedPlan) {
+			// Update existing plan
+			updateMembership({
+				variables: {
+					id: selectedPlan.id,
+					input: {
+						name: formData.name,
+						monthlyPrice: formData.monthlyPrice,
+						description: formData.description,
+						features: formData.features,
+						status: formData.status.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'COMING_SOON',
+						durationType: formData.durationType.toUpperCase() as 'MONTHLY' | 'QUARTERLY' | 'YEARLY',
+					},
+				},
+			});
+		} else {
+			// Create new plan
+			createMembership({
+				variables: {
+					input: {
+						name: formData.name,
+						monthlyPrice: formData.monthlyPrice,
+						description: formData.description,
+						features: formData.features,
+						status: formData.status.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'COMING_SOON',
+						durationType: formData.durationType.toUpperCase() as 'MONTHLY' | 'QUARTERLY' | 'YEARLY',
+					},
+				},
+			});
+		}
+	};
+
+	const handleConfirmDelete = () => {
+		if (selectedPlan) {
+			deleteMembership({
+				variables: {
+					id: selectedPlan.id,
+				},
+			});
+		}
+	};
+
+	// Show loading state
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary-yellow)] mx-auto mb-4"></div>
+					<p className="text-[var(--text-secondary)]">Loading membership plans...</p>
+				</div>
+			</div>
+		);
+	}
+
+	// Show error state
+	if (error || !data) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="text-red-500 mb-4">
+						<svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Load Membership Plans</h2>
+					<p className="text-[var(--text-secondary)] mb-4">
+						{error?.message || 'Failed to connect to the server'}
+					</p>
+					<button 
+						onClick={() => refetch()} 
+						className="btn-primary"
+					>
+						Retry
+					</button>
+				</div>
+			</div>
+		);
+	}
+
+	const plans: Membership[] = data?.getMemberships || [];
 
 	return (
 		<div className="space-y-6">
@@ -21,10 +185,10 @@ export function MembershipsPage() {
 						Membership Management
 					</h1>
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
-						Manage membership plans, pricing, and features
+						Manage membership plans, pricing, and features ({plans.length} plans)
 					</p>
 				</div>
-				<Button>
+				<Button onClick={handleCreatePlan}>
 					<Plus className="w-4 h-4" />
 					Add New Plan
 				</Button>
@@ -32,7 +196,18 @@ export function MembershipsPage() {
 
 			<div className="plans-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 				{plans.map((plan) => {
-					const isFeatured = plan.count > 0;
+					const isFeatured = plan.name.includes('PROMO');
+					const statusMap: Record<string, string> = {
+						ACTIVE: 'Active',
+						INACTIVE: 'Inactive',
+						COMING_SOON: 'Coming Soon',
+					};
+					const durationMap: Record<string, string> = {
+						MONTHLY: 'month',
+						QUARTERLY: 'quarter',
+						YEARLY: 'year',
+					};
+
 					return (
 						<div
 							key={plan.id}
@@ -56,27 +231,27 @@ export function MembershipsPage() {
 								</div>
 								<span
 									className={`plan-status-badge px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
-										plan.status === 'Active'
+										plan.status === 'ACTIVE'
 											? 'active bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
 											: 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
 									}`}
 								>
-									{plan.status}
+									{statusMap[plan.status] || plan.status}
 								</span>
 							</div>
 							<div className="plan-price flex items-baseline gap-2 mb-4">
 								<span className="plan-price-value text-[2.5rem] font-bold text-[var(--primary-yellow)] font-['Poppins']">
-									₱{plan.price.toLocaleString()}
+									₱{plan.monthlyPrice.toLocaleString()}
 								</span>
 								<span className="plan-price-period text-base text-[var(--text-secondary)] font-medium">
-									/{plan.duration.toLowerCase()}
+									/{durationMap[plan.durationType] || 'month'}
 								</span>
 							</div>
 							<p className="plan-description text-sm text-[var(--text-secondary)] mb-6 leading-relaxed">
 								{plan.description}
 							</p>
 							<ul className="plan-features space-y-3 mb-6">
-								{plan.features.map((feature, idx) => (
+								{plan.features?.map((feature, idx) => (
 									<li
 										key={idx}
 										className="flex items-center gap-3 text-sm text-[var(--text-secondary)] py-3 border-b border-[rgba(255,255,255,0.05)] last:border-0"
@@ -88,24 +263,6 @@ export function MembershipsPage() {
 									</li>
 								))}
 							</ul>
-							<div className="plan-stats flex gap-4 mb-6 p-4 bg-[rgba(255,255,255,0.02)] rounded-xl">
-								<div className="plan-stat flex-1 text-center">
-									<span className="plan-stat-value block text-2xl font-bold text-[var(--primary-yellow)] mb-1">
-										{plan.count}
-									</span>
-									<span className="plan-stat-label text-xs text-[var(--text-secondary)] uppercase tracking-wider">
-										Active Members
-									</span>
-								</div>
-								<div className="plan-stat flex-1 text-center">
-									<span className="plan-stat-value block text-2xl font-bold text-[var(--primary-yellow)] mb-1">
-										₱{(plan.price * plan.count).toLocaleString()}
-									</span>
-									<span className="plan-stat-label text-xs text-[var(--text-secondary)] uppercase tracking-wider">
-										Monthly Revenue
-									</span>
-								</div>
-							</div>
 							<div className="plan-actions flex gap-3">
 								<button
 									onClick={() => {
@@ -117,11 +274,17 @@ export function MembershipsPage() {
 									<Eye className="w-4 h-4" />
 									View
 								</button>
-								<button className="btn-small btn-edit flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)] flex items-center justify-center gap-2">
+								<button
+									onClick={() => handleEditPlan(plan)}
+									className="btn-small btn-edit flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)] flex items-center justify-center gap-2"
+								>
 									<Edit className="w-4 h-4" />
 									Edit
 								</button>
-								<button className="btn-small btn-delete flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] flex items-center justify-center gap-2">
+								<button
+									onClick={() => handleDeletePlan(plan)}
+									className="btn-small btn-delete flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] flex items-center justify-center gap-2"
+								>
 									<Trash2 className="w-4 h-4" />
 									Delete
 								</button>
@@ -131,40 +294,47 @@ export function MembershipsPage() {
 				})}
 			</div>
 
-			{isViewModalOpen && selectedPlan && (
-				<div
-					className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-					onClick={() => setIsViewModalOpen(false)}
-				>
-					<div
-						className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4"
-						onClick={(e) => e.stopPropagation()}
-					>
-						<h2 className="text-2xl font-bold mb-4">Plan Details</h2>
-						<div className="space-y-4">
-							<div>
-								<span className="text-gray-600 dark:text-gray-400">Name:</span>{' '}
-								<span className="font-medium">{selectedPlan.name}</span>
-							</div>
-							<div>
-								<span className="text-gray-600 dark:text-gray-400">Price:</span>{' '}
-								<span className="font-medium">₱{selectedPlan.price.toLocaleString()}</span>
-							</div>
-							<div>
-								<span className="text-gray-600 dark:text-gray-400">Duration:</span>{' '}
-								<span className="font-medium">{selectedPlan.duration}</span>
-							</div>
-							<div>
-								<span className="text-gray-600 dark:text-gray-400">Active Members:</span>{' '}
-								<span className="font-medium">{selectedPlan.count}</span>
-							</div>
-						</div>
-						<Button className="mt-6" onClick={() => setIsViewModalOpen(false)}>
-							Close
-						</Button>
-					</div>
-				</div>
-			)}
+			{/* Modals */}
+			<MembershipViewModal
+				isOpen={isViewModalOpen}
+				onClose={() => {
+					setIsViewModalOpen(false);
+					setSelectedPlan(null);
+				}}
+				membership={selectedPlan}
+				onEdit={() => handleEditPlan(selectedPlan!)}
+			/>
+
+			<MembershipFormModal
+				isOpen={isFormModalOpen}
+				onClose={() => {
+					setIsFormModalOpen(false);
+					setSelectedPlan(null);
+					setIsEditMode(false);
+				}}
+				onSubmit={handleFormSubmit}
+				membership={isEditMode ? selectedPlan : null}
+				isLoading={creating || updating}
+			/>
+
+			<DeleteConfirmModal
+				isOpen={isDeleteModalOpen}
+				onClose={() => {
+					setIsDeleteModalOpen(false);
+					setSelectedPlan(null);
+				}}
+				onConfirm={handleConfirmDelete}
+				title="Delete Membership Plan?"
+				message={`Are you sure you want to delete "${selectedPlan?.name}"? This action cannot be undone.`}
+				isDeleting={deleting}
+			/>
+
+			<SuccessModal
+				isOpen={isSuccessModalOpen}
+				onClose={() => setIsSuccessModalOpen(false)}
+				title="Success!"
+				message={successMessage}
+			/>
 		</div>
 	);
 }

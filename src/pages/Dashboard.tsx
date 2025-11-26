@@ -1,74 +1,106 @@
 import { useEffect } from 'react';
 import { useQuery } from '@apollo/client';
-import { gql } from '@apollo/client';
 import { Link } from 'react-router';
 import { Users, UserCog, DollarSign, CreditCard, BarChart3 } from 'lucide-react';
-import { mockMembers, mockCoaches, mockMembershipPlans } from '@/lib/mock/data';
-import { useAppDispatch } from '@/store/hooks';
-import { addToast } from '@/store/slices/uiSlice';
-
-// GraphQL query (will be replaced with generated types later)
-const GET_DASHBOARD_STATS = gql`
-	query GetDashboardStats {
-		getUsers(role: member) {
-			id
-			firstName
-			lastName
-			email
-		}
-		getUsers(role: coach) {
-			id
-			firstName
-			lastName
-		}
-	}
-`;
+import { GET_DASHBOARD_STATS } from '@/graphql/operations/index';
 
 export function DashboardPage() {
 	useEffect(() => {
 		document.title = 'Admin Dashboard - X-TRIM FIT GYM';
 	}, []);
 
-	const dispatch = useAppDispatch();
 	const { data, loading, error } = useQuery(GET_DASHBOARD_STATS, {
-		errorPolicy: 'all',
+		errorPolicy: 'none',
+		pollInterval: 30000, // Refresh every 30 seconds
 	});
 
-	// Use mock data if API fails or in dev mode
-	const useMock = import.meta.env.VITE_USE_MOCK === 'true' || error || !data;
+	// Show loading state
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary-yellow)] mx-auto mb-4"></div>
+					<p className="text-[var(--text-secondary)]">Loading dashboard...</p>
+				</div>
+			</div>
+		);
+	}
 
-	const members = useMock ? Object.values(mockMembers) : [];
-	const coaches = useMock ? Object.values(mockCoaches) : [];
-	const plans = mockMembershipPlans;
+	// Show error state
+	if (error || !data) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="text-red-500 mb-4">
+						<svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Load Dashboard</h2>
+					<p className="text-[var(--text-secondary)] mb-4">
+						{error?.message || 'Failed to connect to the server'}
+					</p>
+					<button 
+						onClick={() => window.location.reload()} 
+						className="btn-primary"
+					>
+						Retry
+					</button>
+				</div>
+			</div>
+		);
+	}
+
+	const members = (data?.members || []).map((m: any) => ({
+		id: m.id,
+		name: `${m.firstName} ${m.lastName}`,
+		email: m.email,
+		phone: m.phoneNumber || 'N/A',
+		membership: m.membershipDetails?.membershipTransaction?.membership?.name || 'No Plan',
+		status: m.membershipDetails?.membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive',
+		joinDate: m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A',
+		avatar: `${m.firstName?.[0] || ''}${m.lastName?.[0] || ''}`,
+		progress: {
+			weightLost: 0,
+			workoutsCompleted: 0,
+		},
+	}));
+
+	const coaches = (data?.coaches || []).map((c: any) => ({
+		id: c.id,
+		name: `${c.firstName} ${c.lastName}`,
+		email: c.email,
+		phone: c.phoneNumber || 'N/A',
+		specialization: c.coachDetails?.specialization?.[0] || 'General Fitness',
+		yearsExperience: c.coachDetails?.yearsOfExperience?.toString() || '0',
+		status: 'Active',
+		avatar: `${c.firstName?.[0] || ''}${c.lastName?.[0] || ''}`,
+		totalClients: c.coachDetails?.clientsIds?.length || 0,
+		rating: c.coachDetails?.ratings || 5.0,
+	}));
 
 	// Calculate stats
 	const totalMembers = members.length;
 	const totalCoaches = coaches.length;
-	const monthlyRevenue = Object.values(plans).reduce(
-		(sum, plan) => sum + plan.price * plan.count,
-		0
-	);
 	const activeSubscriptions = members.filter((m) => m.status === 'Active').length;
+	// TODO: Get actual revenue from membership transactions API
+	const monthlyRevenue = activeSubscriptions * 50; // Placeholder calculation
 
-	// Recent members (last 3)
+	// Recent members (last 3) - sort by join date
 	const recentMembers = [...members]
 		.sort((a, b) => {
-			const dates: Record<string, number> = {
-				'November 2024': 3,
-				'October 2024': 2,
-				'September 2024': 1,
-				'June 2024': 0,
-			};
-			return (dates[b.joinDate] || 0) - (dates[a.joinDate] || 0);
+			const dateA = new Date(data.members.find((m: any) => m.id === a.id)?.createdAt || 0).getTime();
+			const dateB = new Date(data.members.find((m: any) => m.id === b.id)?.createdAt || 0).getTime();
+			return dateB - dateA;
 		})
 		.slice(0, 3);
 
-	// Membership distribution
-	const membershipDistribution = {
-		Student: members.filter((m) => m.membership === 'Student').length,
-		'PROMO Student': members.filter((m) => m.membership === 'PROMO Student').length,
-		'Non student': members.filter((m) => m.membership === 'Non student').length,
-	};
+	// Membership distribution - group by actual membership names
+	const membershipTypes = [...new Set(members.map(m => m.membership))];
+	const membershipDistribution: Record<string, number> = {};
+	membershipTypes.forEach(type => {
+		membershipDistribution[type] = members.filter((m) => m.membership === type).length;
+	});
 
 	return (
 		<div className="space-y-6">

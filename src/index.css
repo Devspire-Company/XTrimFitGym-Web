@@ -12,60 +12,60 @@
 	--primary-red: #e41e26;
 	--primary-yellow: #f9c513;
 	--primary-gray: #6a7b94;
-
+	
 	/* Background Colors */
 	--bg-dark: #1a1d29;
 	--bg-darker: #13161f;
 	--bg-light: #22252f;
-
+	
 	/* Card Colors */
 	--card-bg: rgba(255, 255, 255, 0.06);
 	--card-border: rgba(255, 255, 255, 0.1);
-
+	
 	/* Text Colors */
 	--text-primary: #ffffff;
 	--text-secondary: #b8bcc8;
-
+	
 	/* Transitions */
 	--transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
+	
 	/* Radius */
 	--radius: 0.625rem;
-
+	
 	/* Shadcn Colors - Dark Theme */
 	--background: var(--bg-darker);
 	--foreground: var(--text-primary);
-
+	
 	--card: var(--card-bg);
 	--card-foreground: var(--text-primary);
-
+	
 	--popover: var(--bg-dark);
 	--popover-foreground: var(--text-primary);
-
+	
 	--primary: var(--primary-yellow);
 	--primary-foreground: #1a1a1a;
-
+	
 	--secondary: rgba(255, 255, 255, 0.05);
 	--secondary-foreground: var(--text-primary);
-
+	
 	--muted: rgba(255, 255, 255, 0.03);
 	--muted-foreground: var(--text-secondary);
-
+	
 	--accent: rgba(249, 197, 19, 0.1);
 	--accent-foreground: var(--primary-yellow);
-
+	
 	--destructive: #ef4444;
-
+	
 	--border: var(--card-border);
 	--input: var(--card-bg);
 	--ring: var(--primary-yellow);
-
+	
 	--chart-1: var(--primary-red);
 	--chart-2: var(--primary-yellow);
 	--chart-3: var(--primary-gray);
 	--chart-4: #10b981;
 	--chart-5: #3b82f6;
-
+	
 	--sidebar: var(--bg-darker);
 	--sidebar-foreground: var(--text-primary);
 	--sidebar-primary: var(--primary-yellow);
@@ -81,7 +81,7 @@
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);
 	--radius-xl: calc(var(--radius) + 4px);
-
+	
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
@@ -119,7 +119,7 @@
 	* {
 		@apply border-border outline-ring/50;
 	}
-
+	
 	body {
 		@apply bg-background text-foreground;
 		font-family: 'Inter', sans-serif;
@@ -129,7 +129,7 @@
 		min-height: 100vh;
 		-webkit-font-smoothing: antialiased;
 	}
-
+	
 	h1,
 	h2,
 	h3,
@@ -138,6 +138,270 @@
 	h6 {
 		font-family: 'Poppins', sans-serif;
 	}
+}
+
+/* Membership Modal Styles */
+.membership-details {
+	display: flex;
+	flex-direction: column;
+	gap: 2rem;
+}
+
+.detail-section h3 {
+	color: var(--text-primary);
+	font-size: 1.1rem;
+	font-weight: 600;
+	margin-bottom: 1rem;
+	padding-bottom: 0.5rem;
+	border-bottom: 2px solid var(--card-border);
+}
+
+.detail-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 1.5rem;
+}
+
+.detail-item label {
+	display: block;
+	color: var(--text-secondary);
+	font-size: 0.875rem;
+	font-weight: 500;
+	margin-bottom: 0.5rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.detail-item p {
+	color: var(--text-primary);
+	font-size: 1rem;
+	margin: 0;
+}
+
+.detail-item .price-value {
+	color: var(--primary-yellow);
+	font-size: 1.5rem;
+	font-weight: 700;
+}
+
+.features-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.features-list li {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	color: var(--text-primary);
+	padding: 0.75rem;
+	background: var(--card-bg);
+	border-radius: var(--border-radius);
+	border: 1px solid var(--card-border);
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.features-list li:hover {
+	background: rgba(255, 255, 255, 0.05);
+	border-color: var(--primary-yellow);
+	transform: translateX(5px);
+}
+
+.features-list li svg {
+	flex-shrink: 0;
+}
+
+.features-list li span {
+	flex: 1;
+}
+
+.subscription-summary {
+	background: var(--card-bg);
+	border: 1px solid var(--card-border);
+	border-radius: var(--border-radius);
+	padding: 1.5rem;
+	margin: 1.5rem 0;
+}
+
+.summary-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0.75rem 0;
+	border-bottom: 1px solid var(--card-border);
+}
+
+.summary-item:last-child {
+	border-bottom: none;
+}
+
+.summary-item span {
+	color: var(--text-secondary);
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.summary-item strong {
+	color: var(--text-primary);
+}
+
+.features-preview {
+	background: rgba(255, 255, 255, 0.02);
+	border: 1px solid var(--card-border);
+	border-radius: var(--border-radius);
+	padding: 1.5rem;
+}
+
+.features-preview h4 {
+	color: var(--text-primary);
+	font-size: 0.95rem;
+	font-weight: 600;
+	margin: 0;
+}
+
+.modal-actions {
+	display: flex;
+	gap: 1rem;
+}
+
+/* Current Subscription Card Styles */
+.current-subscription-card {
+	background: linear-gradient(135deg, rgba(249, 197, 19, 0.05), rgba(220, 38, 38, 0.05));
+	border: 2px solid var(--card-border);
+	border-radius: var(--border-radius);
+	padding: 2rem;
+}
+
+.subscription-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: start;
+	margin-bottom: 2rem;
+	padding-bottom: 1.5rem;
+	border-bottom: 2px solid var(--card-border);
+}
+
+.subscription-plan-name {
+	font-size: 2rem;
+	font-weight: 700;
+	color: var(--text-primary);
+	margin: 0;
+	background: linear-gradient(135deg, var(--primary-red), var(--primary-yellow));
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+}
+
+.subscription-duration {
+	color: var(--text-secondary);
+	margin-top: 0.5rem;
+}
+
+.subscription-details {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 1.5rem;
+	margin-bottom: 2rem;
+}
+
+.detail-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.detail-label {
+	color: var(--text-secondary);
+	font-size: 0.875rem;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.detail-value {
+	color: var(--text-primary);
+	font-size: 1.1rem;
+	font-weight: 600;
+}
+
+.detail-value.highlight {
+	color: var(--primary-yellow);
+	font-size: 1.5rem;
+	font-weight: 700;
+}
+
+.detail-value.price {
+	color: var(--primary-yellow);
+	font-size: 1.5rem;
+	font-weight: 700;
+}
+
+.subscription-features {
+	background: rgba(255, 255, 255, 0.02);
+	border: 1px solid var(--card-border);
+	border-radius: var(--border-radius);
+	padding: 1.5rem;
+	margin-bottom: 1.5rem;
+}
+
+.subscription-features h4 {
+	color: var(--text-primary);
+	font-size: 1rem;
+	font-weight: 600;
+	margin: 0 0 1rem 0;
+}
+
+.subscription-features ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.subscription-features ul li {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	color: var(--text-primary);
+}
+
+.no-subscription {
+	text-align: center;
+	padding: 3rem 2rem;
+	color: var(--text-secondary);
+}
+
+.no-subscription h3 {
+	color: var(--text-primary);
+	font-size: 1.5rem;
+	font-weight: 600;
+	margin: 1rem 0 0.5rem;
+}
+
+.no-subscription p {
+	margin: 0.5rem 0;
+	line-height: 1.6;
+}
+
+.plan-card.current-plan {
+	border: 2px solid var(--primary-yellow);
+	background: linear-gradient(135deg, rgba(249, 197, 19, 0.1), rgba(220, 38, 38, 0.05));
+}
+
+.plan-card .plan-badge.current {
+	background: var(--primary-yellow);
+	color: #000;
+	border: none;
 }
 
 /* Custom Scrollbar - Matching Admin Design */

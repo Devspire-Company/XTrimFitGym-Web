@@ -1,26 +1,109 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router';
-import { mockMembers, type MockMember } from '@/lib/mock/data';
+import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { Search, Plus, Eye, Edit, Trash2, Users, X } from 'lucide-react';
+import { GET_ALL_MEMBERS, DELETE_USER } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
+
+interface Member {
+	id: string;
+	name: string;
+	firstName: string;
+	middleName?: string;
+	lastName: string;
+	email: string;
+	phone: string;
+	membership: string;
+	status: string;
+	joinDate: string;
+	avatar: string;
+	dateOfBirth: string;
+	gender: string;
+	address: string;
+	emergencyContact: string;
+	medicalConditions: string;
+	fitnessGoals: string;
+	progress: {
+		weightLost: number;
+		workoutsCompleted: number;
+	};
+}
 
 export function MembersPage() {
 	useEffect(() => {
 		document.title = 'Member Management - X-TRIM FIT GYM';
 	}, []);
+
 	const dispatch = useAppDispatch();
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState<string>('all');
 	const [membershipFilter, setMembershipFilter] = useState<string>('all');
-	const [selectedMember, setSelectedMember] = useState<MockMember | null>(null);
+	const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 	const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
+	// GraphQL queries and mutations
+	const { data, loading, error, refetch } = useQuery(GET_ALL_MEMBERS, {
+		errorPolicy: 'none',
+	});
+
+	const [deleteUserMutation] = useMutation(DELETE_USER, {
+		onCompleted: () => {
+			dispatch(
+				addToast({
+					type: 'success',
+					message: 'Member deleted successfully',
+				})
+			);
+			refetch();
+		},
+		onError: (error) => {
+			dispatch(
+				addToast({
+					type: 'error',
+					message: error.message || 'Failed to delete member',
+				})
+			);
+		},
+	});
+
+	// Transform API data
+	const apiMembers: Member[] = (data?.getUsers || []).map((m: any) => {
+		const membership = m.membershipDetails?.membershipTransaction?.membership?.name || 'No Plan';
+		const status = m.membershipDetails?.membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive';
+		const joinDate = m.createdAt
+			? new Date(m.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+			: 'N/A';
+		
+		return {
+			id: m.id,
+			name: `${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`,
+			firstName: m.firstName,
+			middleName: m.middleName,
+			lastName: m.lastName,
+			email: m.email,
+			phone: m.phoneNumber || 'N/A',
+			membership,
+			status,
+			joinDate,
+			avatar: `${m.firstName?.[0] || ''}${m.lastName?.[0] || ''}`,
+			dateOfBirth: m.dateOfBirth || 'N/A',
+			gender: m.gender || 'N/A',
+			address: 'N/A', // Not in API schema
+			emergencyContact: 'N/A', // Not in API schema
+			medicalConditions: 'None', // Not in API schema
+			fitnessGoals: m.membershipDetails?.fitnessGoal?.join(', ') || 'N/A',
+			progress: {
+				weightLost: 0, // Would need session logs from API
+				workoutsCompleted: 0, // Would need session logs from API
+			},
+		};
+	});
+
 	const filteredMembers = useMemo(() => {
-		return Object.values(mockMembers).filter((member) => {
+		return apiMembers.filter((member) => {
 			const matchesSearch =
 				!searchTerm ||
 				member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -31,7 +114,7 @@ export function MembersPage() {
 				membershipFilter === 'all' || member.membership === membershipFilter;
 			return matchesSearch && matchesStatus && matchesMembership;
 		});
-	}, [searchTerm, statusFilter, membershipFilter]);
+	}, [apiMembers, searchTerm, statusFilter, membershipFilter]);
 
 	const handleView = (member: MockMember) => {
 		setSelectedMember(member);
@@ -48,13 +131,56 @@ export function MembersPage() {
 		setIsDeleteModalOpen(true);
 	};
 
-	const confirmDelete = () => {
+	const confirmDelete = async () => {
 		if (selectedMember) {
-			dispatch(addToast({ message: `Member ${selectedMember.name} deleted`, type: 'success' }));
-			setIsDeleteModalOpen(false);
-			setSelectedMember(null);
+			try {
+				await deleteUserMutation({
+					variables: { id: selectedMember.id },
+				});
+				setIsDeleteModalOpen(false);
+				setSelectedMember(null);
+			} catch (err) {
+				console.error('Error deleting member:', err);
+			}
 		}
 	};
+
+	// Show loading state
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary-yellow)] mx-auto mb-4"></div>
+					<p className="text-[var(--text-secondary)]">Loading members...</p>
+				</div>
+			</div>
+		);
+	}
+
+	// Show error state
+	if (error || !data) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="text-red-500 mb-4">
+						<svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Load Members</h2>
+					<p className="text-[var(--text-secondary)] mb-4">
+						{error?.message || 'Failed to connect to the server'}
+					</p>
+					<button 
+						onClick={() => refetch()} 
+						className="btn-primary"
+					>
+						Retry
+					</button>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-6">
@@ -66,7 +192,7 @@ export function MembersPage() {
 						Member Management
 					</h1>
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
-						Manage all gym members, view details, and update information
+						Manage all gym members, view details, and update information ({apiMembers.length} total)
 					</p>
 				</div>
 				<Button>
@@ -290,7 +416,7 @@ function MemberViewModal({
 	onClose,
 	onEdit,
 }: {
-	member: MockMember;
+	member: Member;
 	onClose: () => void;
 	onEdit: () => void;
 }) {

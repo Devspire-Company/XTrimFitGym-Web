@@ -1,5 +1,5 @@
 import { useMemo, useEffect } from 'react';
-import { mockMembers, mockCoaches, mockMembershipPlans } from '@/lib/mock/data';
+import { useQuery } from '@apollo/client';
 import {
 	Chart as ChartJS,
 	CategoryScale,
@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { BarChart3, DollarSign, Users, UserCog, Dumbbell } from 'lucide-react';
+import { GET_DASHBOARD_STATS } from '@/graphql/operations/index';
 
 ChartJS.register(
 	CategoryScale,
@@ -32,21 +33,73 @@ export function ReportsPage() {
 		document.title = 'Reports & Analytics - X-TRIM FIT GYM';
 	}, []);
 
-	const members = Object.values(mockMembers);
-	const coaches = Object.values(mockCoaches);
-	const plans = mockMembershipPlans;
+	// Fetch real data from API
+	const { data, loading, error, refetch } = useQuery(GET_DASHBOARD_STATS, {
+		errorPolicy: 'none',
+	});
 
-	const totalRevenue = useMemo(() => {
-		return Object.values(plans).reduce((sum, plan) => sum + plan.price * plan.count, 0);
-	}, [plans]);
+	// Show loading state
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary-yellow)] mx-auto mb-4"></div>
+					<p className="text-[var(--text-secondary)]">Loading reports...</p>
+				</div>
+			</div>
+		);
+	}
 
-	const totalWorkouts = useMemo(() => {
-		return members.reduce((sum, m) => sum + m.progress.workoutsCompleted, 0);
-	}, [members]);
+	// Show error state
+	if (error || !data) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="text-red-500 mb-4">
+						<svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Load Reports</h2>
+					<p className="text-[var(--text-secondary)] mb-4">
+						{error?.message || 'Failed to connect to the server'}
+					</p>
+					<button 
+						onClick={() => refetch()} 
+						className="btn-primary"
+					>
+						Retry
+					</button>
+				</div>
+			</div>
+		);
+	}
 
-	const totalWeightLost = useMemo(() => {
-		return members.reduce((sum, m) => sum + m.progress.weightLost, 0);
-	}, [members]);
+	const members = (data?.members || []).map((m: any) => ({
+		id: m.id,
+		name: `${m.firstName} ${m.lastName}`,
+		status: m.membershipDetails?.membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive',
+		membership: m.membershipDetails?.membershipTransaction?.membership?.name || 'No Plan',
+		joinDate: m.createdAt || new Date().toISOString(),
+	}));
+
+	const coaches = (data?.coaches || []).map((c: any) => ({
+		id: c.id,
+		name: `${c.firstName} ${c.lastName}`,
+		specialization: c.coachDetails?.specialization?.[0] || 'General Fitness',
+	}));
+
+	const totalMembers = members.length;
+	const activeMembers = members.filter((m: any) => m.status === 'Active').length;
+	const totalRevenue = activeMembers * 50; // Placeholder calculation
+	const totalWorkouts = 0; // Would need session logs from API
+	const totalWeightLost = 0; // Would need session logs from API
+
+	// Group members by membership type
+	const membershipTypes = members.reduce((acc: any, m: any) => {
+		acc[m.membership] = (acc[m.membership] || 0) + 1;
+		return acc;
+	}, {});
 
 	const revenueData = {
 		labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
@@ -62,25 +115,38 @@ export function ReportsPage() {
 	};
 
 	const membershipData = {
-		labels: Object.keys(plans),
+		labels: Object.keys(membershipTypes),
 		datasets: [
 			{
-				data: Object.values(plans).map((p) => p.count),
-				backgroundColor: ['#F9C513', '#E41E26', '#10B981'],
+				data: Object.values(membershipTypes),
+				backgroundColor: ['#F9C513', '#E41E26', '#10B981', '#3B82F6'],
 			},
 		],
 	};
 
-	const memberGrowthData = {
-		labels: ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
-		datasets: [
-			{
-				label: 'New Members',
-				data: [1, 1, 1, 2, 3, 4],
-				backgroundColor: 'rgba(249, 197, 19, 0.8)',
-			},
-		],
-	};
+	// Group members by month for growth data
+	const memberGrowthData = useMemo(() => {
+		const months = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'];
+		const counts = months.map((_, i) => {
+			const date = new Date();
+			date.setMonth(date.getMonth() - (5 - i));
+			return members.filter((m: any) => {
+				const joinDate = new Date(m.joinDate);
+				return joinDate.getMonth() === date.getMonth() && joinDate.getFullYear() === date.getFullYear();
+			}).length;
+		});
+
+		return {
+			labels: months,
+			datasets: [
+				{
+					label: 'New Members',
+					data: counts,
+					backgroundColor: 'rgba(249, 197, 19, 0.8)',
+				},
+			],
+		};
+	}, [members]);
 
 	return (
 		<div className="space-y-6">
@@ -121,8 +187,8 @@ export function ReportsPage() {
 				/>
 				<SummaryCard
 					icon={Dumbbell}
-					title="Total Workouts"
-					value={totalWorkouts}
+					title="Active Members"
+					value={activeMembers}
 					change="+18%"
 					changeType="positive"
 				/>

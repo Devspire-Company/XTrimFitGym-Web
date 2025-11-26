@@ -1,5 +1,7 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { AdminLayout } from '@/components/layout/AdminLayout';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { LoginPage } from '@/pages/Login';
 import { DashboardPage } from '@/pages/Dashboard';
 import { MembersPage } from '@/pages/Members';
 import { CoachesPage } from '@/pages/Coaches';
@@ -9,13 +11,21 @@ import { SettingsPage } from '@/pages/Settings';
 
 export const router = createBrowserRouter([
 	{
+		path: '/login',
+		element: <LoginPage />,
+	},
+	{
 		path: '/',
-		element: <AdminLayout />,
+		element: (
+			<ProtectedRoute>
+				<AdminLayout />
+			</ProtectedRoute>
+		),
 		errorElement: <div>Error occurred</div>,
 		children: [
 			{
 				index: true,
-				element: <DashboardPage />,
+				element: <Navigate to="/dashboard" replace />,
 			},
 			{
 				path: 'dashboard',

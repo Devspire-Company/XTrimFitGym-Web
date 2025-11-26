@@ -1,0 +1,50 @@
+# Membership Queries
+query GetAllMemberships {
+	getMemberships {
+		id
+		name
+		monthlyPrice
+		description
+		features
+		status
+		durationType
+		createdAt
+		updatedAt
+	}
+}
+
+query GetActiveMemberships {
+	getMemberships(status: ACTIVE) {
+		id
+		name
+		monthlyPrice
+		description
+		features
+		status
+		durationType
+		createdAt
+		updatedAt
+	}
+}
+
+query GetCurrentMembership {
+	getCurrentMembership {
+		id
+		clientId
+		membershipId
+		membership {
+			id
+			name
+			monthlyPrice
+			description
+			features
+			durationType
+		}
+		priceAtPurchase
+		startedAt
+		expiresAt
+		status
+		createdAt
+		updatedAt
+	}
+}

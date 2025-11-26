@@ -1,0 +1,215 @@
+query GetUsers($role: RoleType) {
+	getUsers(role: $role) {
+		id
+		firstName
+		middleName
+		lastName
+		email
+		role
+		phoneNumber
+		dateOfBirth
+		gender
+		heardFrom
+		membershipDetails {
+			membershipId
+			physiqueGoalType
+			fitnessGoal
+			workOutTime
+			coachesIds
+			hasEnteredDetails
+			membershipTransaction {
+				id
+				membershipId
+				priceAtPurchase
+				startedAt
+				expiresAt
+				status
+			}
+		}
+		coachDetails {
+			clientsIds
+			sessionsIds
+			specialization
+			ratings
+			yearsOfExperience
+			moreDetails
+			teachingDate
+			teachingTime
+			clientLimit
+		}
+		createdAt
+		updatedAt
+	}
+}
+
+query GetUser($id: ID!) {
+	getUser(id: $id) {
+		id
+		firstName
+		middleName
+		lastName
+		email
+		role
+		phoneNumber
+		dateOfBirth
+		gender
+		heardFrom
+		membershipDetails {
+			membershipId
+			physiqueGoalType
+			fitnessGoal
+			workOutTime
+			coachesIds
+			hasEnteredDetails
+			membershipTransaction {
+				id
+				membershipId
+				priceAtPurchase
+				startedAt
+				expiresAt
+				status
+			}
+		}
+		coachDetails {
+			clientsIds
+			sessionsIds
+			specialization
+			ratings
+			yearsOfExperience
+			moreDetails
+			teachingDate
+			teachingTime
+			clientLimit
+		}
+		createdAt
+		updatedAt
+	}
+}
+
+mutation Login($input: LoginInput!) {
+	login(input: $input) {
+		user {
+			id
+			firstName
+			middleName
+			lastName
+			email
+			role
+			phoneNumber
+			dateOfBirth
+			gender
+		}
+		token
+	}
+}
+
+mutation CreateUser($input: CreateUserInput!) {
+	createUser(input: $input) {
+		user {
+			id
+			firstName
+			middleName
+			lastName
+			email
+			role
+			phoneNumber
+			dateOfBirth
+			gender
+		}
+		token
+	}
+}
+
+mutation UpdateUser($id: ID!, $input: UpdateUserInput!) {
+	updateUser(id: $id, input: $input) {
+		id
+		firstName
+		middleName
+		lastName
+		email
+		phoneNumber
+		dateOfBirth
+		gender
+		membershipDetails {
+			membershipId
+			physiqueGoalType
+			fitnessGoal
+			workOutTime
+			coachesIds
+			hasEnteredDetails
+		}
+		coachDetails {
+			clientsIds
+			sessionsIds
+			specialization
+			ratings
+			yearsOfExperience
+			moreDetails
+			teachingDate
+			teachingTime
+			clientLimit
+		}
+		updatedAt
+	}
+}
+
+mutation DeleteUser($id: ID!) {
+	deleteUser(id: $id)
+}
+
+mutation CreateMembership($input: CreateMembershipInput!) {
+	createMembership(input: $input) {
+		id
+		name
+		monthlyPrice
+		description
+		features
+		status
+		durationType
+		createdAt
+		updatedAt
+	}
+}
+
+mutation UpdateMembership($id: ID!, $input: UpdateMembershipInput!) {
+	updateMembership(id: $id, input: $input) {
+		id
+		name
+		monthlyPrice
+		description
+		features
+		status
+		durationType
+		updatedAt
+	}
+}
+
+mutation DeleteMembership($id: ID!) {
+	deleteMembership(id: $id)
+}
+
+mutation PurchaseMembership($input: PurchaseMembershipInput!) {
+	purchaseMembership(input: $input) {
+		id
+		clientId
+		membershipId
+		membership {
+			id
+			name
+			monthlyPrice
+			description
+			features
+		}
+		priceAtPurchase
+		startedAt
+		expiresAt
+		status
+		createdAt
+		updatedAt
+	}
+}
+
+mutation CancelMembership($transactionId: ID!) {
+	cancelMembership(transactionId: $transactionId)
+}
+

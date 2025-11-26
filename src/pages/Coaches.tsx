@@ -1,21 +1,79 @@
 import { useState, useMemo, useEffect } from 'react';
-import { mockCoaches, type MockCoach } from '@/lib/mock/data';
+import { useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { Search, Plus, Eye, Edit, Trash2, UserCog } from 'lucide-react';
-import { useAppDispatch } from '@/store/hooks';
-import { addToast } from '@/store/slices/uiSlice';
+import { GET_ALL_COACHES } from '@/graphql/operations/index';
+
+interface Coach {
+	id: string;
+	name: string;
+	firstName: string;
+	middleName?: string;
+	lastName: string;
+	email: string;
+	phone: string;
+	specialization: string;
+	yearsExperience: string;
+	status: string;
+	avatar: string;
+	totalClients: number;
+	rating: number;
+	dateOfBirth: string;
+	gender: string;
+	certifications: string[];
+	achievements: string[];
+	bio: string;
+	teachingDate: string[];
+	teachingTime: string[];
+	clientLimit: number;
+}
 
 export function CoachesPage() {
 	useEffect(() => {
 		document.title = 'Coach Management - X-TRIM FIT GYM';
 	}, []);
-	const dispatch = useAppDispatch();
+
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState<string>('all');
 	const [specializationFilter, setSpecializationFilter] = useState<string>('all');
 
+	// GraphQL queries and mutations
+	const { data, loading, error, refetch } = useQuery(GET_ALL_COACHES, {
+		errorPolicy: 'none',
+	});
+
+	// Transform API data
+	const apiCoaches: Coach[] = (data?.getUsers || []).map((c: any) => {
+		const specialization = c.coachDetails?.specialization?.[0] || 'General Fitness';
+		const yearsExperience = c.coachDetails?.yearsOfExperience?.toString() || '0';
+		
+		return {
+			id: c.id,
+			name: `${c.firstName} ${c.middleName ? c.middleName + ' ' : ''}${c.lastName}`,
+			firstName: c.firstName,
+			middleName: c.middleName,
+			lastName: c.lastName,
+			email: c.email,
+			phone: c.phoneNumber || 'N/A',
+			specialization,
+			yearsExperience,
+			status: 'Active',
+			avatar: `${c.firstName?.[0] || ''}${c.lastName?.[0] || ''}`,
+			totalClients: c.coachDetails?.clientsIds?.length || 0,
+			rating: c.coachDetails?.ratings || 5.0,
+			dateOfBirth: c.dateOfBirth || 'N/A',
+			gender: c.gender || 'N/A',
+			certifications: [], // Not in API schema
+			achievements: [], // Not in API schema
+			bio: c.coachDetails?.moreDetails || 'No bio available',
+			teachingDate: c.coachDetails?.teachingDate || [],
+			teachingTime: c.coachDetails?.teachingTime || [],
+			clientLimit: c.coachDetails?.clientLimit || 0,
+		};
+	});
+
 	const filteredCoaches = useMemo(() => {
-		return Object.values(mockCoaches).filter((coach) => {
+		return apiCoaches.filter((coach) => {
 			const matchesSearch =
 				!searchTerm ||
 				coach.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -26,7 +84,44 @@ export function CoachesPage() {
 				specializationFilter === 'all' || coach.specialization === specializationFilter;
 			return matchesSearch && matchesStatus && matchesSpecialization;
 		});
-	}, [searchTerm, statusFilter, specializationFilter]);
+	}, [apiCoaches, searchTerm, statusFilter, specializationFilter]);
+
+	// Show loading state
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary-yellow)] mx-auto mb-4"></div>
+					<p className="text-[var(--text-secondary)]">Loading coaches...</p>
+				</div>
+			</div>
+		);
+	}
+
+	// Show error state
+	if (error || !data) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="text-red-500 mb-4">
+						<svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Load Coaches</h2>
+					<p className="text-[var(--text-secondary)] mb-4">
+						{error?.message || 'Failed to connect to the server'}
+					</p>
+					<button 
+						onClick={() => refetch()} 
+						className="btn-primary"
+					>
+						Retry
+					</button>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-6">
@@ -37,7 +132,7 @@ export function CoachesPage() {
 						Coach Management
 					</h1>
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
-						Manage all gym coaches, view details, and update information
+						Manage all gym coaches, view details, and update information ({apiCoaches.length} total)
 					</p>
 				</div>
 				<Button>

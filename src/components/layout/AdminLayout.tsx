@@ -1,9 +1,7 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { toggleSidebar } from '@/store/slices/uiSlice';
 import { logout } from '@/store/slices/authSlice';
 import { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import {
 	Home,
 	Users,
@@ -28,7 +26,8 @@ export function AdminLayout() {
 
 	const handleLogout = () => {
 		dispatch(logout());
-		window.location.href = '/';
+		setLogoutModalOpen(false);
+		navigate('/login');
 	};
 
 	const navItems = [

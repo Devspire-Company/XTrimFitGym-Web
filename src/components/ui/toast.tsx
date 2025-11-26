@@ -52,27 +52,27 @@ function Toast({
 	return (
 		<div
 			className={cn(
-				'flex items-center gap-3 p-4 rounded-lg shadow-lg border bg-white dark:bg-gray-800 animate-in slide-in-from-right',
+				'flex items-center gap-3 p-4 rounded-lg shadow-lg border backdrop-blur-[10px] animate-in slide-in-from-right',
 				{
-					'border-green-200 dark:border-green-800': toast.type === 'success',
-					'border-red-200 dark:border-red-800': toast.type === 'error',
-					'border-yellow-200 dark:border-yellow-800': toast.type === 'warning',
-					'border-blue-200 dark:border-blue-800': toast.type === 'info',
+					'bg-[rgba(16,185,129,0.15)] border-[rgba(16,185,129,0.3)]': toast.type === 'success',
+					'bg-[rgba(239,68,68,0.15)] border-[rgba(239,68,68,0.3)]': toast.type === 'error',
+					'bg-[rgba(249,197,19,0.15)] border-[rgba(249,197,19,0.3)]': toast.type === 'warning',
+					'bg-[rgba(59,130,246,0.15)] border-[rgba(59,130,246,0.3)]': toast.type === 'info',
 				}
 			)}
 		>
 			<Icon
 				className={cn('w-5 h-5 shrink-0', {
-					'text-green-600 dark:text-green-400': toast.type === 'success',
-					'text-red-600 dark:text-red-400': toast.type === 'error',
-					'text-yellow-600 dark:text-yellow-400': toast.type === 'warning',
-					'text-blue-600 dark:text-blue-400': toast.type === 'info',
+					'text-[#10B981]': toast.type === 'success',
+					'text-[#EF4444]': toast.type === 'error',
+					'text-[var(--primary-yellow)]': toast.type === 'warning',
+					'text-[#3B82F6]': toast.type === 'info',
 				})}
 			/>
-			<p className="flex-1 text-sm font-medium">{toast.message}</p>
+			<p className="flex-1 text-sm font-medium text-[var(--text-primary)]">{toast.message}</p>
 			<button
 				onClick={onClose}
-				className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+				className="shrink-0 p-1 rounded hover:bg-[rgba(255,255,255,0.1)] transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
 			>
 				<X className="w-4 h-4" />
 			</button>
