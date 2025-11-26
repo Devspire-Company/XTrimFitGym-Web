@@ -44,7 +44,7 @@ export function SettingsPage() {
 	return (
 		<div className="settings-layout flex min-h-[calc(100vh-80px)]">
 			{/* Sidebar */}
-			<aside className="settings-sidebar w-80 bg-[var(--card-bg)] border-r border-[var(--card-border)] py-10 flex flex-col sticky top-20 h-[calc(100vh-80px)] overflow-y-auto backdrop-blur-[10px]">
+			<aside className="settings-sidebar w-80 bg-[var(--card-bg)] border-r border-[var(--card-border)] py-10 flex flex-col sticky top-20 h-[calc(100vh-80px)] overflow-y-auto backdrop-blur-md">
 				<div className="profile-section px-8 pb-8 border-b border-[var(--card-border)] mb-6 text-center">
 					<div className="profile-picture-wrapper relative inline-block mb-4">
 						<div className="profile-picture w-25 h-25 rounded-full bg-gradient-to-br from-[var(--primary-yellow)] to-[#E6B800] flex items-center justify-center text-3xl font-semibold text-[#1a1a1a] mx-auto">

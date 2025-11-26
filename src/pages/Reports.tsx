@@ -196,7 +196,7 @@ export function ReportsPage() {
 
 			{/* Charts */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+				<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 					<h2 className="text-xl font-semibold mb-4 text-[var(--text-primary)] font-['Poppins']">
 						Revenue Trends
 					</h2>
@@ -204,7 +204,7 @@ export function ReportsPage() {
 						<Line data={revenueData} options={{ maintainAspectRatio: false }} />
 					</div>
 				</div>
-				<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+				<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 					<h2 className="text-xl font-semibold mb-4 text-[var(--text-primary)] font-['Poppins']">
 						Membership Distribution
 					</h2>
@@ -214,7 +214,7 @@ export function ReportsPage() {
 				</div>
 			</div>
 
-			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 				<h2 className="text-xl font-semibold mb-4 text-[var(--text-primary)] font-['Poppins']">
 					Member Growth
 				</h2>
@@ -240,7 +240,7 @@ function SummaryCard({
 	changeType: 'positive' | 'negative' | 'neutral';
 }) {
 	return (
-		<div className="stat-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+		<div className="stat-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 			<div className="flex items-center justify-between mb-6">
 				<div className="stat-icon w-14 h-14 rounded-[14px] bg-gradient-to-br from-[rgba(249,197,19,0.15)] to-[rgba(228,30,38,0.1)] flex items-center justify-center text-[1.6rem] text-[var(--primary-yellow)]">
 					<Icon className="w-6 h-6" />

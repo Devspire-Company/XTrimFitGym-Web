@@ -30,6 +30,10 @@ const authSlice = createSlice({
 	initialState,
 	reducers: {
 		setCredentials: (state, action: PayloadAction<{ user: User; token: string }>) => {
+			// Only allow admin users to be authenticated
+			if (action.payload.user.role !== 'admin') {
+				return; // Don't set credentials for non-admin users
+			}
 			state.user = action.payload.user;
 			state.token = action.payload.token;
 			state.isAuthenticated = true;

@@ -141,7 +141,7 @@ export function CoachesPage() {
 				</Button>
 			</div>
 
-			<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 backdrop-blur-[10px]">
+			<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 backdrop-blur-md">
 				<div className="search-filter-bar flex flex-col md:flex-row gap-4">
 					<div className="search-box flex-1 relative">
 						<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" />
@@ -177,7 +177,7 @@ export function CoachesPage() {
 				</div>
 			</div>
 
-			<div className="table-container bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden backdrop-blur-[10px]">
+			<div className="table-container bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden backdrop-blur-md">
 				<div className="overflow-x-auto">
 					<table className="coaches-table w-full text-sm">
 						<thead className="bg-[rgba(249,197,19,0.05)] border-b-2 border-[rgba(249,197,19,0.2)]">

@@ -148,7 +148,7 @@ export function DashboardPage() {
 			</div>
 
 			{/* Quick Actions */}
-			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 				<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
 					<span className="text-[var(--primary-yellow)]">⚡</span> Quick Actions
 				</h2>
@@ -165,7 +165,7 @@ export function DashboardPage() {
 				{/* Left Column */}
 				<div className="lg:col-span-2 space-y-6">
 					{/* Recent Members */}
-					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 						<div className="section-header flex items-center justify-between mb-6 pb-4 border-b border-[rgba(255,255,255,0.08)]">
 							<h2 className="text-xl font-semibold flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
 								<Users className="w-5 h-5 text-[var(--primary-yellow)]" />
@@ -202,7 +202,7 @@ export function DashboardPage() {
 					</div>
 
 					{/* Coaches */}
-					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 						<div className="section-header flex items-center justify-between mb-6 pb-4 border-b border-[rgba(255,255,255,0.08)]">
 							<h2 className="text-xl font-semibold flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
 								<UserCog className="w-5 h-5 text-[var(--primary-yellow)]" />
@@ -242,7 +242,7 @@ export function DashboardPage() {
 				{/* Right Column */}
 				<div className="space-y-6">
 					{/* Revenue Overview */}
-					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 						<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
 							<span className="text-[var(--primary-yellow)]">📈</span> Revenue Overview
 						</h2>
@@ -263,7 +263,7 @@ export function DashboardPage() {
 					</div>
 
 					{/* Membership Distribution */}
-					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 						<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
 							<span className="text-[var(--primary-yellow)]">📊</span> Membership Distribution
 						</h2>
@@ -322,7 +322,7 @@ function StatCard({
 	changeType: 'positive' | 'negative' | 'neutral';
 }) {
 	return (
-		<div className="stat-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-[10px]">
+		<div className="stat-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 			<div className="flex items-center justify-between mb-6">
 				<div className="stat-icon w-14 h-14 rounded-[14px] bg-gradient-to-br from-[rgba(249,197,19,0.15)] to-[rgba(228,30,38,0.1)] flex items-center justify-center text-[1.6rem] text-[var(--primary-yellow)]">
 					<Icon className="w-6 h-6" />

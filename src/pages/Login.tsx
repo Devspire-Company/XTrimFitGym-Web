@@ -50,7 +50,7 @@ export function LoginPage() {
 				</div>
 
 				{/* Login Form */}
-				<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] p-8 backdrop-blur-[10px]">
+				<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] p-8 backdrop-blur-md">
 					<form onSubmit={handleSubmit} className="space-y-6">
 						{/* Email Input */}
 						<div className="form-group">

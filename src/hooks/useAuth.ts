@@ -14,6 +14,17 @@ export function useAuth() {
 			if (data?.login) {
 				const { user, token } = data.login;
 				
+				// Check if user is an admin - only admins can access the web app
+				if (user.role !== 'admin') {
+					dispatch(
+						addToast({
+							type: 'error',
+							message: 'Access denied. Only administrators can access this application.',
+						})
+					);
+					return;
+				}
+				
 				// Store credentials in Redux and localStorage
 				dispatch(
 					setCredentials({

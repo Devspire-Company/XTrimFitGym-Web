@@ -52,7 +52,7 @@ function Toast({
 	return (
 		<div
 			className={cn(
-				'flex items-center gap-3 p-4 rounded-lg shadow-lg border backdrop-blur-[10px] animate-in slide-in-from-right',
+				'flex items-center gap-3 p-4 rounded-lg shadow-lg border backdrop-blur-md animate-in slide-in-from-right',
 				{
 					'bg-[rgba(16,185,129,0.15)] border-[rgba(16,185,129,0.3)]': toast.type === 'success',
 					'bg-[rgba(239,68,68,0.15)] border-[rgba(239,68,68,0.3)]': toast.type === 'error',

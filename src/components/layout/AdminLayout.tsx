@@ -76,7 +76,7 @@ export function AdminLayout() {
 			}
 		>
 			{/* Top Navbar */}
-			<nav className="top-navbar fixed top-0 left-0 right-0 h-20 bg-[rgba(19,22,31,0.95)] backdrop-blur-[12px] border-b border-[rgba(255,255,255,0.08)] z-50">
+			<nav className="top-navbar fixed top-0 left-0 right-0 h-20 bg-[rgba(19,22,31,0.95)] backdrop-blur-md border-b border-[rgba(255,255,255,0.08)] z-50">
 				<div className="flex items-center justify-between h-full px-10">
 					<div className="logo flex items-center gap-3 h-10">
 						<img

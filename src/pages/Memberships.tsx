@@ -211,7 +211,7 @@ export function MembershipsPage() {
 					return (
 						<div
 							key={plan.id}
-							className={`plan-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] p-8 backdrop-blur-[10px] ${
+							className={`plan-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] p-8 backdrop-blur-md ${
 								isFeatured
 									? 'featured border-2 border-[var(--primary-yellow)] shadow-[0_0_30px_rgba(249,197,19,0.2)]'
 									: ''
