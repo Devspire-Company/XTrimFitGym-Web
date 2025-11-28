@@ -2,14 +2,12 @@
 
 // Queries
 export {
-	GetDashboardStatsDocument as GET_DASHBOARD_STATS,
-	GetAllMembersDocument as GET_ALL_MEMBERS,
-	GetAllCoachesDocument as GET_ALL_COACHES,
 	GetAllMembershipsDocument as GET_ALL_MEMBERSHIPS,
 	GetActiveMembershipsDocument as GET_ACTIVE_MEMBERSHIPS,
 	GetCurrentMembershipDocument as GET_CURRENT_MEMBERSHIP,
 	GetUsersDocument as GET_USERS,
 	GetUserDocument as GET_USER,
+	GetPendingSubscriptionRequestsDocument as GET_PENDING_SUBSCRIPTION_REQUESTS,
 } from '../generated/graphql';
 
 // Mutations
@@ -23,5 +21,8 @@ export {
 	DeleteMembershipDocument as DELETE_MEMBERSHIP,
 	PurchaseMembershipDocument as PURCHASE_MEMBERSHIP,
 	CancelMembershipDocument as CANCEL_MEMBERSHIP,
+	DirectSubscribeMemberDocument as DIRECT_SUBSCRIBE_MEMBER,
+	ApproveSubscriptionRequestDocument as APPROVE_SUBSCRIPTION_REQUEST,
+	RejectSubscriptionRequestDocument as REJECT_SUBSCRIPTION_REQUEST,
 } from '../generated/graphql';
 

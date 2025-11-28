@@ -20,11 +20,37 @@ query GetUsers($role: RoleType) {
 			membershipTransaction {
 				id
 				membershipId
+				membership {
+					id
+					name
+					monthlyPrice
+					description
+					features
+					status
+					durationType
+				}
 				priceAtPurchase
 				startedAt
 				expiresAt
 				status
 			}
+		}
+		currentMembership {
+			id
+			membershipId
+			membership {
+				id
+				name
+				monthlyPrice
+				description
+				features
+				status
+				durationType
+			}
+			priceAtPurchase
+			startedAt
+			expiresAt
+			status
 		}
 		coachDetails {
 			clientsIds
@@ -64,11 +90,37 @@ query GetUser($id: ID!) {
 			membershipTransaction {
 				id
 				membershipId
+				membership {
+					id
+					name
+					monthlyPrice
+					description
+					features
+					status
+					durationType
+				}
 				priceAtPurchase
 				startedAt
 				expiresAt
 				status
 			}
+		}
+		currentMembership {
+			id
+			membershipId
+			membership {
+				id
+				name
+				monthlyPrice
+				description
+				features
+				status
+				durationType
+			}
+			priceAtPurchase
+			startedAt
+			expiresAt
+			status
 		}
 		coachDetails {
 			clientsIds

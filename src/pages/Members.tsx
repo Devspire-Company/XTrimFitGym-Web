@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Search, Plus, Eye, Edit, Trash2, Users, X } from 'lucide-react';
-import { GET_ALL_MEMBERS, DELETE_USER } from '@/graphql/operations/index';
+import { Search, Plus, Eye, Edit, Trash2, Users, X, CreditCard, Loader2 } from 'lucide-react';
+import { GET_USERS, DELETE_USER, CANCEL_MEMBERSHIP } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
+import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
 
 interface Member {
 	id: string;
@@ -28,6 +29,7 @@ interface Member {
 		weightLost: number;
 		workoutsCompleted: number;
 	};
+	transactionId?: string; // ID of the active membership transaction
 }
 
 export function MembersPage() {
@@ -43,9 +45,20 @@ export function MembersPage() {
 	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 	const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+	const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
+	const [memberToSubscribe, setMemberToSubscribe] = useState<{ id: string; name: string } | null>(
+		null
+	);
+	const [isUnsubscribeModalOpen, setIsUnsubscribeModalOpen] = useState(false);
+	const [memberToUnsubscribe, setMemberToUnsubscribe] = useState<{
+		id: string;
+		name: string;
+		transactionId: string;
+	} | null>(null);
 
 	// GraphQL queries and mutations
-	const { data, loading, error, refetch } = useQuery(GET_ALL_MEMBERS, {
+	const { data, loading, error, refetch } = useQuery(GET_USERS, {
+		variables: { role: 'member' as any },
 		errorPolicy: 'none',
 	});
 
@@ -69,14 +82,38 @@ export function MembersPage() {
 		},
 	});
 
+	const [cancelMembershipMutation, { loading: isUnsubscribing }] = useMutation(CANCEL_MEMBERSHIP, {
+		onCompleted: () => {
+			dispatch(
+				addToast({
+					type: 'success',
+					message: `Successfully unsubscribed ${memberToUnsubscribe?.name}`,
+				})
+			);
+			setIsUnsubscribeModalOpen(false);
+			setMemberToUnsubscribe(null);
+			refetch();
+		},
+		onError: (error) => {
+			dispatch(
+				addToast({
+					type: 'error',
+					message: error.message || 'Failed to unsubscribe member',
+				})
+			);
+		},
+	});
+
 	// Transform API data
 	const apiMembers: Member[] = (data?.getUsers || []).map((m: any) => {
-		const membership = m.membershipDetails?.membershipTransaction?.membership?.name || 'No Plan';
-		const status = m.membershipDetails?.membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive';
+		// Check both currentMembership and membershipTransaction for subscription info
+		const membershipTransaction = m.currentMembership || m.membershipDetails?.membershipTransaction;
+		const membership = membershipTransaction?.membership?.name || 'No Plan';
+		const status = membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive';
 		const joinDate = m.createdAt
 			? new Date(m.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 			: 'N/A';
-		
+
 		return {
 			id: m.id,
 			name: `${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`,
@@ -99,6 +136,7 @@ export function MembersPage() {
 				weightLost: 0, // Would need session logs from API
 				workoutsCompleted: 0, // Would need session logs from API
 			},
+			transactionId: membershipTransaction?.id, // Store transaction ID for unsubscribe
 		};
 	});
 
@@ -116,19 +154,49 @@ export function MembersPage() {
 		});
 	}, [apiMembers, searchTerm, statusFilter, membershipFilter]);
 
-	const handleView = (member: MockMember) => {
+	const handleView = (member: Member) => {
 		setSelectedMember(member);
 		setIsViewModalOpen(true);
 	};
 
-	const handleEdit = (member: MockMember) => {
+	const handleEdit = (member: Member) => {
 		setSelectedMember(member);
 		setIsEditModalOpen(true);
 	};
 
-	const handleDelete = (member: MockMember) => {
+	const handleDelete = (member: Member) => {
 		setSelectedMember(member);
 		setIsDeleteModalOpen(true);
+	};
+
+	const handleSubscribe = (member: Member) => {
+		console.log('🔔 Subscribe button clicked for member:', member);
+		if (!member || !member.id) {
+			console.error('❌ Invalid member data:', member);
+			return;
+		}
+		setMemberToSubscribe({ id: member.id, name: member.name });
+		setIsSubscribeModalOpen(true);
+	};
+
+	const handleUnsubscribe = (member: Member) => {
+		console.log('🔔 Unsubscribe button clicked for member:', member);
+		if (!member || !member.id || !member.transactionId) {
+			console.error('❌ Invalid member data or missing transaction ID:', member);
+			dispatch(
+				addToast({
+					type: 'error',
+					message: 'Cannot unsubscribe: No active subscription found',
+				})
+			);
+			return;
+		}
+		setMemberToUnsubscribe({
+			id: member.id,
+			name: member.name,
+			transactionId: member.transactionId,
+		});
+		setIsUnsubscribeModalOpen(true);
 	};
 
 	const confirmDelete = async () => {
@@ -144,6 +212,34 @@ export function MembersPage() {
 			}
 		}
 	};
+
+	const confirmUnsubscribe = async () => {
+		if (memberToUnsubscribe) {
+			try {
+				await cancelMembershipMutation({
+					variables: { transactionId: memberToUnsubscribe.transactionId },
+				});
+			} catch (err) {
+				console.error('Error unsubscribing member:', err);
+			}
+		}
+	};
+
+	// Debug: Log when modal state changes
+	useEffect(() => {
+		console.log('📊 Subscribe modal state changed:', {
+			isOpen: isSubscribeModalOpen,
+			memberToSubscribe,
+		});
+	}, [isSubscribeModalOpen, memberToSubscribe]);
+
+	// Debug: Log when modal state changes
+	useEffect(() => {
+		console.log('📊 Subscribe modal state:', {
+			isOpen: isSubscribeModalOpen,
+			memberToSubscribe,
+		});
+	}, [isSubscribeModalOpen, memberToSubscribe]);
 
 	// Show loading state
 	if (loading) {
@@ -163,18 +259,27 @@ export function MembersPage() {
 			<div className="flex items-center justify-center min-h-[400px]">
 				<div className="text-center">
 					<div className="text-red-500 mb-4">
-						<svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						<svg
+							className="w-16 h-16 mx-auto"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								strokeWidth={2}
+								d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+							/>
 						</svg>
 					</div>
-					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Load Members</h2>
+					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">
+						Unable to Load Members
+					</h2>
 					<p className="text-[var(--text-secondary)] mb-4">
 						{error?.message || 'Failed to connect to the server'}
 					</p>
-					<button 
-						onClick={() => refetch()} 
-						className="btn-primary"
-					>
+					<button onClick={() => refetch()} className="btn-primary">
 						Retry
 					</button>
 				</div>
@@ -339,18 +444,50 @@ export function MembersPage() {
 												<button
 													onClick={() => handleView(member)}
 													className="btn-small btn-view px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(59,130,246,0.15)] text-[#3B82F6] border border-[rgba(59,130,246,0.3)]"
+													title="View"
 												>
 													<Eye className="w-4 h-4" />
 												</button>
+												{member.status === 'Active' && member.transactionId ? (
+													<button
+														type="button"
+														onClick={(e) => {
+															e.preventDefault();
+															e.stopPropagation();
+															console.log('🔔 Unsubscribe button clicked, member:', member);
+															handleUnsubscribe(member);
+														}}
+														className="btn-small btn-unsubscribe px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] hover:bg-[rgba(239,68,68,0.25)] transition-colors cursor-pointer"
+														title="Unsubscribe"
+													>
+														<X className="w-4 h-4" />
+													</button>
+												) : (
+													<button
+														type="button"
+														onClick={(e) => {
+															e.preventDefault();
+															e.stopPropagation();
+															console.log('🔔 Subscribe button clicked, member:', member);
+															handleSubscribe(member);
+														}}
+														className="btn-small btn-subscribe px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.25)] transition-colors cursor-pointer"
+														title="Subscribe"
+													>
+														<CreditCard className="w-4 h-4" />
+													</button>
+												)}
 												<button
 													onClick={() => handleEdit(member)}
 													className="btn-small btn-edit px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]"
+													title="Edit"
 												>
 													<Edit className="w-4 h-4" />
 												</button>
 												<button
 													onClick={() => handleDelete(member)}
 													className="btn-small btn-delete px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]"
+													title="Delete"
 												>
 													<Trash2 className="w-4 h-4" />
 												</button>
@@ -407,6 +544,121 @@ export function MembersPage() {
 					/>
 				)}
 			</div>
+
+			{/* Direct Subscribe Modal */}
+			{memberToSubscribe && (
+				<DirectSubscribeModal
+					isOpen={isSubscribeModalOpen}
+					onClose={() => {
+						setIsSubscribeModalOpen(false);
+						setMemberToSubscribe(null);
+					}}
+					memberId={memberToSubscribe.id}
+					memberName={memberToSubscribe.name}
+					onSuccess={() => {
+						// Refetch members to show updated subscription
+						refetch();
+					}}
+				/>
+			)}
+
+			{/* Unsubscribe Confirmation Modal */}
+			{memberToUnsubscribe && (
+				<div
+					className={`modal-overlay ${isUnsubscribeModalOpen ? 'active' : ''}`}
+					onClick={() => {
+						setIsUnsubscribeModalOpen(false);
+						setMemberToUnsubscribe(null);
+					}}
+				>
+					<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+						<div className="modal-body">
+							<div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+								<div
+									className="modal-error-icon-large"
+									style={{
+										background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+									}}
+								>
+									<X size={48} style={{ color: 'white' }} />
+								</div>
+							</div>
+
+							<h2 className="modal-title" style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+								Unsubscribe Member?
+							</h2>
+
+							<p className="modal-text" style={{ textAlign: 'center', marginBottom: '2rem' }}>
+								Are you sure you want to unsubscribe <strong>{memberToUnsubscribe.name}</strong>?
+								This action will cancel their current membership subscription.
+							</p>
+
+							<div
+								className="modal-actions"
+								style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}
+							>
+								<button
+									type="button"
+									className="btn-secondary"
+									onClick={() => {
+										setIsUnsubscribeModalOpen(false);
+										setMemberToUnsubscribe(null);
+									}}
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										gap: '0.5rem',
+										padding: '0.75rem 1.5rem',
+										borderRadius: '0.75rem',
+										fontWeight: '600',
+										transition: 'all 0.2s',
+										cursor: 'pointer',
+									}}
+								>
+									<X className="w-4 h-4" />
+									Cancel
+								</button>
+								<button
+									type="button"
+									className="btn-primary"
+									onClick={confirmUnsubscribe}
+									disabled={isUnsubscribing}
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										gap: '0.5rem',
+										padding: '0.75rem 1.5rem',
+										borderRadius: '0.75rem',
+										fontWeight: '600',
+										transition: 'all 0.2s',
+										cursor: isUnsubscribing ? 'not-allowed' : 'pointer',
+										opacity: isUnsubscribing ? 0.6 : 1,
+										background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+										color: 'white',
+										border: 'none',
+									}}
+								>
+									{isUnsubscribing ? (
+										<>
+											<Loader2 className="w-4 h-4 animate-spin" />
+											Processing...
+										</>
+									) : (
+										<>
+											<X className="w-4 h-4" />
+											Unsubscribe
+										</>
+									)}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

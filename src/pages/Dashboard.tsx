@@ -2,17 +2,32 @@ import { useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { Link } from 'react-router';
 import { Users, UserCog, DollarSign, CreditCard, BarChart3 } from 'lucide-react';
-import { GET_DASHBOARD_STATS } from '@/graphql/operations/index';
+import { GET_USERS } from '@/graphql/operations/index';
 
 export function DashboardPage() {
 	useEffect(() => {
 		document.title = 'Admin Dashboard - X-TRIM FIT GYM';
 	}, []);
 
-	const { data, loading, error } = useQuery(GET_DASHBOARD_STATS, {
+	// Fetch members and coaches separately
+	const { data: membersData, loading: membersLoading } = useQuery(GET_USERS, {
+		variables: { role: 'member' },
 		errorPolicy: 'none',
-		pollInterval: 30000, // Refresh every 30 seconds
+		pollInterval: 30000,
 	});
+
+	const { data: coachesData, loading: coachesLoading } = useQuery(GET_USERS, {
+		variables: { role: 'coach' },
+		errorPolicy: 'none',
+		pollInterval: 30000,
+	});
+
+	const loading = membersLoading || coachesLoading;
+	const error = null; // Handle errors separately if needed
+	const data = {
+		members: membersData?.getUsers || [],
+		coaches: coachesData?.getUsers || [],
+	};
 
 	// Show loading state
 	if (loading) {

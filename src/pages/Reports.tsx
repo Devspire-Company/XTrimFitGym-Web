@@ -14,7 +14,7 @@ import {
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { BarChart3, DollarSign, Users, UserCog, Dumbbell } from 'lucide-react';
-import { GET_DASHBOARD_STATS } from '@/graphql/operations/index';
+import { GET_USERS } from '@/graphql/operations/index';
 
 ChartJS.register(
 	CategoryScale,
@@ -33,10 +33,27 @@ export function ReportsPage() {
 		document.title = 'Reports & Analytics - X-TRIM FIT GYM';
 	}, []);
 
-	// Fetch real data from API
-	const { data, loading, error, refetch } = useQuery(GET_DASHBOARD_STATS, {
+	// Fetch members and coaches separately
+	const { data: membersData, loading: membersLoading, refetch: refetchMembers } = useQuery(GET_USERS, {
+		variables: { role: 'member' },
 		errorPolicy: 'none',
 	});
+
+	const { data: coachesData, loading: coachesLoading, refetch: refetchCoaches } = useQuery(GET_USERS, {
+		variables: { role: 'coach' },
+		errorPolicy: 'none',
+	});
+
+	const loading = membersLoading || coachesLoading;
+	const error = null; // Handle errors separately if needed
+	const data = {
+		members: membersData?.getUsers || [],
+		coaches: coachesData?.getUsers || [],
+	};
+	const refetch = () => {
+		refetchMembers();
+		refetchCoaches();
+	};
 
 	// Show loading state
 	if (loading) {

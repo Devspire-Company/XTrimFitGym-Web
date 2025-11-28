@@ -48,3 +48,21 @@ query GetCurrentMembership {
 		updatedAt
 	}
 }
+
+mutation DirectSubscribeMember($input: DirectSubscribeInput!) {
+	directSubscribeMember(input: $input) {
+		id
+		clientId
+		membershipId
+		membership {
+			id
+			name
+			monthlyPrice
+		}
+		priceAtPurchase
+		startedAt
+		expiresAt
+		status
+		createdAt
+	}
+}

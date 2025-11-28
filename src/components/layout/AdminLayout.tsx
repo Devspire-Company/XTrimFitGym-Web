@@ -13,6 +13,7 @@ import {
 	LogOut,
 	X,
 } from 'lucide-react';
+import { SubscriptionRequestNotification } from '../SubscriptionRequestNotification';
 
 export function AdminLayout() {
 	const location = useLocation();
@@ -195,6 +196,9 @@ export function AdminLayout() {
 			{profileDropdownOpen && (
 				<div className="fixed inset-0 z-30" onClick={() => setProfileDropdownOpen(false)} />
 			)}
+
+			{/* Subscription Request Notification */}
+			<SubscriptionRequestNotification />
 		</div>
 	);
 }

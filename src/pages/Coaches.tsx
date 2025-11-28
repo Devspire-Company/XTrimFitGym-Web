@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { Search, Plus, Eye, Edit, Trash2, UserCog } from 'lucide-react';
-import { GET_ALL_COACHES } from '@/graphql/operations/index';
+import { GET_USERS } from '@/graphql/operations/index';
 
 interface Coach {
 	id: string;
@@ -38,7 +38,8 @@ export function CoachesPage() {
 	const [specializationFilter, setSpecializationFilter] = useState<string>('all');
 
 	// GraphQL queries and mutations
-	const { data, loading, error, refetch } = useQuery(GET_ALL_COACHES, {
+	const { data, loading, error, refetch } = useQuery(GET_USERS, {
+		variables: { role: 'coach' },
 		errorPolicy: 'none',
 	});
 
