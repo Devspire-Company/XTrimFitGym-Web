@@ -1,7 +1,18 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Search, Plus, Eye, Edit, Trash2, Users, X, CreditCard, Loader2 } from 'lucide-react';
+import {
+	Search,
+	Plus,
+	Eye,
+	Trash2,
+	Users,
+	X,
+	CreditCard,
+	Loader2,
+	RefreshCw,
+	MoreVertical,
+} from 'lucide-react';
 import { GET_USERS, DELETE_USER, CANCEL_MEMBERSHIP } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
@@ -30,6 +41,10 @@ interface Member {
 		workoutsCompleted: number;
 	};
 	transactionId?: string; // ID of the active membership transaction
+	durationType?: string; // MONTHLY, QUARTERLY, YEARLY
+	startDate?: string; // Subscription start date
+	endDate?: string; // Subscription end date
+	daysLeft?: number; // Remaining days in subscription
 }
 
 export function MembersPage() {
@@ -43,7 +58,6 @@ export function MembersPage() {
 	const [membershipFilter, setMembershipFilter] = useState<string>('all');
 	const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-	const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
 	const [memberToSubscribe, setMemberToSubscribe] = useState<{ id: string; name: string } | null>(
@@ -55,12 +69,43 @@ export function MembersPage() {
 		name: string;
 		transactionId: string;
 	} | null>(null);
+	const [isRefreshing, setIsRefreshing] = useState(false);
+	const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+	const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(
+		null
+	);
+
+	// Close dropdown when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (openDropdownId) {
+				setOpenDropdownId(null);
+			}
+		};
+
+		if (openDropdownId) {
+			document.addEventListener('mousedown', handleClickOutside);
+		}
+
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [openDropdownId]);
 
 	// GraphQL queries and mutations
 	const { data, loading, error, refetch } = useQuery(GET_USERS, {
 		variables: { role: 'member' as any },
 		errorPolicy: 'none',
 	});
+
+	const handleRefresh = async () => {
+		setIsRefreshing(true);
+		try {
+			await refetch();
+		} finally {
+			setIsRefreshing(false);
+		}
+	};
 
 	const [deleteUserMutation] = useMutation(DELETE_USER, {
 		onCompleted: () => {
@@ -83,6 +128,10 @@ export function MembersPage() {
 	});
 
 	const [cancelMembershipMutation, { loading: isUnsubscribing }] = useMutation(CANCEL_MEMBERSHIP, {
+		refetchQueries: [
+			{ query: GET_USERS, variables: { role: 'member' } },
+			{ query: GET_USERS, variables: { role: 'coach' } },
+		],
 		onCompleted: () => {
 			dispatch(
 				addToast({
@@ -104,6 +153,36 @@ export function MembersPage() {
 		},
 	});
 
+	// Helper function to calculate days left
+	const calculateDaysLeft = (startDate: string, durationType: string): number => {
+		if (!startDate || !durationType) return 0;
+
+		const start = new Date(startDate);
+		const now = new Date();
+		const end = new Date(start);
+
+		// Calculate end date based on duration type
+		switch (durationType.toUpperCase()) {
+			case 'MONTHLY':
+				end.setMonth(end.getMonth() + 1);
+				break;
+			case 'QUARTERLY':
+				end.setMonth(end.getMonth() + 3);
+				break;
+			case 'YEARLY':
+				end.setFullYear(end.getFullYear() + 1);
+				break;
+			default:
+				return 0;
+		}
+
+		// Calculate difference in days
+		const diffTime = end.getTime() - now.getTime();
+		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+		return diffDays > 0 ? diffDays : 0;
+	};
+
 	// Transform API data
 	const apiMembers: Member[] = (data?.getUsers || []).map((m: any) => {
 		// Check both currentMembership and membershipTransaction for subscription info
@@ -113,6 +192,16 @@ export function MembersPage() {
 		const joinDate = m.createdAt
 			? new Date(m.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 			: 'N/A';
+
+		const durationType =
+			membershipTransaction?.membership?.durationType || membershipTransaction?.durationType;
+		const startDate =
+			membershipTransaction?.startDate || membershipTransaction?.createdAt || m.createdAt;
+		const endDate = membershipTransaction?.endDate;
+		const daysLeft =
+			status === 'Active' && startDate && durationType
+				? calculateDaysLeft(startDate, durationType)
+				: 0;
 
 		return {
 			id: m.id,
@@ -137,6 +226,10 @@ export function MembersPage() {
 				workoutsCompleted: 0, // Would need session logs from API
 			},
 			transactionId: membershipTransaction?.id, // Store transaction ID for unsubscribe
+			durationType,
+			startDate,
+			endDate,
+			daysLeft,
 		};
 	});
 
@@ -157,11 +250,6 @@ export function MembersPage() {
 	const handleView = (member: Member) => {
 		setSelectedMember(member);
 		setIsViewModalOpen(true);
-	};
-
-	const handleEdit = (member: Member) => {
-		setSelectedMember(member);
-		setIsEditModalOpen(true);
 	};
 
 	const handleDelete = (member: Member) => {
@@ -300,10 +388,21 @@ export function MembersPage() {
 						Manage all gym members, view details, and update information ({apiMembers.length} total)
 					</p>
 				</div>
-				<Button>
-					<Plus className="w-4 h-4" />
-					Add New Member
-				</Button>
+				<div className="flex items-center gap-3">
+					<button
+						onClick={handleRefresh}
+						disabled={isRefreshing || loading}
+						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+						title="Refresh data"
+					>
+						<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+						Refresh
+					</button>
+					<Button>
+						<Plus className="w-4 h-4" />
+						Add New Member
+					</Button>
+				</div>
 			</div>
 
 			{/* Search and Filters */}
@@ -364,7 +463,7 @@ export function MembersPage() {
 									Join Date
 								</th>
 								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-									Progress
+									Days Left
 								</th>
 								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
 									Actions
@@ -430,66 +529,44 @@ export function MembersPage() {
 											{member.joinDate}
 										</td>
 										<td className="px-4 py-5 text-sm">
-											<div className="progress-info">
-												<span className="text-[var(--text-secondary)]">
-													{member.progress.weightLost} lbs lost
+											{member.status === 'Active' && member.daysLeft !== undefined ? (
+												<span
+													className={`px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
+														member.daysLeft <= 7
+															? 'bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]'
+															: member.daysLeft <= 30
+																? 'bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]'
+																: 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
+													}`}
+												>
+													{member.daysLeft} {member.daysLeft === 1 ? 'day' : 'days'}
 												</span>
-												<span className="progress-value text-[var(--primary-yellow)] font-semibold">
-													{member.progress.workoutsCompleted} workouts
-												</span>
-											</div>
+											) : (
+												<span className="text-[var(--text-secondary)]">—</span>
+											)}
 										</td>
 										<td className="px-4 py-5">
-											<div className="action-buttons flex items-center gap-2">
+											<div className="relative">
 												<button
-													onClick={() => handleView(member)}
-													className="btn-small btn-view px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(59,130,246,0.15)] text-[#3B82F6] border border-[rgba(59,130,246,0.3)]"
-													title="View"
+													onClick={(e) => {
+														e.stopPropagation();
+														const button = e.currentTarget;
+														const rect = button.getBoundingClientRect();
+														if (openDropdownId === member.id) {
+															setOpenDropdownId(null);
+															setDropdownPosition(null);
+														} else {
+															setOpenDropdownId(member.id);
+															setDropdownPosition({
+																top: rect.bottom + 4,
+																right: window.innerWidth - rect.right,
+															});
+														}
+													}}
+													className="btn-small px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] border border-[var(--card-border)] hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+													title="Actions"
 												>
-													<Eye className="w-4 h-4" />
-												</button>
-												{member.status === 'Active' && member.transactionId ? (
-													<button
-														type="button"
-														onClick={(e) => {
-															e.preventDefault();
-															e.stopPropagation();
-															console.log('🔔 Unsubscribe button clicked, member:', member);
-															handleUnsubscribe(member);
-														}}
-														className="btn-small btn-unsubscribe px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] hover:bg-[rgba(239,68,68,0.25)] transition-colors cursor-pointer"
-														title="Unsubscribe"
-													>
-														<X className="w-4 h-4" />
-													</button>
-												) : (
-													<button
-														type="button"
-														onClick={(e) => {
-															e.preventDefault();
-															e.stopPropagation();
-															console.log('🔔 Subscribe button clicked, member:', member);
-															handleSubscribe(member);
-														}}
-														className="btn-small btn-subscribe px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.25)] transition-colors cursor-pointer"
-														title="Subscribe"
-													>
-														<CreditCard className="w-4 h-4" />
-													</button>
-												)}
-												<button
-													onClick={() => handleEdit(member)}
-													className="btn-small btn-edit px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]"
-													title="Edit"
-												>
-													<Edit className="w-4 h-4" />
-												</button>
-												<button
-													onClick={() => handleDelete(member)}
-													className="btn-small btn-delete px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]"
-													title="Delete"
-												>
-													<Trash2 className="w-4 h-4" />
+													<MoreVertical className="w-4 h-4" />
 												</button>
 											</div>
 										</td>
@@ -500,6 +577,104 @@ export function MembersPage() {
 					</table>
 				</div>
 			</div>
+
+			{/* Dropdown Menu - Rendered outside table */}
+			{openDropdownId && dropdownPosition && (
+				<>
+					<div
+						className="fixed inset-0 z-[45]"
+						onClick={() => {
+							setOpenDropdownId(null);
+							setDropdownPosition(null);
+						}}
+						style={{ pointerEvents: 'auto' }}
+					></div>
+					<div
+						className="fixed w-48 bg-[#1a1a1a] border border-[var(--card-border)] rounded-lg shadow-lg z-[60]"
+						style={{
+							top: `${dropdownPosition.top}px`,
+							right: `${dropdownPosition.right}px`,
+							pointerEvents: 'auto',
+						}}
+						onClick={(e) => e.stopPropagation()}
+						onMouseDown={(e) => e.stopPropagation()}
+					>
+						<div className="py-1">
+							{(() => {
+								const member = filteredMembers.find((m) => m.id === openDropdownId);
+								if (!member) return null;
+								return (
+									<>
+										<button
+											type="button"
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												handleView(member);
+												setOpenDropdownId(null);
+												setDropdownPosition(null);
+											}}
+											onMouseDown={(e) => e.stopPropagation()}
+											className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(59,130,246,0.1)] flex items-center gap-2 cursor-pointer"
+										>
+											<Eye className="w-4 h-4 text-[#3B82F6]" />
+											View
+										</button>
+										{member.status === 'Active' && member.transactionId ? (
+											<button
+												type="button"
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													handleUnsubscribe(member);
+													setOpenDropdownId(null);
+													setDropdownPosition(null);
+												}}
+												onMouseDown={(e) => e.stopPropagation()}
+												className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(239,68,68,0.1)] flex items-center gap-2 cursor-pointer"
+											>
+												<X className="w-4 h-4 text-[#EF4444]" />
+												Unsubscribe
+											</button>
+										) : (
+											<button
+												type="button"
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													handleSubscribe(member);
+													setOpenDropdownId(null);
+													setDropdownPosition(null);
+												}}
+												onMouseDown={(e) => e.stopPropagation()}
+												className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(16,185,129,0.1)] flex items-center gap-2 cursor-pointer"
+											>
+												<CreditCard className="w-4 h-4 text-[#10B981]" />
+												Subscribe
+											</button>
+										)}
+										<button
+											type="button"
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												handleDelete(member);
+												setOpenDropdownId(null);
+												setDropdownPosition(null);
+											}}
+											onMouseDown={(e) => e.stopPropagation()}
+											className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(239,68,68,0.1)] flex items-center gap-2 cursor-pointer"
+										>
+											<Trash2 className="w-4 h-4 text-[#EF4444]" />
+											Delete
+										</button>
+									</>
+								);
+							})()}
+						</div>
+					</div>
+				</>
+			)}
 
 			{/* View Modal */}
 			<div
@@ -515,10 +690,6 @@ export function MembersPage() {
 						onClose={() => {
 							setIsViewModalOpen(false);
 							setSelectedMember(null);
-						}}
-						onEdit={() => {
-							setIsViewModalOpen(false);
-							setIsEditModalOpen(true);
 						}}
 					/>
 				)}
@@ -663,15 +834,7 @@ export function MembersPage() {
 	);
 }
 
-function MemberViewModal({
-	member,
-	onClose,
-	onEdit,
-}: {
-	member: Member;
-	onClose: () => void;
-	onEdit: () => void;
-}) {
+function MemberViewModal({ member, onClose }: { member: Member; onClose: () => void }) {
 	return (
 		<div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
 			<div className="modal-header">
@@ -685,12 +848,29 @@ function MemberViewModal({
 			</div>
 			<div className="modal-body">
 				<div className="grid grid-cols-2 gap-6">
+					{/* Personal Information */}
 					<div>
 						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Personal Information</h3>
 						<div className="space-y-2 text-sm">
 							<div>
-								<span className="text-[var(--text-secondary)]">Name:</span>{' '}
+								<span className="text-[var(--text-secondary)]">Full Name:</span>{' '}
 								<span className="font-medium text-[var(--text-primary)]">{member.name}</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">First Name:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">{member.firstName}</span>
+							</div>
+							{member.middleName && (
+								<div>
+									<span className="text-[var(--text-secondary)]">Middle Name:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{member.middleName}
+									</span>
+								</div>
+							)}
+							<div>
+								<span className="text-[var(--text-secondary)]">Last Name:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">{member.lastName}</span>
 							</div>
 							<div>
 								<span className="text-[var(--text-secondary)]">Email:</span>{' '}
@@ -701,6 +881,18 @@ function MemberViewModal({
 								<span className="font-medium text-[var(--text-primary)]">{member.phone}</span>
 							</div>
 							<div>
+								<span className="text-[var(--text-secondary)]">Date of Birth:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{member.dateOfBirth && member.dateOfBirth !== 'N/A'
+										? new Date(member.dateOfBirth).toLocaleDateString('en-US', {
+												year: 'numeric',
+												month: 'long',
+												day: 'numeric',
+											})
+										: 'N/A'}
+								</span>
+							</div>
+							<div>
 								<span className="text-[var(--text-secondary)]">Gender:</span>{' '}
 								<span className="font-medium text-[var(--text-primary)]">
 									{member.gender || 'N/A'}
@@ -708,21 +900,115 @@ function MemberViewModal({
 							</div>
 						</div>
 					</div>
+
+					{/* Membership & Subscription */}
 					<div>
-						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Membership & Status</h3>
+						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">
+							Membership & Subscription
+						</h3>
 						<div className="space-y-2 text-sm">
 							<div>
-								<span className="text-[var(--text-secondary)]">Membership:</span>{' '}
+								<span className="text-[var(--text-secondary)]">Membership Plan:</span>{' '}
 								<span className="font-medium text-[var(--text-primary)]">{member.membership}</span>
 							</div>
 							<div>
 								<span className="text-[var(--text-secondary)]">Status:</span>{' '}
-								<span className="font-medium text-[var(--text-primary)]">{member.status}</span>
+								<span
+									className={`font-medium ${
+										member.status === 'Active' ? 'text-[#10B981]' : 'text-[var(--text-primary)]'
+									}`}
+								>
+									{member.status}
+								</span>
+							</div>
+							{member.durationType && (
+								<div>
+									<span className="text-[var(--text-secondary)]">Duration Type:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{member.durationType}
+									</span>
+								</div>
+							)}
+							{member.startDate && (
+								<div>
+									<span className="text-[var(--text-secondary)]">Start Date:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{new Date(member.startDate).toLocaleDateString('en-US', {
+											year: 'numeric',
+											month: 'long',
+											day: 'numeric',
+										})}
+									</span>
+								</div>
+							)}
+							{member.endDate && (
+								<div>
+									<span className="text-[var(--text-secondary)]">End Date:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{new Date(member.endDate).toLocaleDateString('en-US', {
+											year: 'numeric',
+											month: 'long',
+											day: 'numeric',
+										})}
+									</span>
+								</div>
+							)}
+							{member.daysLeft !== undefined && member.daysLeft > 0 && (
+								<div>
+									<span className="text-[var(--text-secondary)]">Days Left:</span>{' '}
+									<span
+										className={`font-medium ${
+											member.daysLeft <= 7
+												? 'text-[#EF4444]'
+												: member.daysLeft <= 30
+													? 'text-[var(--primary-yellow)]'
+													: 'text-[#10B981]'
+										}`}
+									>
+										{member.daysLeft} {member.daysLeft === 1 ? 'day' : 'days'}
+									</span>
+								</div>
+							)}
+						</div>
+					</div>
+
+					{/* Fitness Goals & Preferences */}
+					<div>
+						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">
+							Fitness Goals & Preferences
+						</h3>
+						<div className="space-y-2 text-sm">
+							<div>
+								<span className="text-[var(--text-secondary)]">Fitness Goals:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{member.fitnessGoals || 'N/A'}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Account Information */}
+					<div>
+						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Account Information</h3>
+						<div className="space-y-2 text-sm">
+							<div>
+								<span className="text-[var(--text-secondary)]">Member ID:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)] font-mono text-xs">
+									{member.id}
+								</span>
 							</div>
 							<div>
 								<span className="text-[var(--text-secondary)]">Join Date:</span>{' '}
 								<span className="font-medium text-[var(--text-primary)]">{member.joinDate}</span>
 							</div>
+							{member.transactionId && (
+								<div>
+									<span className="text-[var(--text-secondary)]">Transaction ID:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)] font-mono text-xs">
+										{member.transactionId}
+									</span>
+								</div>
+							)}
 						</div>
 					</div>
 				</div>
@@ -731,10 +1017,6 @@ function MemberViewModal({
 				<button type="button" className="btn-secondary" onClick={onClose}>
 					<X className="w-4 h-4" />
 					Close
-				</button>
-				<button type="button" className="btn-primary" onClick={onEdit}>
-					<Edit className="w-4 h-4" />
-					Edit Member
 				</button>
 			</div>
 		</div>
@@ -761,11 +1043,43 @@ function DeleteConfirmModal({
 				<h3 className="modal-delete-title">{title}</h3>
 				<p className="modal-delete-text">{message}</p>
 				<div className="modal-delete-actions">
-					<button type="button" className="btn-secondary" onClick={onCancel}>
+					<button
+						type="button"
+						className="btn-secondary"
+						onClick={onCancel}
+						style={{
+							flex: 1,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							gap: '0.5rem',
+							padding: '0.75rem 1.5rem',
+							borderRadius: '0.75rem',
+							fontWeight: '600',
+							transition: 'all 0.2s',
+							cursor: 'pointer',
+						}}
+					>
 						<X className="w-4 h-4" />
 						Cancel
 					</button>
-					<button type="button" className="btn-danger" onClick={onConfirm}>
+					<button
+						type="button"
+						className="btn-danger"
+						onClick={onConfirm}
+						style={{
+							flex: 1,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							gap: '0.5rem',
+							padding: '0.75rem 1.5rem',
+							borderRadius: '0.75rem',
+							fontWeight: '600',
+							transition: 'all 0.2s',
+							cursor: 'pointer',
+						}}
+					>
 						<Trash2 className="w-4 h-4" />
 						Delete
 					</button>

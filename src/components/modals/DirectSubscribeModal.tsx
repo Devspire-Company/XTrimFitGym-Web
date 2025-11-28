@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { X, Check, Calendar, CreditCard, Loader2 } from 'lucide-react';
-import { GET_ACTIVE_MEMBERSHIPS, DIRECT_SUBSCRIBE_MEMBER } from '@/graphql/operations/index';
+import { GET_ACTIVE_MEMBERSHIPS, DIRECT_SUBSCRIBE_MEMBER, GET_USERS } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 
@@ -28,6 +28,10 @@ export function DirectSubscribeModal({
 	});
 
 	const [directSubscribe, { loading: subscribing }] = useMutation(DIRECT_SUBSCRIBE_MEMBER, {
+		refetchQueries: [
+			{ query: GET_USERS, variables: { role: 'member' } },
+			{ query: GET_USERS, variables: { role: 'coach' } },
+		],
 		onCompleted: (data) => {
 			console.log('✅ Subscription successful:', data);
 			const membershipName = data.directSubscribeMember.membership?.name || 'the selected plan';

@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import {
 	Chart as ChartJS,
@@ -13,7 +13,7 @@ import {
 	Legend,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
-import { BarChart3, DollarSign, Users, UserCog, Dumbbell } from 'lucide-react';
+import { BarChart3, DollarSign, Users, UserCog, Dumbbell, RefreshCw } from 'lucide-react';
 import { GET_USERS } from '@/graphql/operations/index';
 
 ChartJS.register(
@@ -50,9 +50,15 @@ export function ReportsPage() {
 		members: membersData?.getUsers || [],
 		coaches: coachesData?.getUsers || [],
 	};
-	const refetch = () => {
-		refetchMembers();
-		refetchCoaches();
+	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	const refetch = async () => {
+		setIsRefreshing(true);
+		try {
+			await Promise.all([refetchMembers(), refetchCoaches()]);
+		} finally {
+			setIsRefreshing(false);
+		}
 	};
 
 	// Show loading state
@@ -92,13 +98,17 @@ export function ReportsPage() {
 		);
 	}
 
-	const members = (data?.members || []).map((m: any) => ({
-		id: m.id,
-		name: `${m.firstName} ${m.lastName}`,
-		status: m.membershipDetails?.membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive',
-		membership: m.membershipDetails?.membershipTransaction?.membership?.name || 'No Plan',
-		joinDate: m.createdAt || new Date().toISOString(),
-	}));
+	const members = (data?.members || []).map((m: any) => {
+		const membershipTransaction = m.currentMembership || m.membershipDetails?.membershipTransaction;
+		return {
+			id: m.id,
+			name: `${m.firstName} ${m.lastName}`,
+			status: membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive',
+			membership: membershipTransaction?.membership?.name || 'No Plan',
+			joinDate: m.createdAt || new Date().toISOString(),
+			monthlyPrice: membershipTransaction?.membership?.monthlyPrice || 0,
+		};
+	});
 
 	const coaches = (data?.coaches || []).map((c: any) => ({
 		id: c.id,
@@ -108,7 +118,10 @@ export function ReportsPage() {
 
 	const totalMembers = members.length;
 	const activeMembers = members.filter((m: any) => m.status === 'Active').length;
-	const totalRevenue = activeMembers * 50; // Placeholder calculation
+	// Calculate total revenue from actual subscription prices
+	const totalRevenue = members
+		.filter((m: any) => m.status === 'Active')
+		.reduce((total, m) => total + (m.monthlyPrice || 0), 0);
 	const totalWorkouts = 0; // Would need session logs from API
 	const totalWeightLost = 0; // Would need session logs from API
 
@@ -177,6 +190,15 @@ export function ReportsPage() {
 						Comprehensive insights and analytics for your gym operations
 					</p>
 				</div>
+				<button
+					onClick={refetch}
+					disabled={isRefreshing || loading}
+					className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+					title="Refresh analytics data"
+				>
+					<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+					Refresh
+				</button>
 			</div>
 
 			{/* Summary Cards */}

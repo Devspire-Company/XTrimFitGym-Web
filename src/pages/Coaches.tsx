@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Search, Plus, Eye, Edit, Trash2, UserCog } from 'lucide-react';
-import { GET_USERS } from '@/graphql/operations/index';
+import { Search, Plus, Eye, Trash2, UserCog, RefreshCw, X } from 'lucide-react';
+import { GET_USERS, DELETE_USER } from '@/graphql/operations/index';
+import { useAppDispatch } from '@/store/hooks';
+import { addToast } from '@/store/slices/uiSlice';
 
 interface Coach {
 	id: string;
@@ -33,15 +35,76 @@ export function CoachesPage() {
 		document.title = 'Coach Management - X-TRIM FIT GYM';
 	}, []);
 
+	const dispatch = useAppDispatch();
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState<string>('all');
 	const [specializationFilter, setSpecializationFilter] = useState<string>('all');
+	const [isRefreshing, setIsRefreshing] = useState(false);
+	const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
+	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
 	// GraphQL queries and mutations
 	const { data, loading, error, refetch } = useQuery(GET_USERS, {
 		variables: { role: 'coach' },
 		errorPolicy: 'none',
 	});
+
+	const [deleteUserMutation] = useMutation(DELETE_USER, {
+		refetchQueries: [
+			{ query: GET_USERS, variables: { role: 'coach' } },
+			{ query: GET_USERS, variables: { role: 'member' } },
+		],
+		onCompleted: () => {
+			dispatch(
+				addToast({
+					type: 'success',
+					message: `Successfully deleted coach ${selectedCoach?.name}`,
+				})
+			);
+			setIsDeleteModalOpen(false);
+			setSelectedCoach(null);
+		},
+		onError: (error) => {
+			dispatch(
+				addToast({
+					type: 'error',
+					message: error.message || 'Failed to delete coach',
+				})
+			);
+		},
+	});
+
+	const handleRefresh = async () => {
+		setIsRefreshing(true);
+		try {
+			await refetch();
+		} finally {
+			setIsRefreshing(false);
+		}
+	};
+
+	const handleView = (coach: Coach) => {
+		setSelectedCoach(coach);
+		setIsViewModalOpen(true);
+	};
+
+	const handleDelete = (coach: Coach) => {
+		setSelectedCoach(coach);
+		setIsDeleteModalOpen(true);
+	};
+
+	const confirmDelete = async () => {
+		if (selectedCoach) {
+			try {
+				await deleteUserMutation({
+					variables: { id: selectedCoach.id },
+				});
+			} catch (err) {
+				console.error('Error deleting coach:', err);
+			}
+		}
+	};
 
 	// Transform API data
 	const apiCoaches: Coach[] = (data?.getUsers || []).map((c: any) => {
@@ -136,10 +199,21 @@ export function CoachesPage() {
 						Manage all gym coaches, view details, and update information ({apiCoaches.length} total)
 					</p>
 				</div>
-				<Button>
-					<Plus className="w-4 h-4" />
-					Add New Coach
-				</Button>
+				<div className="flex items-center gap-3">
+					<button
+						onClick={handleRefresh}
+						disabled={isRefreshing || loading}
+						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+						title="Refresh data"
+					>
+						<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+						Refresh
+					</button>
+					<Button>
+						<Plus className="w-4 h-4" />
+						Add New Coach
+					</Button>
+				</div>
 			</div>
 
 			<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 backdrop-blur-md">
@@ -199,9 +273,6 @@ export function CoachesPage() {
 									Status
 								</th>
 								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase">
-									Performance
-								</th>
-								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase">
 									Actions
 								</th>
 							</tr>
@@ -249,28 +320,20 @@ export function CoachesPage() {
 											{coach.status}
 										</span>
 									</td>
-									<td className="px-4 py-5 text-sm">
-										<div className="performance-info">
-											<div className="performance-item flex items-center gap-2">
-												<span className="rating-stars text-[var(--primary-yellow)]">⭐</span>
-												<span className="performance-value text-[var(--text-primary)] font-semibold">
-													{coach.rating}
-												</span>
-											</div>
-											<div className="text-[var(--text-secondary)]">
-												{coach.totalClients} clients
-											</div>
-										</div>
-									</td>
 									<td className="px-4 py-5">
 										<div className="action-buttons flex items-center gap-2">
-											<button className="btn-small btn-view px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(59,130,246,0.15)] text-[#3B82F6] border border-[rgba(59,130,246,0.3)]">
+											<button
+												onClick={() => handleView(coach)}
+												className="btn-small btn-view px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(59,130,246,0.15)] text-[#3B82F6] border border-[rgba(59,130,246,0.3)] hover:bg-[rgba(59,130,246,0.25)] transition-colors"
+												title="View Coach"
+											>
 												<Eye className="w-4 h-4" />
 											</button>
-											<button className="btn-small btn-edit px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]">
-												<Edit className="w-4 h-4" />
-											</button>
-											<button className="btn-small btn-delete px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]">
+											<button
+												onClick={() => handleDelete(coach)}
+												className="btn-small btn-delete px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] hover:bg-[rgba(239,68,68,0.25)] transition-colors"
+												title="Delete Coach"
+											>
 												<Trash2 className="w-4 h-4" />
 											</button>
 										</div>
@@ -279,6 +342,281 @@ export function CoachesPage() {
 							))}
 						</tbody>
 					</table>
+				</div>
+			</div>
+
+			{/* View Modal */}
+			<div
+				className={`modal-overlay ${isViewModalOpen && selectedCoach ? 'active' : ''}`}
+				onClick={() => {
+					setIsViewModalOpen(false);
+					setSelectedCoach(null);
+				}}
+			>
+				{selectedCoach && (
+					<CoachViewModal
+						coach={selectedCoach}
+						onClose={() => {
+							setIsViewModalOpen(false);
+							setSelectedCoach(null);
+						}}
+					/>
+				)}
+			</div>
+
+			{/* Delete Modal */}
+			<div
+				className={`modal-overlay ${isDeleteModalOpen && selectedCoach ? 'active' : ''}`}
+				onClick={() => {
+					setIsDeleteModalOpen(false);
+					setSelectedCoach(null);
+				}}
+			>
+				{selectedCoach && (
+					<DeleteConfirmModal
+						title="Delete Coach?"
+						message={`Are you sure you want to delete ${selectedCoach.name}? This action cannot be undone.`}
+						onConfirm={confirmDelete}
+						onCancel={() => {
+							setIsDeleteModalOpen(false);
+							setSelectedCoach(null);
+						}}
+					/>
+				)}
+			</div>
+		</div>
+	);
+}
+
+function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void }) {
+	return (
+		<div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
+			<div className="modal-header">
+				<h3>
+					<Eye className="w-5 h-5" />
+					View Coach
+				</h3>
+				<button className="modal-close" onClick={onClose} title="Close" aria-label="Close">
+					<X className="w-5 h-5" />
+				</button>
+			</div>
+			<div className="modal-body">
+				<div className="grid grid-cols-2 gap-6">
+					{/* Personal Information */}
+					<div>
+						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Personal Information</h3>
+						<div className="space-y-2 text-sm">
+							<div>
+								<span className="text-[var(--text-secondary)]">Full Name:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">{coach.name}</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">First Name:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">{coach.firstName}</span>
+							</div>
+							{coach.middleName && (
+								<div>
+									<span className="text-[var(--text-secondary)]">Middle Name:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{coach.middleName}
+									</span>
+								</div>
+							)}
+							<div>
+								<span className="text-[var(--text-secondary)]">Last Name:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">{coach.lastName}</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Email:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">{coach.email}</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Phone:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">{coach.phone}</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Date of Birth:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.dateOfBirth && coach.dateOfBirth !== 'N/A'
+										? new Date(coach.dateOfBirth).toLocaleDateString('en-US', {
+												year: 'numeric',
+												month: 'long',
+												day: 'numeric',
+											})
+										: 'N/A'}
+								</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Gender:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.gender || 'N/A'}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Professional Information */}
+					<div>
+						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">
+							Professional Information
+						</h3>
+						<div className="space-y-2 text-sm">
+							<div>
+								<span className="text-[var(--text-secondary)]">Specialization:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.specialization}
+								</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Years of Experience:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.yearsExperience} years
+								</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Status:</span>{' '}
+								<span
+									className={`font-medium ${
+										coach.status === 'Active' ? 'text-[#10B981]' : 'text-[var(--text-primary)]'
+									}`}
+								>
+									{coach.status}
+								</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Total Clients:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.totalClients}
+								</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Rating:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.rating.toFixed(1)} ⭐
+								</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Client Limit:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.clientLimit || 'Unlimited'}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Schedule Information */}
+					<div>
+						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Schedule</h3>
+						<div className="space-y-2 text-sm">
+							<div>
+								<span className="text-[var(--text-secondary)]">Teaching Days:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.teachingDate && coach.teachingDate.length > 0
+										? coach.teachingDate.join(', ')
+										: 'N/A'}
+								</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Teaching Times:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.teachingTime && coach.teachingTime.length > 0
+										? coach.teachingTime.join(', ')
+										: 'N/A'}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Account Information */}
+					<div>
+						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Account Information</h3>
+						<div className="space-y-2 text-sm">
+							<div>
+								<span className="text-[var(--text-secondary)]">Coach ID:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)] font-mono text-xs">
+									{coach.id}
+								</span>
+							</div>
+							<div>
+								<span className="text-[var(--text-secondary)]">Bio:</span>{' '}
+								<span className="font-medium text-[var(--text-primary)]">
+									{coach.bio || 'No bio available'}
+								</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div className="modal-footer">
+				<button type="button" className="btn-secondary" onClick={onClose}>
+					<X className="w-4 h-4" />
+					Close
+				</button>
+			</div>
+		</div>
+	);
+}
+
+function DeleteConfirmModal({
+	title,
+	message,
+	onConfirm,
+	onCancel,
+}: {
+	title: string;
+	message: string;
+	onConfirm: () => void;
+	onCancel: () => void;
+}) {
+	return (
+		<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+			<div className="modal-body">
+				<div className="modal-delete-icon">
+					<Trash2 className="w-10 h-10" />
+				</div>
+				<h3 className="modal-delete-title">{title}</h3>
+				<p className="modal-delete-text">{message}</p>
+				<div className="modal-delete-actions">
+					<button
+						type="button"
+						className="btn-secondary"
+						onClick={onCancel}
+						style={{
+							flex: 1,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							gap: '0.5rem',
+							padding: '0.75rem 1.5rem',
+							borderRadius: '0.75rem',
+							fontWeight: '600',
+							transition: 'all 0.2s',
+							cursor: 'pointer',
+						}}
+					>
+						<X className="w-4 h-4" />
+						Cancel
+					</button>
+					<button
+						type="button"
+						className="btn-danger"
+						onClick={onConfirm}
+						style={{
+							flex: 1,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							gap: '0.5rem',
+							padding: '0.75rem 1.5rem',
+							borderRadius: '0.75rem',
+							fontWeight: '600',
+							transition: 'all 0.2s',
+							cursor: 'pointer',
+						}}
+					>
+						<Trash2 className="w-4 h-4" />
+						Delete
+					</button>
 				</div>
 			</div>
 		</div>

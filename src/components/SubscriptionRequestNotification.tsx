@@ -5,6 +5,7 @@ import {
 	GET_PENDING_SUBSCRIPTION_REQUESTS,
 	APPROVE_SUBSCRIPTION_REQUEST,
 	REJECT_SUBSCRIPTION_REQUEST,
+	GET_USERS,
 } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
@@ -48,8 +49,13 @@ export function SubscriptionRequestNotification() {
 	});
 
 	const [approveRequest] = useMutation(APPROVE_SUBSCRIPTION_REQUEST, {
+		refetchQueries: [
+			{ query: GET_USERS, variables: { role: 'member' } },
+			{ query: GET_USERS, variables: { role: 'coach' } },
+		],
 		onCompleted: (data) => {
-			const membershipName = data.approveSubscriptionRequest.membership?.name || 'the selected plan';
+			const membershipName =
+				data.approveSubscriptionRequest.membership?.name || 'the selected plan';
 			dispatch(
 				addToast({
 					type: 'success',
@@ -70,6 +76,10 @@ export function SubscriptionRequestNotification() {
 	});
 
 	const [rejectRequest] = useMutation(REJECT_SUBSCRIPTION_REQUEST, {
+		refetchQueries: [
+			{ query: GET_USERS, variables: { role: 'member' } },
+			{ query: GET_USERS, variables: { role: 'coach' } },
+		],
 		onCompleted: () => {
 			dispatch(
 				addToast({
@@ -211,7 +221,12 @@ export function SubscriptionRequestNotification() {
 							) : (
 								<div className="space-y-3">
 									{pendingRequests.map((request) => {
-										if (!request || !request.member || !request.membership || !request.membership.id) {
+										if (
+											!request ||
+											!request.member ||
+											!request.membership ||
+											!request.membership.id
+										) {
 											return null; // Skip invalid requests
 										}
 
@@ -228,7 +243,8 @@ export function SubscriptionRequestNotification() {
 												<div className="flex items-start justify-between mb-3">
 													<div className="flex-1">
 														<h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
-															{request.member?.firstName || 'Unknown'} {request.member?.lastName || ''}
+															{request.member?.firstName || 'Unknown'}{' '}
+															{request.member?.lastName || ''}
 														</h4>
 														<p className="text-xs text-[var(--text-secondary)] mb-2">
 															{request.member?.email || 'No email'}
@@ -301,4 +317,3 @@ export function SubscriptionRequestNotification() {
 		</div>
 	);
 }
-

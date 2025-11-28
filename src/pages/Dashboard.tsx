@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import { Link } from 'react-router';
-import { Users, UserCog, DollarSign, CreditCard, BarChart3 } from 'lucide-react';
+import { Users, UserCog, DollarSign, CreditCard, BarChart3, RefreshCw } from 'lucide-react';
 import { GET_USERS } from '@/graphql/operations/index';
 
 export function DashboardPage() {
@@ -10,17 +10,28 @@ export function DashboardPage() {
 	}, []);
 
 	// Fetch members and coaches separately
-	const { data: membersData, loading: membersLoading } = useQuery(GET_USERS, {
+	const { data: membersData, loading: membersLoading, refetch: refetchMembers } = useQuery(GET_USERS, {
 		variables: { role: 'member' },
 		errorPolicy: 'none',
 		pollInterval: 30000,
 	});
 
-	const { data: coachesData, loading: coachesLoading } = useQuery(GET_USERS, {
+	const { data: coachesData, loading: coachesLoading, refetch: refetchCoaches } = useQuery(GET_USERS, {
 		variables: { role: 'coach' },
 		errorPolicy: 'none',
 		pollInterval: 30000,
 	});
+
+	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	const handleRefresh = async () => {
+		setIsRefreshing(true);
+		try {
+			await Promise.all([refetchMembers(), refetchCoaches()]);
+		} finally {
+			setIsRefreshing(false);
+		}
+	};
 
 	const loading = membersLoading || coachesLoading;
 	const error = null; // Handle errors separately if needed
@@ -66,20 +77,24 @@ export function DashboardPage() {
 		);
 	}
 
-	const members = (data?.members || []).map((m: any) => ({
-		id: m.id,
-		name: `${m.firstName} ${m.lastName}`,
-		email: m.email,
-		phone: m.phoneNumber || 'N/A',
-		membership: m.membershipDetails?.membershipTransaction?.membership?.name || 'No Plan',
-		status: m.membershipDetails?.membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive',
-		joinDate: m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A',
-		avatar: `${m.firstName?.[0] || ''}${m.lastName?.[0] || ''}`,
-		progress: {
-			weightLost: 0,
-			workoutsCompleted: 0,
-		},
-	}));
+	const members = (data?.members || []).map((m: any) => {
+		const membershipTransaction = m.currentMembership || m.membershipDetails?.membershipTransaction;
+		return {
+			id: m.id,
+			name: `${m.firstName} ${m.lastName}`,
+			email: m.email,
+			phone: m.phoneNumber || 'N/A',
+			membership: membershipTransaction?.membership?.name || 'No Plan',
+			status: membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive',
+			joinDate: m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A',
+			avatar: `${m.firstName?.[0] || ''}${m.lastName?.[0] || ''}`,
+			monthlyPrice: membershipTransaction?.membership?.monthlyPrice || 0,
+			progress: {
+				weightLost: 0,
+				workoutsCompleted: 0,
+			},
+		};
+	});
 
 	const coaches = (data?.coaches || []).map((c: any) => ({
 		id: c.id,
@@ -98,8 +113,10 @@ export function DashboardPage() {
 	const totalMembers = members.length;
 	const totalCoaches = coaches.length;
 	const activeSubscriptions = members.filter((m) => m.status === 'Active').length;
-	// TODO: Get actual revenue from membership transactions API
-	const monthlyRevenue = activeSubscriptions * 50; // Placeholder calculation
+	// Calculate monthly revenue from actual subscription prices
+	const monthlyRevenue = members
+		.filter((m) => m.status === 'Active')
+		.reduce((total, m) => total + (m.monthlyPrice || 0), 0);
 
 	// Recent members (last 3) - sort by join date
 	const recentMembers = [...members]
@@ -122,11 +139,22 @@ export function DashboardPage() {
 			{/* Welcome Section */}
 			<div className="welcome-section relative rounded-[20px] overflow-hidden p-10">
 				<div className="welcome-bg-image"></div>
-				<div className="welcome-content relative z-10">
-					<h1 className="text-[2.2rem] font-bold mb-2 gradient-text">Welcome Back, Admin!</h1>
-					<p className="text-[var(--text-secondary)] text-[1.05rem]">
-						Manage your gym operations, members, coaches, and track your business performance.
-					</p>
+				<div className="welcome-content relative z-10 flex items-center justify-between">
+					<div>
+						<h1 className="text-[2.2rem] font-bold mb-2 gradient-text">Welcome Back, Admin!</h1>
+						<p className="text-[var(--text-secondary)] text-[1.05rem]">
+							Manage your gym operations, members, coaches, and track your business performance.
+						</p>
+					</div>
+					<button
+						onClick={handleRefresh}
+						disabled={isRefreshing || loading}
+						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+						title="Refresh data"
+					>
+						<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+						Refresh
+					</button>
 				</div>
 			</div>
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Plus, Eye, Edit, Trash2, CreditCard, Crown } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, CreditCard, Crown, RefreshCw } from 'lucide-react';
 import { MembershipFormModal, type MembershipFormData } from '@/components/modals/MembershipFormModal';
 import { MembershipViewModal } from '@/components/modals/MembershipViewModal';
 import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
@@ -29,11 +29,21 @@ export function MembershipsPage() {
 	const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 	const [successMessage, setSuccessMessage] = useState('');
 	const [isEditMode, setIsEditMode] = useState(false);
+	const [isRefreshing, setIsRefreshing] = useState(false);
 
 	// GraphQL queries and mutations
 	const { data, loading, error, refetch } = useQuery(GET_ALL_MEMBERSHIPS, {
 		errorPolicy: 'none',
 	});
+
+	const handleRefresh = async () => {
+		setIsRefreshing(true);
+		try {
+			await refetch();
+		} finally {
+			setIsRefreshing(false);
+		}
+	};
 
 	const [createMembership, { loading: creating }] = useMutation(CREATE_MEMBERSHIP, {
 		onCompleted: () => {
@@ -188,10 +198,21 @@ export function MembershipsPage() {
 						Manage membership plans, pricing, and features ({plans.length} plans)
 					</p>
 				</div>
-				<Button onClick={handleCreatePlan}>
-					<Plus className="w-4 h-4" />
-					Add New Plan
-				</Button>
+				<div className="flex items-center gap-3">
+					<button
+						onClick={handleRefresh}
+						disabled={isRefreshing || loading}
+						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+						title="Refresh data"
+					>
+						<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+						Refresh
+					</button>
+					<Button onClick={handleCreatePlan}>
+						<Plus className="w-4 h-4" />
+						Add New Plan
+					</Button>
+				</div>
 			</div>
 
 			<div className="plans-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
