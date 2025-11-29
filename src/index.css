@@ -766,6 +766,7 @@
 	transition: var(--transition);
 	position: relative;
 	overflow: hidden;
+	cursor: pointer;
 }
 
 .btn-primary:hover {
@@ -778,6 +779,7 @@
 	color: var(--text-secondary);
 	border: 1px solid rgba(255, 255, 255, 0.1);
 	transition: var(--transition);
+	cursor: pointer;
 }
 
 .btn-secondary:hover {
@@ -1516,6 +1518,7 @@
 .modal-body .form-group input[type='email'],
 .modal-body .form-group input[type='tel'],
 .modal-body .form-group input[type='number'],
+.modal-body .form-group input[type='date'],
 .modal-body .form-group select,
 .modal-body .form-group textarea {
 	width: 100%;
@@ -1529,6 +1532,115 @@
 	transition: var(--transition);
 }
 
+.modal-body .form-group input[type='date'] {
+	position: relative;
+}
+
+.modal-body .form-group input[type='date']::-webkit-calendar-picker-indicator {
+	cursor: pointer;
+	filter: invert(1);
+	opacity: 0.7;
+	transition: opacity 0.3s ease;
+}
+
+.modal-body .form-group input[type='date']::-webkit-calendar-picker-indicator:hover {
+	opacity: 1;
+}
+
+.modal-body .form-group select option {
+	background: var(--bg-darker);
+	color: var(--text-primary);
+	padding: 0.75rem 1rem;
+}
+
+/* Date Picker Dropdown Styling */
+[data-slot="popover-content"] .rdp-dropdown {
+	background: rgba(255, 255, 255, 0.1);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 8px;
+	padding: 0.5rem 0.75rem;
+	color: #ffffff;
+	font-size: 0.9rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.3s ease;
+	min-width: 100px;
+}
+
+[data-slot="popover-content"] .rdp-dropdown:hover {
+	background: rgba(255, 255, 255, 0.15);
+	border-color: var(--primary-yellow);
+}
+
+[data-slot="popover-content"] .rdp-dropdown:focus {
+	outline: none;
+	border-color: var(--primary-yellow);
+	box-shadow: 0 0 0 3px rgba(249, 197, 19, 0.1);
+	background: rgba(255, 255, 255, 0.15);
+}
+
+[data-slot="popover-content"] .rdp-dropdown option {
+	background: rgba(30, 30, 35, 0.95);
+	color: #ffffff;
+	padding: 0.75rem 1rem;
+	font-size: 0.95rem;
+	font-weight: 600;
+	line-height: 1.5;
+}
+
+[data-slot="popover-content"] .rdp-dropdown option:hover,
+[data-slot="popover-content"] .rdp-dropdown option:focus {
+	background: rgba(249, 197, 19, 0.2);
+	color: var(--primary-yellow);
+	font-weight: 700;
+}
+
+[data-slot="popover-content"] .rdp-dropdown option:checked,
+[data-slot="popover-content"] .rdp-dropdown option[selected] {
+	background: rgba(249, 197, 19, 0.25);
+	color: var(--primary-yellow);
+	font-weight: 700;
+}
+
+[data-slot="popover-content"] .rdp-dropdown_root {
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 8px;
+	padding: 0.25rem;
+}
+
+[data-slot="popover-content"] .rdp-dropdowns {
+	gap: 0.75rem;
+	margin-bottom: 0.5rem;
+}
+
+/* Ensure dropdown text is always visible with high contrast */
+[data-slot="popover-content"] .rdp-dropdown,
+[data-slot="popover-content"] .rdp-dropdown * {
+	color: #ffffff !important;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Additional styling for better visibility across browsers */
+[data-slot="popover-content"] select.rdp-dropdown {
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23F9C513' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 0.75rem center;
+	background-size: 12px;
+	padding-right: 2.5rem;
+}
+
+/* Firefox specific styling */
+@-moz-document url-prefix() {
+	[data-slot="popover-content"] .rdp-dropdown option {
+		background-color: rgba(30, 30, 35, 0.95) !important;
+		color: #ffffff !important;
+	}
+}
+
 .modal-body .form-group input::placeholder {
 	color: var(--text-secondary);
 	opacity: 0.6;
@@ -1539,6 +1651,7 @@
 .modal-body .form-group input[type='email']:focus,
 .modal-body .form-group input[type='tel']:focus,
 .modal-body .form-group input[type='number']:focus,
+.modal-body .form-group input[type='date']:focus,
 .modal-body .form-group select:focus,
 .modal-body .form-group textarea:focus {
 	outline: none;
@@ -1577,6 +1690,26 @@
 	gap: 0.5rem;
 	font-family: 'Inter', sans-serif;
 	border: none;
+}
+
+/* Add cursor-pointer to all buttons */
+button:not(:disabled),
+.btn-primary:not(:disabled),
+.btn-secondary:not(:disabled),
+.btn-danger:not(:disabled),
+.btn-small:not(:disabled),
+.btn-view:not(:disabled),
+.btn-delete:not(:disabled),
+.btn-edit:not(:disabled),
+.modal-close:not(:disabled),
+[role="button"]:not(:disabled) {
+	cursor: pointer;
+}
+
+button:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled {
+	cursor: not-allowed;
 }
 
 .modal-footer .btn-secondary {
@@ -1815,4 +1948,62 @@
 .modal-button-full {
 	width: 100%;
 	justify-content: center;
+}
+
+/* Dropdown Option Styling - Make options clearly visible in Coach and Member Management pages */
+.search-filter-bar select option,
+.coaches-page select option,
+.members-page select option {
+	background: rgba(30, 30, 35, 0.95) !important;
+	color: #ffffff !important;
+	padding: 0.75rem 1rem !important;
+	font-size: 0.9rem !important;
+	font-weight: 500 !important;
+	font-family: 'Inter', sans-serif !important;
+}
+
+.search-filter-bar select option:hover,
+.search-filter-bar select option:focus,
+.search-filter-bar select option:checked,
+.coaches-page select option:hover,
+.coaches-page select option:focus,
+.coaches-page select option:checked,
+.members-page select option:hover,
+.members-page select option:focus,
+.members-page select option:checked {
+	background: rgba(249, 197, 19, 0.2) !important;
+	color: var(--primary-yellow) !important;
+	font-weight: 600 !important;
+}
+
+.search-filter-bar select option[selected],
+.coaches-page select option[selected],
+.members-page select option[selected] {
+	background: rgba(249, 197, 19, 0.25) !important;
+	color: var(--primary-yellow) !important;
+	font-weight: 600 !important;
+}
+
+/* General select option styling for better visibility */
+select option {
+	background: rgba(30, 30, 35, 0.95) !important;
+	color: #ffffff !important;
+	padding: 0.75rem 1rem !important;
+	font-size: 0.9rem !important;
+	font-weight: 500 !important;
+	font-family: 'Inter', sans-serif !important;
+}
+
+select option:hover,
+select option:focus,
+select option:checked {
+	background: rgba(249, 197, 19, 0.2) !important;
+	color: var(--primary-yellow) !important;
+	font-weight: 600 !important;
+}
+
+select option[selected] {
+	background: rgba(249, 197, 19, 0.25) !important;
+	color: var(--primary-yellow) !important;
+	font-weight: 600 !important;
 }

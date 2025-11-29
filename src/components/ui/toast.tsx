@@ -16,7 +16,7 @@ export function ToastContainer() {
 	const dispatch = useAppDispatch();
 
 	return (
-		<div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-md w-full">
+		<div className="fixed top-4 right-4 flex flex-col gap-2 max-w-md w-full" style={{ zIndex: 9999 }}>
 			{toasts.map((toast) => {
 				const Icon = icons[toast.type];
 				return (

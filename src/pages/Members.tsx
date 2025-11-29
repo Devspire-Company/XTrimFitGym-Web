@@ -1,9 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { Button } from '@/components/ui/button';
 import {
 	Search,
-	Plus,
 	Eye,
 	Trash2,
 	Users,
@@ -77,7 +75,7 @@ export function MembersPage() {
 
 	// Close dropdown when clicking outside
 	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
+		const handleClickOutside = () => {
 			if (openDropdownId) {
 				setOpenDropdownId(null);
 			}
@@ -398,10 +396,6 @@ export function MembersPage() {
 						<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
 						Refresh
 					</button>
-					<Button>
-						<Plus className="w-4 h-4" />
-						Add New Member
-					</Button>
 				</div>
 			</div>
 
