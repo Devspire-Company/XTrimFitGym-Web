@@ -16,17 +16,38 @@ export function MembershipViewModal({
 }: MembershipViewModalProps) {
 	if (!isOpen || !membership) return null;
 
+	// Map API status values to display format
+	const statusMap: Record<string, string> = {
+		ACTIVE: 'Active',
+		INACTIVE: 'Inactive',
+		COMING_SOON: 'Coming Soon',
+	};
+
+	// Map API durationType values to display format
+	const durationMap: Record<string, string> = {
+		MONTHLY: 'Monthly',
+		QUARTERLY: 'Quarterly',
+		YEARLY: 'Yearly',
+	};
+
+	const displayStatus = statusMap[membership.status] || membership.status;
+	const displayDuration = durationMap[membership.durationType] || membership.durationType;
+
 	return (
-		<div className="modal-overlay" onClick={onClose}>
-			<div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
-				<div className="modal-header">
+		<div className={`modal-overlay ${isOpen ? 'active' : ''}`} onClick={onClose}>
+			<div
+				className="modal modal-large"
+				onClick={(e) => e.stopPropagation()}
+				style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}
+			>
+				<div className="modal-header" style={{ flexShrink: 0 }}>
 					<h2 className="modal-title">Membership Plan Details</h2>
 					<button className="modal-close" onClick={onClose} aria-label="Close">
 						<X size={24} />
 					</button>
 				</div>
 
-				<div className="modal-body">
+				<div className="modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
 					<div className="membership-details">
 						<div className="detail-section">
 							<h3>Plan Information</h3>
@@ -41,25 +62,25 @@ export function MembershipViewModal({
 								</div>
 								<div className="detail-item">
 									<label>Duration</label>
-									<p>{membership.durationType}</p>
+									<p>{displayDuration}</p>
 								</div>
 								<div className="detail-item">
 									<label>Status</label>
 									<span
-										className={`status-badge ${
-											membership.status === 'Active'
-												? 'status-active'
-												: membership.status === 'Inactive'
-												? 'status-inactive'
-												: 'status-pending'
+										className={`px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
+											membership.status === 'ACTIVE'
+												? 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
+												: membership.status === 'INACTIVE'
+												? 'bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
+												: 'bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]'
 										}`}
 									>
-										{membership.status}
+										{displayStatus}
 									</span>
 								</div>
 								<div className="detail-item" style={{ gridColumn: '1 / -1' }}>
 									<label>Description</label>
-									<p>{membership.description}</p>
+									<p>{membership.description || 'No description provided'}</p>
 								</div>
 							</div>
 						</div>
@@ -67,18 +88,24 @@ export function MembershipViewModal({
 						<div className="detail-section">
 							<h3>Features</h3>
 							<ul className="features-list">
-								{membership.features?.map((feature, index) => (
-									<li key={index}>
-										<Check size={18} style={{ color: 'var(--primary-yellow)' }} />
-										<span>{feature}</span>
+								{membership.features && membership.features.length > 0 ? (
+									membership.features.map((feature, index) => (
+										<li key={index}>
+											<Check size={18} style={{ color: 'var(--primary-yellow)' }} />
+											<span>{feature}</span>
+										</li>
+									))
+								) : (
+									<li style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+										No features listed
 									</li>
-								))}
+								)}
 							</ul>
 						</div>
 					</div>
 				</div>
 
-				<div className="modal-footer">
+				<div className="modal-footer" style={{ flexShrink: 0 }}>
 					<button className="btn-secondary" onClick={onClose}>
 						Close
 					</button>

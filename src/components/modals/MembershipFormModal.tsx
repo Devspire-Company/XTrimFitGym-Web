@@ -26,8 +26,6 @@ export function MembershipFormModal({
 	membership,
 	isLoading = false,
 }: MembershipFormModalProps) {
-	if (!isOpen) return null;
-
 	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const formData = new FormData(e.currentTarget);
@@ -52,10 +50,35 @@ export function MembershipFormModal({
 
 	const defaultFeatures = membership?.features?.join('\n') || '';
 
+	// Map API status values to form values
+	const statusMap: Record<string, string> = {
+		ACTIVE: 'Active',
+		INACTIVE: 'Inactive',
+		COMING_SOON: 'Coming Soon',
+	};
+
+	// Map API durationType values to form values
+	const durationMap: Record<string, string> = {
+		MONTHLY: 'Monthly',
+		QUARTERLY: 'Quarterly',
+		YEARLY: 'Yearly',
+	};
+
+	const defaultStatus = membership?.status ? statusMap[membership.status] || 'Active' : 'Active';
+	const defaultDurationType = membership?.durationType
+		? durationMap[membership.durationType] || 'Monthly'
+		: 'Monthly';
+
+	if (!isOpen) return null;
+
 	return (
-		<div className="modal-overlay" onClick={onClose}>
-			<div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
-				<div className="modal-header">
+		<div className={`modal-overlay ${isOpen ? 'active' : ''}`} onClick={onClose}>
+			<div
+				className="modal modal-large"
+				onClick={(e) => e.stopPropagation()}
+				style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}
+			>
+				<div className="modal-header" style={{ flexShrink: 0 }}>
 					<h2 className="modal-title">
 						{membership ? 'Edit Membership Plan' : 'Create Membership Plan'}
 					</h2>
@@ -64,8 +87,11 @@ export function MembershipFormModal({
 					</button>
 				</div>
 
-				<form onSubmit={handleSubmit}>
-					<div className="modal-body">
+				<form
+					onSubmit={handleSubmit}
+					style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+				>
+					<div className="modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
 						<div className="form-grid">
 							<div className="form-group">
 								<label htmlFor="name">Plan Name *</label>
@@ -98,23 +124,18 @@ export function MembershipFormModal({
 								<select
 									id="durationType"
 									name="durationType"
-									defaultValue={membership?.durationType || 'Monthly'}
+									defaultValue={defaultDurationType}
 									required
 								>
 									<option value="Monthly">Monthly</option>
-									<option value="Quarterly">Quarterly (3 months)</option>
+									<option value="Quarterly">Quarterly</option>
 									<option value="Yearly">Yearly</option>
 								</select>
 							</div>
 
 							<div className="form-group">
 								<label htmlFor="status">Status *</label>
-								<select
-									id="status"
-									name="status"
-									defaultValue={membership?.status || 'Active'}
-									required
-								>
+								<select id="status" name="status" defaultValue={defaultStatus} required>
 									<option value="Active">Active</option>
 									<option value="Inactive">Inactive</option>
 									<option value="Coming Soon">Coming Soon</option>
@@ -143,27 +164,20 @@ export function MembershipFormModal({
 									rows={6}
 									placeholder="Gym access (6am-10pm)&#10;Basic equipment access&#10;Locker facilities"
 								/>
-								<small style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'block' }}>
+								<small
+									style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'block' }}
+								>
 									Enter each feature on a new line
 								</small>
 							</div>
 						</div>
 					</div>
 
-					<div className="modal-footer">
-						<button
-							type="button"
-							className="btn-secondary"
-							onClick={onClose}
-							disabled={isLoading}
-						>
+					<div className="modal-footer" style={{ flexShrink: 0 }}>
+						<button type="button" className="btn-secondary" onClick={onClose} disabled={isLoading}>
 							Cancel
 						</button>
-						<button
-							type="submit"
-							className="btn-primary"
-							disabled={isLoading}
-						>
+						<button type="submit" className="btn-primary" disabled={isLoading}>
 							{isLoading ? 'Saving...' : membership ? 'Update Plan' : 'Create Plan'}
 						</button>
 					</div>
@@ -172,4 +186,3 @@ export function MembershipFormModal({
 		</div>
 	);
 }
-

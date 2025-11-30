@@ -105,6 +105,23 @@ export function MembershipsPage() {
 	};
 
 	const handleFormSubmit = (formData: MembershipFormData) => {
+		// Map status from form format to API format
+		const statusMap: Record<string, 'ACTIVE' | 'INACTIVE' | 'COMING_SOON'> = {
+			'Active': 'ACTIVE',
+			'Inactive': 'INACTIVE',
+			'Coming Soon': 'COMING_SOON',
+		};
+
+		// Map durationType from form format to API format
+		const durationMap: Record<string, 'MONTHLY' | 'QUARTERLY' | 'YEARLY'> = {
+			'Monthly': 'MONTHLY',
+			'Quarterly': 'QUARTERLY',
+			'Yearly': 'YEARLY',
+		};
+
+		const status = statusMap[formData.status] || 'ACTIVE';
+		const durationType = durationMap[formData.durationType] || 'MONTHLY';
+
 		if (isEditMode && selectedPlan) {
 			// Update existing plan
 			updateMembership({
@@ -115,8 +132,8 @@ export function MembershipsPage() {
 						monthlyPrice: formData.monthlyPrice,
 						description: formData.description,
 						features: formData.features,
-						status: formData.status.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'COMING_SOON',
-						durationType: formData.durationType.toUpperCase() as 'MONTHLY' | 'QUARTERLY' | 'YEARLY',
+						status,
+						durationType,
 					},
 				},
 			});
@@ -129,8 +146,8 @@ export function MembershipsPage() {
 						monthlyPrice: formData.monthlyPrice,
 						description: formData.description,
 						features: formData.features,
-						status: formData.status.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'COMING_SOON',
-						durationType: formData.durationType.toUpperCase() as 'MONTHLY' | 'QUARTERLY' | 'YEARLY',
+						status,
+						durationType,
 					},
 				},
 			});
