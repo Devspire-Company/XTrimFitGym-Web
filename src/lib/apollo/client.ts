@@ -5,14 +5,37 @@ import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 
+const getGraphQLUrl = () => {
+	// Backend server runs on port 8080 by default (see XTrimFitGym-Api/src/server.ts)
+	const url = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
+	// Only log in development mode
+	if (import.meta.env.DEV) {
+		console.log(`[Apollo Client] Connecting to GraphQL endpoint: ${url}`);
+	}
+	return url;
+};
+
 const httpLink = createHttpLink({
-	uri: import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:4000/graphql',
+	uri: getGraphQLUrl(),
+	fetchOptions: {
+		mode: 'cors',
+	},
 });
 
 // WebSocket link for real-time subscriptions
+const getWebSocketUrl = () => {
+	// Backend server runs on port 8080 by default
+	const wsUrl = import.meta.env.VITE_GRAPHQL_WS_URL || 'ws://localhost:8080/graphql';
+	// Only log in development mode
+	if (import.meta.env.DEV) {
+		console.log(`[Apollo Client] WebSocket URL: ${wsUrl}`);
+	}
+	return wsUrl;
+};
+
 const wsLink = new GraphQLWsLink(
 	createClient({
-		url: import.meta.env.VITE_GRAPHQL_WS_URL || 'ws://localhost:4000/graphql',
+		url: getWebSocketUrl(),
 		connectionParams: () => {
 			const token = localStorage.getItem('authToken');
 			return {
@@ -40,15 +63,59 @@ const authLink = setContext((_, { headers }) => {
 	};
 });
 
-const errorLink = onError(({ graphQLErrors, networkError }) => {
+const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
 	if (graphQLErrors) {
 		graphQLErrors.forEach(({ message, locations, path }) => {
-			console.error(`[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`);
+			// Only log GraphQL errors that aren't expected (like authorization errors)
+			// Analytics queries may fail if user is not admin, which is handled gracefully
+			const operationName = operation?.operationName || '';
+			const isAnalyticsQuery =
+				operationName.includes('Analytics') || operationName.includes('Revenue');
+
+			if (isAnalyticsQuery && message.includes('Unauthorized')) {
+				// Silently handle unauthorized analytics errors - they're expected and handled with fallback data
+				return;
+			}
+
+			if (!message.includes('Unauthorized') && !message.includes('Forbidden')) {
+				console.error(
+					`[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
+				);
+			}
 		});
 	}
 
 	if (networkError) {
-		console.error(`[Network error]: ${networkError}`);
+		const operationName = operation?.operationName || 'unknown';
+		const isAnalyticsQuery =
+			operationName.includes('Analytics') ||
+			operationName.includes('Revenue') ||
+			operationName.includes('RevenueSummary');
+
+		// Check if this is a real connectivity issue vs a handled error
+		const isRealNetworkError =
+			networkError.message.includes('Failed to fetch') ||
+			networkError.message.includes('NetworkError') ||
+			networkError.message.includes('Network request failed');
+
+		// For analytics queries, suppress network errors - they're handled gracefully with fallback data
+		if (isAnalyticsQuery) {
+			// Don't log analytics query network errors - they're expected and handled
+			return;
+		}
+
+		// Only log real network errors for non-analytics queries
+		if (isRealNetworkError) {
+			const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
+			console.error(`[Network error]: ${networkError}`);
+			console.error(`Failed to connect to GraphQL endpoint: ${graphqlUrl}`);
+			console.error('Possible causes:');
+			console.error('1. Backend server is not running (check XTrimFitGym-Api)');
+			console.error('2. GraphQL endpoint URL is incorrect');
+			console.error('3. CORS configuration issue');
+			console.error(`4. Check if ${graphqlUrl} is accessible`);
+			console.error('5. Make sure the backend server is running on port 8080');
+		}
 	}
 });
 

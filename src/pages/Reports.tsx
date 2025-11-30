@@ -14,7 +14,7 @@ import {
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { BarChart3, DollarSign, Users, UserCog, Dumbbell, RefreshCw } from 'lucide-react';
-import { GET_USERS } from '@/graphql/operations/index';
+import { GET_USERS, GET_REVENUE_SUMMARY, GET_ANALYTICS_RANGE } from '@/graphql/operations/index';
 
 ChartJS.register(
 	CategoryScale,
@@ -33,6 +33,9 @@ export function ReportsPage() {
 		document.title = 'Reports & Analytics - X-TRIM FIT GYM';
 	}, []);
 
+	// ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+	const [isRefreshing, setIsRefreshing] = useState(false);
+
 	// Fetch members and coaches separately
 	const { data: membersData, loading: membersLoading, refetch: refetchMembers } = useQuery(GET_USERS, {
 		variables: { role: 'member' },
@@ -44,69 +47,61 @@ export function ReportsPage() {
 		errorPolicy: 'none',
 	});
 
+	// Fetch analytics data from stored analytics schema
+	const { data: analyticsData, loading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useQuery(GET_REVENUE_SUMMARY, {
+		errorPolicy: 'all',
+		fetchPolicy: 'cache-and-network',
+		notifyOnNetworkStatusChange: true,
+		onError: (error) => {
+			// Silently handle analytics errors - we'll use fallback data
+			console.warn('[Reports] Analytics query failed, using fallback data:', error.message);
+		},
+	});
+
+	// Get last 30 days of analytics for revenue chart
+	const endDate = new Date();
+	const startDate = new Date();
+	startDate.setDate(startDate.getDate() - 30);
+	
+	const { data: analyticsRangeData, loading: analyticsRangeLoading, error: analyticsRangeError } = useQuery(GET_ANALYTICS_RANGE, {
+		variables: {
+			dateRange: {
+				startDate: startDate.toISOString(),
+				endDate: endDate.toISOString(),
+			},
+		},
+		errorPolicy: 'all',
+		fetchPolicy: 'cache-and-network',
+		notifyOnNetworkStatusChange: true,
+		onError: (error) => {
+			// Silently handle analytics range errors - we'll use fallback data
+			console.warn('[Reports] Analytics range query failed, using fallback data:', error.message);
+		},
+	});
+
+	// Only block on members and coaches loading - analytics can load in background
 	const loading = membersLoading || coachesLoading;
-	const error = null; // Handle errors separately if needed
+	const error = analyticsError || analyticsRangeError || null;
 	const data = {
 		members: membersData?.getUsers || [],
 		coaches: coachesData?.getUsers || [],
 	};
-	const [isRefreshing, setIsRefreshing] = useState(false);
 
-	const refetch = async () => {
-		setIsRefreshing(true);
-		try {
-			await Promise.all([refetchMembers(), refetchCoaches()]);
-		} finally {
-			setIsRefreshing(false);
-		}
-	};
-
-	// Show loading state
-	if (loading) {
-		return (
-			<div className="flex items-center justify-center min-h-[400px]">
-				<div className="text-center">
-					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary-yellow)] mx-auto mb-4"></div>
-					<p className="text-[var(--text-secondary)]">Loading reports...</p>
-				</div>
-			</div>
-		);
-	}
-
-	// Show error state
-	if (error || !data) {
-		return (
-			<div className="flex items-center justify-center min-h-[400px]">
-				<div className="text-center">
-					<div className="text-red-500 mb-4">
-						<svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-						</svg>
-					</div>
-					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Load Reports</h2>
-					<p className="text-[var(--text-secondary)] mb-4">
-						{error?.message || 'Failed to connect to the server'}
-					</p>
-					<button 
-						onClick={() => refetch()} 
-						className="btn-primary"
-					>
-						Retry
-					</button>
-				</div>
-			</div>
-		);
-	}
-
+	// Prepare data transformations (must be before early returns to avoid hook order issues)
 	const members = (data?.members || []).map((m: any) => {
-		const membershipTransaction = m.currentMembership || m.membershipDetails?.membershipTransaction;
+		// IMPORTANT: Only use currentMembership which only returns ACTIVE transactions
+		// Do NOT use membershipDetails.membershipTransaction as it may include canceled/expired transactions
+		const membershipTransaction = m.currentMembership;
+		// Only consider it active if the transaction exists and status is ACTIVE
+		const isActive = membershipTransaction?.status === 'ACTIVE';
 		return {
 			id: m.id,
 			name: `${m.firstName} ${m.lastName}`,
-			status: membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive',
-			membership: membershipTransaction?.membership?.name || 'No Plan',
+			status: isActive ? 'Active' : 'Inactive',
+			membership: isActive ? (membershipTransaction?.membership?.name || 'No Plan') : 'No Plan',
 			joinDate: m.createdAt || new Date().toISOString(),
-			monthlyPrice: membershipTransaction?.membership?.monthlyPrice || 0,
+			// Only include price if transaction is ACTIVE
+			monthlyPrice: isActive ? (membershipTransaction?.membership?.monthlyPrice || 0) : 0,
 		};
 	});
 
@@ -116,14 +111,6 @@ export function ReportsPage() {
 		specialization: c.coachDetails?.specialization?.[0] || 'General Fitness',
 	}));
 
-	const totalMembers = members.length;
-	const activeMembers = members.filter((m: any) => m.status === 'Active').length;
-	// Calculate total revenue from actual subscription prices
-	const totalRevenue = members
-		.filter((m: any) => m.status === 'Active')
-		.reduce((total, m) => total + (m.monthlyPrice || 0), 0);
-	const totalWorkouts = 0; // Would need session logs from API
-	const totalWeightLost = 0; // Would need session logs from API
 
 	// Group members by membership type
 	const membershipTypes = members.reduce((acc: any, m: any) => {
@@ -131,28 +118,81 @@ export function ReportsPage() {
 		return acc;
 	}, {});
 
-	const revenueData = {
-		labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-		datasets: [
-			{
-				label: 'Revenue',
-				data: [2500, 3000, 2800, 3200],
-				borderColor: '#F9C513',
-				backgroundColor: 'rgba(249, 197, 19, 0.1)',
-				tension: 0.4,
-			},
-		],
-	};
+	// Use analytics data from stored analytics schema
+	const analytics = analyticsData?.getRevenueSummary;
 
-	const membershipData = {
-		labels: Object.keys(membershipTypes),
-		datasets: [
-			{
-				data: Object.values(membershipTypes),
-				backgroundColor: ['#F9C513', '#E41E26', '#10B981', '#3B82F6'],
-			},
-		],
-	};
+	// ALL HOOKS (including useMemo) MUST BE CALLED BEFORE EARLY RETURNS
+	// Use analytics range data for revenue chart
+	const revenueData = useMemo(() => {
+		const analyticsRange = analyticsRangeData?.getAnalyticsRange || [];
+		
+		// If we have analytics data, use it; otherwise use placeholder
+		if (analyticsRange.length > 0) {
+			// Group by week or use daily data
+			const labels = analyticsRange.map((a: any) => {
+				const date = new Date(a.date);
+				return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+			}).slice(-30); // Last 30 days
+			
+			const data = analyticsRange.map((a: any) => a.totalRevenue).slice(-30);
+			
+			return {
+				labels,
+				datasets: [
+					{
+						label: 'Total Revenue',
+						data,
+						borderColor: '#F9C513',
+						backgroundColor: 'rgba(249, 197, 19, 0.1)',
+						tension: 0.4,
+					},
+				],
+			};
+		}
+		
+		// Fallback to placeholder data
+		return {
+			labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+			datasets: [
+				{
+					label: 'Revenue',
+					data: [2500, 3000, 2800, 3200],
+					borderColor: '#F9C513',
+					backgroundColor: 'rgba(249, 197, 19, 0.1)',
+					tension: 0.4,
+				},
+			],
+		};
+	}, [analyticsRangeData]);
+
+	// Use analytics data for membership distribution if available
+	const membershipData = useMemo(() => {
+		const revenueByMembership = analytics?.revenueByMembership || [];
+		
+		if (revenueByMembership.length > 0) {
+			return {
+				labels: revenueByMembership.map((m: any) => m.membershipName),
+				datasets: [
+					{
+						label: 'Subscriptions',
+						data: revenueByMembership.map((m: any) => m.count),
+						backgroundColor: ['#F9C513', '#E41E26', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'],
+					},
+				],
+			};
+		}
+		
+		// Fallback to member-based distribution
+		return {
+			labels: Object.keys(membershipTypes),
+			datasets: [
+				{
+					data: Object.values(membershipTypes),
+					backgroundColor: ['#F9C513', '#E41E26', '#10B981', '#3B82F6'],
+				},
+			],
+		};
+	}, [analytics, membershipTypes]);
 
 	// Group members by month for growth data
 	const memberGrowthData = useMemo(() => {
@@ -178,6 +218,69 @@ export function ReportsPage() {
 		};
 	}, [members]);
 
+	// Calculate derived values (after all hooks)
+	const totalMembers = members.length;
+	const activeMembers = members.filter((m: any) => m.status === 'Active').length;
+	const totalRevenue = analytics?.totalRevenue || 0;
+	const activeSubscriptions = analytics?.activeSubscriptions || 0;
+	const newSubscriptions = analytics?.newSubscriptions || 0;
+	const canceledSubscriptions = analytics?.canceledSubscriptions || 0;
+	const expiredSubscriptions = analytics?.expiredSubscriptions || 0;
+	const totalWorkouts = 0; // Would need session logs from API
+	const totalWeightLost = 0; // Would need session logs from API
+
+	const refetch = async () => {
+		setIsRefreshing(true);
+		try {
+			await Promise.all([
+				refetchMembers(), 
+				refetchCoaches(), 
+				refetchAnalytics(),
+			]);
+		} catch (err) {
+			console.error('Error refetching data:', err);
+		} finally {
+			setIsRefreshing(false);
+		}
+	};
+
+	// Show loading state only for essential data (members and coaches)
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary-yellow)] mx-auto mb-4"></div>
+					<p className="text-[var(--text-secondary)]">Loading reports...</p>
+				</div>
+			</div>
+		);
+	}
+
+	// Show error state only if essential data failed
+	if (!data || (!membersData && !coachesData)) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<div className="text-center">
+					<div className="text-red-500 mb-4">
+						<svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Load Reports</h2>
+					<p className="text-[var(--text-secondary)] mb-4">
+						Failed to load essential data. Analytics may still be loading.
+					</p>
+					<button 
+						onClick={() => refetch()} 
+						className="btn-primary"
+					>
+						Retry
+					</button>
+				</div>
+			</div>
+		);
+	}
+
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
@@ -200,6 +303,16 @@ export function ReportsPage() {
 					Refresh
 				</button>
 			</div>
+
+			{/* Analytics Error Banner - Only show if there's an actual error */}
+			{error && (
+				<div className="bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.3)] rounded-lg p-4 flex items-center gap-3">
+					<svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+					<p className="text-red-400">Analytics data unavailable. Showing fallback data.</p>
+				</div>
+			)}
 
 			{/* Summary Cards */}
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -14,6 +14,20 @@ export type Scalars = {
   Float: { input: number; output: number; }
 };
 
+export type Analytics = {
+  __typename?: 'Analytics';
+  activeSubscriptions: Scalars['Int']['output'];
+  canceledSubscriptions: Scalars['Int']['output'];
+  createdAt?: Maybe<Scalars['String']['output']>;
+  date: Scalars['String']['output'];
+  expiredSubscriptions: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  newSubscriptions: Scalars['Int']['output'];
+  revenueByMembership: Array<MembershipRevenue>;
+  totalRevenue: Scalars['Float']['output'];
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 export type ApproveSubscriptionRequestInput = {
   requestId: Scalars['ID']['input'];
 };
@@ -135,6 +149,11 @@ export type CreateUserInput = {
   role: RoleType;
 };
 
+export type DateRangeInput = {
+  endDate: Scalars['String']['input'];
+  startDate: Scalars['String']['input'];
+};
+
 export type DirectSubscribeInput = {
   memberId: Scalars['ID']['input'];
   membershipId: Scalars['ID']['input'];
@@ -216,6 +235,14 @@ export type Membership = {
   name: Scalars['String']['output'];
   status: MembershipStatus;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type MembershipRevenue = {
+  __typename?: 'MembershipRevenue';
+  count: Scalars['Int']['output'];
+  membershipId: Scalars['ID']['output'];
+  membershipName: Scalars['String']['output'];
+  revenue: Scalars['Float']['output'];
 };
 
 export enum MembershipStatus {
@@ -398,12 +425,21 @@ export type MutationUpdateUserArgs = {
   input: UpdateUserInput;
 };
 
+export type PeriodRevenue = {
+  __typename?: 'PeriodRevenue';
+  count: Scalars['Int']['output'];
+  period: Scalars['String']['output'];
+  revenue: Scalars['Float']['output'];
+};
+
 export type PurchaseMembershipInput = {
   membershipId: Scalars['ID']['input'];
 };
 
 export type Query = {
   __typename?: 'Query';
+  getAnalytics?: Maybe<Analytics>;
+  getAnalyticsRange: Array<Analytics>;
   getClientRequests: Array<CoachRequest>;
   getClientSessions: Array<Session>;
   getCoachRequests: Array<CoachRequest>;
@@ -417,6 +453,7 @@ export type Query = {
   getMySubscriptionRequests: Array<SubscriptionRequest>;
   getPendingCoachRequests: Array<CoachRequest>;
   getPendingSubscriptionRequests: Array<SubscriptionRequest>;
+  getRevenueSummary: RevenueSummary;
   getSession?: Maybe<Session>;
   getSessionLogs: Array<SessionLog>;
   getSubscriptionRequest?: Maybe<SubscriptionRequest>;
@@ -425,6 +462,16 @@ export type Query = {
   getUsers?: Maybe<Array<Maybe<User>>>;
   getWeightProgress: Array<SessionLog>;
   getWeightProgressChart: Array<WeightProgress>;
+};
+
+
+export type QueryGetAnalyticsArgs = {
+  date: Scalars['String']['input'];
+};
+
+
+export type QueryGetAnalyticsRangeArgs = {
+  dateRange: DateRangeInput;
 };
 
 
@@ -478,6 +525,11 @@ export type QueryGetMembershipsArgs = {
 };
 
 
+export type QueryGetRevenueSummaryArgs = {
+  dateRange?: InputMaybe<DateRangeInput>;
+};
+
+
 export type QueryGetSessionArgs = {
   id: Scalars['ID']['input'];
 };
@@ -516,6 +568,17 @@ export type QueryGetWeightProgressChartArgs = {
 
 export type RejectSubscriptionRequestInput = {
   requestId: Scalars['ID']['input'];
+};
+
+export type RevenueSummary = {
+  __typename?: 'RevenueSummary';
+  activeSubscriptions: Scalars['Int']['output'];
+  canceledSubscriptions: Scalars['Int']['output'];
+  expiredSubscriptions: Scalars['Int']['output'];
+  newSubscriptions: Scalars['Int']['output'];
+  revenueByMembership: Array<MembershipRevenue>;
+  revenueByPeriod: Array<PeriodRevenue>;
+  totalRevenue: Scalars['Float']['output'];
 };
 
 export enum RoleType {
@@ -680,6 +743,27 @@ export type WeightProgress = {
   sessionLogId?: Maybe<Scalars['ID']['output']>;
   weight: Scalars['Float']['output'];
 };
+
+export type GetRevenueSummaryQueryVariables = Exact<{
+  dateRange?: InputMaybe<DateRangeInput>;
+}>;
+
+
+export type GetRevenueSummaryQuery = { __typename?: 'Query', getRevenueSummary: { __typename?: 'RevenueSummary', totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }>, revenueByPeriod: Array<{ __typename?: 'PeriodRevenue', period: string, revenue: number, count: number }> } };
+
+export type GetAnalyticsQueryVariables = Exact<{
+  date: Scalars['String']['input'];
+}>;
+
+
+export type GetAnalyticsQuery = { __typename?: 'Query', getAnalytics?: { __typename?: 'Analytics', id: string, date: string, totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, createdAt?: string | null, updatedAt?: string | null, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }> } | null };
+
+export type GetAnalyticsRangeQueryVariables = Exact<{
+  dateRange: DateRangeInput;
+}>;
+
+
+export type GetAnalyticsRangeQuery = { __typename?: 'Query', getAnalyticsRange: Array<{ __typename?: 'Analytics', id: string, date: string, totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, createdAt?: string | null, updatedAt?: string | null, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }> }> };
 
 export type GetAllMembershipsQueryVariables = Exact<{ [key: string]: never; }>;
 

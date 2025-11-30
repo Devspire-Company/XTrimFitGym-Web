@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import { Link } from 'react-router';
 import { Users, UserCog, DollarSign, CreditCard, BarChart3, RefreshCw } from 'lucide-react';
-import { GET_USERS } from '@/graphql/operations/index';
+import { GET_USERS, GET_REVENUE_SUMMARY } from '@/graphql/operations/index';
 
 export function DashboardPage() {
 	useEffect(() => {
@@ -22,17 +22,26 @@ export function DashboardPage() {
 		pollInterval: 30000,
 	});
 
+	// Fetch analytics data from stored analytics schema
+	const { data: analyticsData, loading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useQuery(GET_REVENUE_SUMMARY, {
+		errorPolicy: 'all',
+		fetchPolicy: 'network-only',
+		notifyOnNetworkStatusChange: true,
+		pollInterval: 30000,
+	});
+
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
 	const handleRefresh = async () => {
 		setIsRefreshing(true);
 		try {
-			await Promise.all([refetchMembers(), refetchCoaches()]);
+			await Promise.all([refetchMembers(), refetchCoaches(), refetchAnalytics()]);
 		} finally {
 			setIsRefreshing(false);
 		}
 	};
 
+	// Only block on members and coaches loading - analytics can load in background
 	const loading = membersLoading || coachesLoading;
 	const error = null; // Handle errors separately if needed
 	const data = {
@@ -78,17 +87,22 @@ export function DashboardPage() {
 	}
 
 	const members = (data?.members || []).map((m: any) => {
-		const membershipTransaction = m.currentMembership || m.membershipDetails?.membershipTransaction;
+		// IMPORTANT: Only use currentMembership which only returns ACTIVE transactions
+		// Do NOT use membershipDetails.membershipTransaction as it may include canceled/expired transactions
+		const membershipTransaction = m.currentMembership;
+		// Only consider it active if the transaction exists and status is ACTIVE
+		const isActive = membershipTransaction?.status === 'ACTIVE';
 		return {
 			id: m.id,
 			name: `${m.firstName} ${m.lastName}`,
 			email: m.email,
 			phone: m.phoneNumber || 'N/A',
-			membership: membershipTransaction?.membership?.name || 'No Plan',
-			status: membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive',
+			membership: isActive ? (membershipTransaction?.membership?.name || 'No Plan') : 'No Plan',
+			status: isActive ? 'Active' : 'Inactive',
 			joinDate: m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A',
 			avatar: `${m.firstName?.[0] || ''}${m.lastName?.[0] || ''}`,
-			monthlyPrice: membershipTransaction?.membership?.monthlyPrice || 0,
+			// Only include price if transaction is ACTIVE
+			monthlyPrice: isActive ? (membershipTransaction?.membership?.monthlyPrice || 0) : 0,
 			progress: {
 				weightLost: 0,
 				workoutsCompleted: 0,
@@ -112,11 +126,11 @@ export function DashboardPage() {
 	// Calculate stats
 	const totalMembers = members.length;
 	const totalCoaches = coaches.length;
-	const activeSubscriptions = members.filter((m) => m.status === 'Active').length;
-	// Calculate monthly revenue from actual subscription prices
-	const monthlyRevenue = members
-		.filter((m) => m.status === 'Active')
-		.reduce((total, m) => total + (m.monthlyPrice || 0), 0);
+	
+	// Use analytics data from stored analytics schema
+	const analytics = analyticsData?.getRevenueSummary;
+	const monthlyRevenue = analytics?.totalRevenue || 0;
+	const activeSubscriptions = analytics?.activeSubscriptions || 0;
 
 	// Recent members (last 3) - sort by join date
 	const recentMembers = [...members]
@@ -294,6 +308,18 @@ export function DashboardPage() {
 								<span className="text-[var(--text-secondary)]">Total Revenue</span>
 								<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
 									₱{monthlyRevenue.toLocaleString()}
+								</span>
+							</div>
+							<div className="flex items-center justify-between">
+								<span className="text-[var(--text-secondary)]">Active Subscriptions</span>
+								<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+									{activeSubscriptions}
+								</span>
+							</div>
+							<div className="flex items-center justify-between">
+								<span className="text-[var(--text-secondary)]">New This Period</span>
+								<span className="text-lg font-semibold text-[var(--primary-yellow)] font-['Poppins']">
+									+{analytics?.newSubscriptions || 0}
 								</span>
 							</div>
 							<div className="flex items-center justify-between">

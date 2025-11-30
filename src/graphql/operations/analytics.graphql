@@ -1,0 +1,62 @@
+# Analytics Queries
+query GetRevenueSummary($dateRange: DateRangeInput) {
+	getRevenueSummary(dateRange: $dateRange) {
+		totalRevenue
+		activeSubscriptions
+		newSubscriptions
+		canceledSubscriptions
+		expiredSubscriptions
+		revenueByMembership {
+			membershipId
+			membershipName
+			revenue
+			count
+		}
+		revenueByPeriod {
+			period
+			revenue
+			count
+		}
+	}
+}
+
+query GetAnalytics($date: String!) {
+	getAnalytics(date: $date) {
+		id
+		date
+		totalRevenue
+		activeSubscriptions
+		newSubscriptions
+		canceledSubscriptions
+		expiredSubscriptions
+		revenueByMembership {
+			membershipId
+			membershipName
+			revenue
+			count
+		}
+		createdAt
+		updatedAt
+	}
+}
+
+query GetAnalyticsRange($dateRange: DateRangeInput!) {
+	getAnalyticsRange(dateRange: $dateRange) {
+		id
+		date
+		totalRevenue
+		activeSubscriptions
+		newSubscriptions
+		canceledSubscriptions
+		expiredSubscriptions
+		revenueByMembership {
+			membershipId
+			membershipName
+			revenue
+			count
+		}
+		createdAt
+		updatedAt
+	}
+}
+

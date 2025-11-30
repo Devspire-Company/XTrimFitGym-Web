@@ -16,6 +16,20 @@ export type Scalars = {
   Float: { input: number; output: number; }
 };
 
+export type Analytics = {
+  __typename?: 'Analytics';
+  activeSubscriptions: Scalars['Int']['output'];
+  canceledSubscriptions: Scalars['Int']['output'];
+  createdAt?: Maybe<Scalars['String']['output']>;
+  date: Scalars['String']['output'];
+  expiredSubscriptions: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  newSubscriptions: Scalars['Int']['output'];
+  revenueByMembership: Array<MembershipRevenue>;
+  totalRevenue: Scalars['Float']['output'];
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 export type ApproveSubscriptionRequestInput = {
   requestId: Scalars['ID']['input'];
 };
@@ -137,6 +151,11 @@ export type CreateUserInput = {
   role: RoleType;
 };
 
+export type DateRangeInput = {
+  endDate: Scalars['String']['input'];
+  startDate: Scalars['String']['input'];
+};
+
 export type DirectSubscribeInput = {
   memberId: Scalars['ID']['input'];
   membershipId: Scalars['ID']['input'];
@@ -218,6 +237,14 @@ export type Membership = {
   name: Scalars['String']['output'];
   status: MembershipStatus;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type MembershipRevenue = {
+  __typename?: 'MembershipRevenue';
+  count: Scalars['Int']['output'];
+  membershipId: Scalars['ID']['output'];
+  membershipName: Scalars['String']['output'];
+  revenue: Scalars['Float']['output'];
 };
 
 export enum MembershipStatus {
@@ -400,12 +427,21 @@ export type MutationUpdateUserArgs = {
   input: UpdateUserInput;
 };
 
+export type PeriodRevenue = {
+  __typename?: 'PeriodRevenue';
+  count: Scalars['Int']['output'];
+  period: Scalars['String']['output'];
+  revenue: Scalars['Float']['output'];
+};
+
 export type PurchaseMembershipInput = {
   membershipId: Scalars['ID']['input'];
 };
 
 export type Query = {
   __typename?: 'Query';
+  getAnalytics?: Maybe<Analytics>;
+  getAnalyticsRange: Array<Analytics>;
   getClientRequests: Array<CoachRequest>;
   getClientSessions: Array<Session>;
   getCoachRequests: Array<CoachRequest>;
@@ -419,6 +455,7 @@ export type Query = {
   getMySubscriptionRequests: Array<SubscriptionRequest>;
   getPendingCoachRequests: Array<CoachRequest>;
   getPendingSubscriptionRequests: Array<SubscriptionRequest>;
+  getRevenueSummary: RevenueSummary;
   getSession?: Maybe<Session>;
   getSessionLogs: Array<SessionLog>;
   getSubscriptionRequest?: Maybe<SubscriptionRequest>;
@@ -427,6 +464,16 @@ export type Query = {
   getUsers?: Maybe<Array<Maybe<User>>>;
   getWeightProgress: Array<SessionLog>;
   getWeightProgressChart: Array<WeightProgress>;
+};
+
+
+export type QueryGetAnalyticsArgs = {
+  date: Scalars['String']['input'];
+};
+
+
+export type QueryGetAnalyticsRangeArgs = {
+  dateRange: DateRangeInput;
 };
 
 
@@ -480,6 +527,11 @@ export type QueryGetMembershipsArgs = {
 };
 
 
+export type QueryGetRevenueSummaryArgs = {
+  dateRange?: InputMaybe<DateRangeInput>;
+};
+
+
 export type QueryGetSessionArgs = {
   id: Scalars['ID']['input'];
 };
@@ -518,6 +570,17 @@ export type QueryGetWeightProgressChartArgs = {
 
 export type RejectSubscriptionRequestInput = {
   requestId: Scalars['ID']['input'];
+};
+
+export type RevenueSummary = {
+  __typename?: 'RevenueSummary';
+  activeSubscriptions: Scalars['Int']['output'];
+  canceledSubscriptions: Scalars['Int']['output'];
+  expiredSubscriptions: Scalars['Int']['output'];
+  newSubscriptions: Scalars['Int']['output'];
+  revenueByMembership: Array<MembershipRevenue>;
+  revenueByPeriod: Array<PeriodRevenue>;
+  totalRevenue: Scalars['Float']['output'];
 };
 
 export enum RoleType {
@@ -683,6 +746,27 @@ export type WeightProgress = {
   weight: Scalars['Float']['output'];
 };
 
+export type GetRevenueSummaryQueryVariables = Exact<{
+  dateRange?: InputMaybe<DateRangeInput>;
+}>;
+
+
+export type GetRevenueSummaryQuery = { __typename?: 'Query', getRevenueSummary: { __typename?: 'RevenueSummary', totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }>, revenueByPeriod: Array<{ __typename?: 'PeriodRevenue', period: string, revenue: number, count: number }> } };
+
+export type GetAnalyticsQueryVariables = Exact<{
+  date: Scalars['String']['input'];
+}>;
+
+
+export type GetAnalyticsQuery = { __typename?: 'Query', getAnalytics?: { __typename?: 'Analytics', id: string, date: string, totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, createdAt?: string | null, updatedAt?: string | null, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }> } | null };
+
+export type GetAnalyticsRangeQueryVariables = Exact<{
+  dateRange: DateRangeInput;
+}>;
+
+
+export type GetAnalyticsRangeQuery = { __typename?: 'Query', getAnalyticsRange: Array<{ __typename?: 'Analytics', id: string, date: string, totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, createdAt?: string | null, updatedAt?: string | null, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }> }> };
+
 export type GetAllMembershipsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -804,6 +888,9 @@ export type CancelMembershipMutationVariables = Exact<{
 export type CancelMembershipMutation = { __typename?: 'Mutation', cancelMembership: boolean };
 
 
+export const GetRevenueSummaryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetRevenueSummary"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dateRange"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"DateRangeInput"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getRevenueSummary"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"dateRange"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dateRange"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalRevenue"}},{"kind":"Field","name":{"kind":"Name","value":"activeSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"newSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"canceledSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"expiredSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"revenueByMembership"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"membershipId"}},{"kind":"Field","name":{"kind":"Name","value":"membershipName"}},{"kind":"Field","name":{"kind":"Name","value":"revenue"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}},{"kind":"Field","name":{"kind":"Name","value":"revenueByPeriod"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"period"}},{"kind":"Field","name":{"kind":"Name","value":"revenue"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}}]}}]} as unknown as DocumentNode<GetRevenueSummaryQuery, GetRevenueSummaryQueryVariables>;
+export const GetAnalyticsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAnalytics"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"date"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getAnalytics"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"date"},"value":{"kind":"Variable","name":{"kind":"Name","value":"date"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"totalRevenue"}},{"kind":"Field","name":{"kind":"Name","value":"activeSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"newSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"canceledSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"expiredSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"revenueByMembership"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"membershipId"}},{"kind":"Field","name":{"kind":"Name","value":"membershipName"}},{"kind":"Field","name":{"kind":"Name","value":"revenue"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<GetAnalyticsQuery, GetAnalyticsQueryVariables>;
+export const GetAnalyticsRangeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAnalyticsRange"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"dateRange"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DateRangeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getAnalyticsRange"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"dateRange"},"value":{"kind":"Variable","name":{"kind":"Name","value":"dateRange"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"date"}},{"kind":"Field","name":{"kind":"Name","value":"totalRevenue"}},{"kind":"Field","name":{"kind":"Name","value":"activeSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"newSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"canceledSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"expiredSubscriptions"}},{"kind":"Field","name":{"kind":"Name","value":"revenueByMembership"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"membershipId"}},{"kind":"Field","name":{"kind":"Name","value":"membershipName"}},{"kind":"Field","name":{"kind":"Name","value":"revenue"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<GetAnalyticsRangeQuery, GetAnalyticsRangeQueryVariables>;
 export const GetAllMembershipsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAllMemberships"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getMemberships"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"monthlyPrice"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"features"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"durationType"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<GetAllMembershipsQuery, GetAllMembershipsQueryVariables>;
 export const GetActiveMembershipsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetActiveMemberships"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getMemberships"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"EnumValue","value":"ACTIVE"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"monthlyPrice"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"features"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"durationType"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<GetActiveMembershipsQuery, GetActiveMembershipsQueryVariables>;
 export const GetCurrentMembershipDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetCurrentMembership"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getCurrentMembership"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"clientId"}},{"kind":"Field","name":{"kind":"Name","value":"membershipId"}},{"kind":"Field","name":{"kind":"Name","value":"membership"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"monthlyPrice"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"features"}},{"kind":"Field","name":{"kind":"Name","value":"durationType"}}]}},{"kind":"Field","name":{"kind":"Name","value":"priceAtPurchase"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<GetCurrentMembershipQuery, GetCurrentMembershipQueryVariables>;
