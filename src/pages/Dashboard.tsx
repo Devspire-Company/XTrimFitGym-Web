@@ -223,19 +223,6 @@ export function DashboardPage() {
 				/>
 			</div>
 
-			{/* Quick Actions */}
-			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
-				<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
-					<span className="text-[var(--primary-yellow)]">⚡</span> Quick Actions
-				</h2>
-				<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-					<QuickActionButton href="/members" icon={Users} label="Add Member" />
-					<QuickActionButton href="/coaches" icon={UserCog} label="Add Coach" />
-					<QuickActionButton href="/memberships" icon={CreditCard} label="Manage Plans" />
-					<QuickActionButton href="/reports" icon={BarChart3} label="View Reports" />
-				</div>
-			</div>
-
 			{/* Revenue Overview Chart - Full Width */}
 			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 				<h2 className="text-xl font-semibold mb-6 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
@@ -279,6 +266,19 @@ export function DashboardPage() {
 							₱{activeSubscriptions > 0 ? Math.round(monthlyRevenue / activeSubscriptions) : 0}
 						</span>
 					</div>
+				</div>
+			</div>
+
+			{/* Quick Actions */}
+			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
+				<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+					<span className="text-[var(--primary-yellow)]">⚡</span> Quick Actions
+				</h2>
+				<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+					<QuickActionButton href="/members" icon={Users} label="Add Member" />
+					<QuickActionButton href="/coaches" icon={UserCog} label="Add Coach" />
+					<QuickActionButton href="/memberships" icon={CreditCard} label="Manage Plans" />
+					<QuickActionButton href="/reports" icon={BarChart3} label="View Reports" />
 				</div>
 			</div>
 

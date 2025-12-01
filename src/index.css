@@ -535,12 +535,12 @@
 
 /* Expand on hover - CSS fallback */
 .sidebar:hover {
-	width: 280px;
+	width: var(--sidebar-expanded-width, 280px);
 	padding: 1.5rem;
 }
 
 .sidebar.expanded {
-	width: 280px;
+	width: var(--sidebar-expanded-width, 280px);
 	padding: 1.5rem;
 }
 

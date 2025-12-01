@@ -13,8 +13,13 @@ import {
 	EyeOff,
 	Edit,
 	RefreshCw,
+	Users,
+	Calendar,
+	Activity,
+	Clock,
+	MapPin,
 } from 'lucide-react';
-import { GET_USERS, DELETE_USER, CREATE_USER, UPDATE_USER, USERS_UPDATED } from '@/graphql/operations/index';
+import { GET_USERS, GET_USER, GET_COACH_SESSIONS, GET_COACH_SESSION_LOGS, DELETE_USER, CREATE_USER, UPDATE_USER, USERS_UPDATED } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import type { CreateUserMutation, CreateUserMutationVariables } from '@/graphql/generated/types';
@@ -657,40 +662,121 @@ export function CoachesPage() {
 }
 
 function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void }) {
+	// Fetch coach sessions
+	const { data: sessionsData, loading: sessionsLoading } = useQuery(GET_COACH_SESSIONS, {
+		variables: { coachId: coach.id },
+		skip: !coach.id,
+	});
+
+	// Fetch coach session logs
+	const { data: sessionLogsData, loading: sessionLogsLoading } = useQuery(GET_COACH_SESSION_LOGS, {
+		variables: { coachId: coach.id },
+		skip: !coach.id,
+	});
+
+	// Get unique client IDs from sessions and session logs
+	const clientIds = useMemo(() => {
+		const ids = new Set<string>();
+		if (sessionsData?.getCoachSessions) {
+			sessionsData.getCoachSessions.forEach((session: any) => {
+				if (session.clientsIds) {
+					session.clientsIds.forEach((id: string) => ids.add(id));
+				}
+				// Also get clients from populated clients array
+				if (session.clients) {
+					session.clients.forEach((client: any) => {
+						if (client?.id) ids.add(client.id);
+					});
+				}
+			});
+		}
+		if (sessionLogsData?.getCoachSessionLogs) {
+			sessionLogsData.getCoachSessionLogs.forEach((log: any) => {
+				if (log.clientId) {
+					ids.add(log.clientId);
+				}
+				// Also get client from populated client object
+				if (log.client?.id) {
+					ids.add(log.client.id);
+				}
+			});
+		}
+		return Array.from(ids);
+	}, [sessionsData, sessionLogsData]);
+
+	// Extract clients from sessions and session logs (they're already populated)
+	const clients = useMemo(() => {
+		const clientMap = new Map<string, any>();
+		
+		// Get clients from sessions
+		if (sessionsData?.getCoachSessions) {
+			sessionsData.getCoachSessions.forEach((session: any) => {
+				if (session.clients) {
+					session.clients.forEach((client: any) => {
+						if (client?.id && !clientMap.has(client.id)) {
+							clientMap.set(client.id, client);
+						}
+					});
+				}
+			});
+		}
+		
+		// Get clients from session logs
+		if (sessionLogsData?.getCoachSessionLogs) {
+			sessionLogsData.getCoachSessionLogs.forEach((log: any) => {
+				if (log.client?.id && !clientMap.has(log.client.id)) {
+					clientMap.set(log.client.id, log.client);
+				}
+			});
+		}
+		
+		return Array.from(clientMap.values());
+	}, [sessionsData, sessionLogsData]);
+	const sessions = sessionsData?.getCoachSessions || [];
+	const sessionLogs = sessionLogsData?.getCoachSessionLogs || [];
+
+	const formatDate = (dateString: string) => {
+		if (!dateString) return 'N/A';
+		try {
+			return new Date(dateString).toLocaleDateString('en-US', {
+				year: 'numeric',
+				month: 'short',
+				day: 'numeric',
+			});
+		} catch {
+			return dateString;
+		}
+	};
+
+	const formatTime = (timeString: string) => {
+		if (!timeString) return 'N/A';
+		return timeString;
+	};
+
 	return (
-		<div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
-			<div className="modal-header">
+		<div className="modal modal-large" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+			<div className="modal-header" style={{ flexShrink: 0 }}>
 				<h3>
 					<Eye className="w-5 h-5" />
-					View Coach
+					View Coach Details
 				</h3>
 				<button className="modal-close" onClick={onClose} title="Close" aria-label="Close">
 					<X className="w-5 h-5" />
 				</button>
 			</div>
-			<div className="modal-body">
-				<div className="grid grid-cols-2 gap-6">
+			<div className="modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+				{/* Basic Information Section */}
+				<div className="grid grid-cols-2 gap-6 mb-8">
 					{/* Personal Information */}
-					<div>
-						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Personal Information</h3>
+					<div className="bg-[rgba(255,255,255,0.03)] rounded-xl p-4 border border-[rgba(255,255,255,0.08)]">
+						<h3 className="font-semibold mb-3 text-[var(--text-primary)] flex items-center gap-2">
+							<UserCog className="w-4 h-4" />
+							Personal Information
+						</h3>
 						<div className="space-y-2 text-sm">
 							<div>
 								<span className="text-[var(--text-secondary)]">Full Name:</span>{' '}
 								<span className="font-medium text-[var(--text-primary)]">{coach.name}</span>
-							</div>
-							<div>
-								<span className="text-[var(--text-secondary)]">First Name:</span>{' '}
-								<span className="font-medium text-[var(--text-primary)]">{coach.firstName}</span>
-							</div>
-							{coach.middleName && (
-								<div>
-									<span className="text-[var(--text-secondary)]">Middle Name:</span>{' '}
-									<span className="font-medium text-[var(--text-primary)]">{coach.middleName}</span>
-								</div>
-							)}
-							<div>
-								<span className="text-[var(--text-secondary)]">Last Name:</span>{' '}
-								<span className="font-medium text-[var(--text-primary)]">{coach.lastName}</span>
 							</div>
 							<div>
 								<span className="text-[var(--text-secondary)]">Email:</span>{' '}
@@ -721,8 +807,9 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 						</div>
 					</div>
 					{/* Professional Information */}
-					<div>
-						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">
+					<div className="bg-[rgba(255,255,255,0.03)] rounded-xl p-4 border border-[rgba(255,255,255,0.08)]">
+						<h3 className="font-semibold mb-3 text-[var(--text-primary)] flex items-center gap-2">
+							<Activity className="w-4 h-4" />
 							Professional Information
 						</h3>
 						<div className="space-y-2 text-sm">
@@ -758,51 +845,233 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 									{coach.clientLimit || 'Unlimited'}
 								</span>
 							</div>
-						</div>
-					</div>
-					{/* Schedule Information */}
-					<div>
-						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Schedule</h3>
-						<div className="space-y-2 text-sm">
 							<div>
-								<span className="text-[var(--text-secondary)]">Teaching Days:</span>{' '}
+								<span className="text-[var(--text-secondary)]">Specialization:</span>{' '}
 								<span className="font-medium text-[var(--text-primary)]">
-									{coach.teachingDate && coach.teachingDate.length > 0
-										? coach.teachingDate.join(', ')
-										: 'N/A'}
-								</span>
-							</div>
-							<div>
-								<span className="text-[var(--text-secondary)]">Teaching Times:</span>{' '}
-								<span className="font-medium text-[var(--text-primary)]">
-									{coach.teachingTime && coach.teachingTime.length > 0
-										? coach.teachingTime.join(', ')
-										: 'N/A'}
-								</span>
-							</div>
-						</div>
-					</div>
-					1{/* Account Information */}
-					<div>
-						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Account Information</h3>
-						<div className="space-y-2 text-sm">
-							<div>
-								<span className="text-[var(--text-secondary)]">Coach ID:</span>{' '}
-								<span className="font-medium text-[var(--text-primary)] font-mono text-xs">
-									{coach.id}
-								</span>
-							</div>
-							<div>
-								<span className="text-[var(--text-secondary)]">Bio:</span>{' '}
-								<span className="font-medium text-[var(--text-primary)]">
-									{coach.bio || 'No bio available'}
+									{coach.specialization || 'N/A'}
 								</span>
 							</div>
 						</div>
 					</div>
 				</div>
+
+				{/* Schedule Section */}
+				<div className="bg-[rgba(255,255,255,0.03)] rounded-xl p-4 border border-[rgba(255,255,255,0.08)] mb-8">
+					<h3 className="font-semibold mb-3 text-[var(--text-primary)] flex items-center gap-2">
+						<Clock className="w-4 h-4" />
+						Schedule
+					</h3>
+					<div className="grid grid-cols-2 gap-4 text-sm">
+						<div>
+							<span className="text-[var(--text-secondary)]">Teaching Days:</span>{' '}
+							<span className="font-medium text-[var(--text-primary)]">
+								{coach.teachingDate && coach.teachingDate.length > 0
+									? coach.teachingDate.join(', ')
+									: 'N/A'}
+							</span>
+						</div>
+						<div>
+							<span className="text-[var(--text-secondary)]">Teaching Times:</span>{' '}
+							<span className="font-medium text-[var(--text-primary)]">
+								{coach.teachingTime && coach.teachingTime.length > 0
+									? coach.teachingTime.join(', ')
+									: 'N/A'}
+							</span>
+						</div>
+					</div>
+				</div>
+
+				{/* Clients Section */}
+				<div className="bg-[rgba(255,255,255,0.03)] rounded-xl p-4 border border-[rgba(255,255,255,0.08)] mb-8">
+					<h3 className="font-semibold mb-4 text-[var(--text-primary)] flex items-center gap-2">
+						<Users className="w-4 h-4" />
+						Clients ({clients.length})
+					</h3>
+					{sessionsLoading ? (
+						<div className="text-center py-4 text-[var(--text-secondary)]">Loading clients...</div>
+					) : clients.length > 0 ? (
+						<div className="space-y-2">
+							{clients.map((client: any) => (
+								<div
+									key={client.id}
+									className="flex items-center justify-between p-3 bg-[rgba(255,255,255,0.05)] rounded-lg border border-[rgba(255,255,255,0.08)]"
+								>
+									<div>
+										<div className="font-medium text-[var(--text-primary)]">
+											{client.firstName} {client.lastName}
+										</div>
+										<div className="text-xs text-[var(--text-secondary)]">{client.email}</div>
+									</div>
+									<div className="text-xs text-[var(--text-secondary)] font-mono">
+										ID: {client.id.slice(0, 8)}...
+									</div>
+								</div>
+							))}
+						</div>
+					) : (
+						<div className="text-center py-4 text-[var(--text-secondary)]">No clients assigned</div>
+					)}
+				</div>
+
+				{/* Sessions Section */}
+				<div className="bg-[rgba(255,255,255,0.03)] rounded-xl p-4 border border-[rgba(255,255,255,0.08)] mb-8">
+					<h3 className="font-semibold mb-4 text-[var(--text-primary)] flex items-center gap-2">
+						<Calendar className="w-4 h-4" />
+						Sessions ({sessions.length})
+					</h3>
+					{sessionsLoading ? (
+						<div className="text-center py-4 text-[var(--text-secondary)]">Loading sessions...</div>
+					) : sessions.length > 0 ? (
+						<div className="space-y-3">
+							{sessions.map((session: any) => (
+								<div
+									key={session.id}
+									className="p-4 bg-[rgba(255,255,255,0.05)] rounded-lg border border-[rgba(255,255,255,0.08)]"
+								>
+									<div className="flex items-start justify-between mb-2">
+										<div className="flex-1">
+											<div className="font-medium text-[var(--text-primary)] mb-1">
+												{session.name || 'Session'}
+											</div>
+											<div className="flex items-center gap-4 text-xs text-[var(--text-secondary)]">
+												<span className="flex items-center gap-1">
+													<Calendar className="w-3 h-3" />
+													{formatDate(session.date)}
+												</span>
+												<span className="flex items-center gap-1">
+													<Clock className="w-3 h-3" />
+													{formatTime(session.startTime)}
+													{session.endTime && ` - ${formatTime(session.endTime)}`}
+												</span>
+												{session.gymArea && (
+													<span className="flex items-center gap-1">
+														<MapPin className="w-3 h-3" />
+														{session.gymArea}
+													</span>
+												)}
+											</div>
+										</div>
+										<span
+											className={`px-2 py-1 text-xs rounded-lg font-semibold ${
+												session.status === 'completed'
+													? 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
+													: session.status === 'cancelled'
+														? 'bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]'
+														: 'bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]'
+											}`}
+										>
+											{session.status}
+										</span>
+									</div>
+									{session.clients && session.clients.length > 0 && (
+										<div className="mt-2 pt-2 border-t border-[rgba(255,255,255,0.08)]">
+											<div className="text-xs text-[var(--text-secondary)] mb-1">Clients:</div>
+											<div className="flex flex-wrap gap-2">
+												{session.clients.map((client: any) => (
+													<span
+														key={client.id}
+														className="px-2 py-1 text-xs bg-[rgba(255,255,255,0.05)] rounded border border-[rgba(255,255,255,0.08)] text-[var(--text-primary)]"
+													>
+														{client.firstName} {client.lastName}
+													</span>
+												))}
+											</div>
+										</div>
+									)}
+									{session.note && (
+										<div className="mt-2 pt-2 border-t border-[rgba(255,255,255,0.08)]">
+											<div className="text-xs text-[var(--text-secondary)]">Note:</div>
+											<div className="text-sm text-[var(--text-primary)]">{session.note}</div>
+										</div>
+									)}
+								</div>
+							))}
+						</div>
+					) : (
+						<div className="text-center py-4 text-[var(--text-secondary)]">No sessions found</div>
+					)}
+				</div>
+
+				{/* Session Logs / Activities Section */}
+				<div className="bg-[rgba(255,255,255,0.03)] rounded-xl p-4 border border-[rgba(255,255,255,0.08)]">
+					<h3 className="font-semibold mb-4 text-[var(--text-primary)] flex items-center gap-2">
+						<Activity className="w-4 h-4" />
+						Session Logs & Activities ({sessionLogs.length})
+					</h3>
+					{sessionLogsLoading ? (
+						<div className="text-center py-4 text-[var(--text-secondary)]">Loading activities...</div>
+					) : sessionLogs.length > 0 ? (
+						<div className="space-y-3">
+							{sessionLogs.map((log: any) => (
+								<div
+									key={log.id}
+									className="p-4 bg-[rgba(255,255,255,0.05)] rounded-lg border border-[rgba(255,255,255,0.08)]"
+								>
+									<div className="flex items-start justify-between mb-2">
+										<div className="flex-1">
+											{log.session && (
+												<div className="font-medium text-[var(--text-primary)] mb-1">
+													{log.session.name || 'Session Activity'}
+												</div>
+											)}
+											<div className="flex items-center gap-4 text-xs text-[var(--text-secondary)]">
+												{log.session?.date && (
+													<span className="flex items-center gap-1">
+														<Calendar className="w-3 h-3" />
+														{formatDate(log.session.date)}
+													</span>
+												)}
+												{log.completedAt && (
+													<span className="flex items-center gap-1">
+														<Clock className="w-3 h-3" />
+														Completed: {formatDate(log.completedAt)}
+													</span>
+												)}
+											</div>
+										</div>
+										{log.session && (
+											<span
+												className={`px-2 py-1 text-xs rounded-lg font-semibold ${
+													log.session.status === 'completed'
+														? 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
+														: 'bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
+												}`}
+											>
+												{log.session.status}
+											</span>
+										)}
+									</div>
+									{log.client && (
+										<div className="mt-2 text-sm">
+											<span className="text-[var(--text-secondary)]">Client:</span>{' '}
+											<span className="font-medium text-[var(--text-primary)]">
+												{log.client.firstName} {log.client.lastName}
+											</span>
+										</div>
+									)}
+									{(log.weight !== null && log.weight !== undefined) && (
+										<div className="mt-2 text-sm">
+											<span className="text-[var(--text-secondary)]">Weight Recorded:</span>{' '}
+											<span className="font-medium text-[var(--text-primary)]">
+												{log.weight} kg
+											</span>
+										</div>
+									)}
+									{log.notes && (
+										<div className="mt-2 pt-2 border-t border-[rgba(255,255,255,0.08)]">
+											<div className="text-xs text-[var(--text-secondary)] mb-1">Notes:</div>
+											<div className="text-sm text-[var(--text-primary)]">{log.notes}</div>
+										</div>
+									)}
+								</div>
+							))}
+						</div>
+					) : (
+						<div className="text-center py-4 text-[var(--text-secondary)]">No session logs found</div>
+					)}
+				</div>
 			</div>
-			<div className="modal-footer">
+			<div className="modal-footer" style={{ flexShrink: 0 }}>
 				<button type="button" className="btn-secondary" onClick={onClose}>
 					<X className="w-4 h-4" />
 					Close

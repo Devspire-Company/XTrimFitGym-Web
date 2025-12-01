@@ -22,6 +22,7 @@ export function AdminLayout() {
 	const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 	const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 	const [sidebarExpanded, setSidebarExpanded] = useState(false);
+	const [expandedSidebarWidth, setExpandedSidebarWidth] = useState(280); // Default width
 	const sidebarRef = useRef<HTMLElement>(null);
 	const navigate = useNavigate();
 
@@ -38,6 +39,43 @@ export function AdminLayout() {
 		{ path: '/memberships', label: 'Membership Management', icon: CreditCard },
 		{ path: '/reports', label: 'Reports & Analytics', icon: BarChart3 },
 	];
+
+	// Calculate sidebar width based on longest menu item text
+	useEffect(() => {
+		// Create a temporary element to measure text width accurately
+		const tempElement = document.createElement('span');
+		tempElement.style.visibility = 'hidden';
+		tempElement.style.position = 'absolute';
+		tempElement.style.fontSize = '14px';
+		tempElement.style.fontWeight = '500';
+		tempElement.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+		tempElement.style.whiteSpace = 'nowrap';
+		document.body.appendChild(tempElement);
+		
+		// Find the longest label width
+		let maxWidth = 0;
+		navItems.forEach((item) => {
+			tempElement.textContent = item.label;
+			const width = tempElement.offsetWidth;
+			if (width > maxWidth) {
+				maxWidth = width;
+			}
+		});
+		
+		// Clean up
+		document.body.removeChild(tempElement);
+		
+		// Calculate total width: icon (20px) + gap (12px) + text width + padding (48px total) + extra space (24px)
+		const iconWidth = 20; // w-5 icon = 20px
+		const gap = 12; // gap between icon and text
+		const padding = 48; // 1.2rem left + 1.2rem right = 24px each = 48px total
+		const extraSpace = 24; // buffer for safety and spacing
+		
+		const calculatedWidth = iconWidth + gap + maxWidth + padding + extraSpace;
+		
+		// Set width with minimum of 240px and round up to nearest 10 for clean numbers
+		setExpandedSidebarWidth(Math.max(240, Math.ceil(calculatedWidth / 10) * 10));
+	}, []);
 
 	const isActive = (path: string) => location.pathname === path;
 
@@ -72,7 +110,8 @@ export function AdminLayout() {
 			style={
 				{
 					background: 'linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%)',
-					'--sidebar-width': sidebarExpanded ? '280px' : '90px',
+					'--sidebar-width': sidebarExpanded ? `${expandedSidebarWidth}px` : '90px',
+					'--sidebar-expanded-width': `${expandedSidebarWidth}px`,
 				} as React.CSSProperties
 			}
 		>
@@ -134,7 +173,13 @@ export function AdminLayout() {
 			</nav>
 
 			{/* Sidebar */}
-			<aside ref={sidebarRef} className={`sidebar ${sidebarExpanded ? 'expanded' : ''}`}>
+			<aside 
+				ref={sidebarRef} 
+				className={`sidebar ${sidebarExpanded ? 'expanded' : ''}`}
+				style={{
+					width: sidebarExpanded ? `${expandedSidebarWidth}px` : '90px',
+				} as React.CSSProperties}
+			>
 				<nav>
 					<ul className="sidebar-menu">
 						{navItems.map((item) => {

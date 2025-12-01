@@ -17,8 +17,9 @@ import {
 	Target,
 	Dumbbell,
 	FileText,
+	RotateCw,
 } from 'lucide-react';
-import { GET_USERS, GET_USER, DELETE_USER, CANCEL_MEMBERSHIP, USERS_UPDATED } from '@/graphql/operations/index';
+import { GET_USERS, GET_USER, DELETE_USER, CANCEL_MEMBERSHIP, DIRECT_SUBSCRIBE_MEMBER, USERS_UPDATED } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
@@ -46,10 +47,11 @@ interface Member {
 		workoutsCompleted: number;
 	};
 	transactionId?: string; // ID of the active membership transaction
+	membershipId?: string; // ID of the current membership plan (for renewal)
 	durationType?: string; // MONTHLY, QUARTERLY, YEARLY
 	startDate?: string; // Subscription start date
-	endDate?: string; // Subscription end date
-	daysLeft?: number; // Remaining days in subscription
+	endDate?: string; // Subscription expiration date
+	expiresAt?: string; // Subscription expiration date (ISO format)
 }
 
 export function MembersPage() {
@@ -73,6 +75,13 @@ export function MembersPage() {
 		id: string;
 		name: string;
 		transactionId: string;
+	} | null>(null);
+	const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+	const [memberToRenew, setMemberToRenew] = useState<{
+		id: string;
+		name: string;
+		membershipId: string;
+		membershipName: string;
 	} | null>(null);
 	const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 	const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(
@@ -153,35 +162,88 @@ export function MembersPage() {
 		},
 	});
 
-	// Helper function to calculate days left
-	const calculateDaysLeft = (startDate: string, durationType: string): number => {
-		if (!startDate || !durationType) return 0;
+	const [renewMembershipMutation, { loading: isRenewing }] = useMutation(DIRECT_SUBSCRIBE_MEMBER, {
+		refetchQueries: [
+			{ query: GET_USERS, variables: { role: 'member' } },
+		],
+		awaitRefetchQueries: true, // Wait for refetch to complete before showing success
+		onCompleted: (data) => {
+			const membershipName = data.directSubscribeMember.membership?.name || memberToRenew?.membershipName || 'the plan';
+			const expiresAt = data.directSubscribeMember.expiresAt;
+			const expirationDate = expiresAt 
+				? new Date(expiresAt).toLocaleDateString('en-US', { 
+					month: 'short', 
+					day: 'numeric', 
+					year: 'numeric' 
+				})
+				: null;
+			
+			dispatch(
+				addToast({
+					type: 'success',
+					message: `Successfully renewed ${memberToRenew?.name}'s subscription to ${membershipName}${expirationDate ? ` (expires ${expirationDate})` : ''}`,
+				})
+			);
+			setIsRenewModalOpen(false);
+			setMemberToRenew(null);
+			// Subscription will automatically update the data, and refetchQueries ensures fresh data
+		},
+		onError: (error) => {
+			dispatch(
+				addToast({
+					type: 'error',
+					message: error.message || 'Failed to renew membership',
+				})
+			);
+		},
+	});
 
-		const start = new Date(startDate);
-		const now = new Date();
-		const end = new Date(start);
-
-		// Calculate end date based on duration type
-		switch (durationType.toUpperCase()) {
-			case 'MONTHLY':
-				end.setMonth(end.getMonth() + 1);
-				break;
-			case 'QUARTERLY':
-				end.setMonth(end.getMonth() + 3);
-				break;
-			case 'YEARLY':
-				end.setFullYear(end.getFullYear() + 1);
-				break;
-			default:
-				return 0;
+	// Helper function to safely extract ID from various formats
+	const extractId = (value: any): string | undefined => {
+		if (!value) return undefined;
+		
+		// If it's already a string and not "[object Object]", return it
+		if (typeof value === 'string') {
+			if (value === '[object Object]' || value === 'undefined' || value === 'null') {
+				return undefined;
+			}
+			return value;
 		}
 
-		// Calculate difference in days
-		const diffTime = end.getTime() - now.getTime();
-		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-		return diffDays > 0 ? diffDays : 0;
+		// If it's an object, extract the ID
+		if (typeof value === 'object' && value !== null) {
+			// Try common ID field names
+			if (value.id !== undefined && value.id !== null) {
+				const id = value.id;
+				if (typeof id === 'string') return id;
+				if (typeof id === 'object' && id !== null) {
+					// Nested object, try to extract ID
+					return extractId(id);
+				}
+				return String(id);
+			}
+			if (value._id !== undefined && value._id !== null) {
+				const id = value._id;
+				if (typeof id === 'string') return id;
+				if (typeof id === 'object' && id !== null) {
+					return extractId(id);
+				}
+				return String(id);
+			}
+			// If it's an array with one element, try that
+			if (Array.isArray(value) && value.length > 0) {
+				return extractId(value[0]);
+			}
+		}
+		
+		// Last resort: try to convert to string, but check if it's valid
+		const str = String(value);
+		if (str === '[object Object]' || str === 'undefined' || str === 'null') {
+			return undefined;
+		}
+		return str;
 	};
+
 
 	// Transform API data
 	const apiMembers: Member[] = membersData.map((m: any) => {
@@ -196,12 +258,90 @@ export function MembersPage() {
 		const durationType =
 			membershipTransaction?.membership?.durationType || membershipTransaction?.durationType;
 		const startDate =
-			membershipTransaction?.startDate || membershipTransaction?.createdAt || m.createdAt;
-		const endDate = membershipTransaction?.endDate;
-		const daysLeft =
-			status === 'Active' && startDate && durationType
-				? calculateDaysLeft(startDate, durationType)
-				: 0;
+			membershipTransaction?.startedAt || membershipTransaction?.startDate || membershipTransaction?.createdAt || m.createdAt;
+		const expiresAt = membershipTransaction?.expiresAt || membershipTransaction?.endDate;
+		
+		// Format expiration date for display
+		const formatExpirationDate = (dateString: string | undefined): string | undefined => {
+			if (!dateString) return undefined;
+			try {
+				const date = new Date(dateString);
+				if (isNaN(date.getTime())) return undefined;
+				// Format as "Jan 15, 2025"
+				return date.toLocaleDateString('en-US', { 
+					month: 'short', 
+					day: 'numeric', 
+					year: 'numeric' 
+				});
+			} catch {
+				return undefined;
+			}
+		};
+		
+		const expirationDate = formatExpirationDate(expiresAt);
+		
+		// Calculate days until expiration for color coding
+		const getDaysUntilExpiration = (dateString: string | undefined): number | null => {
+			if (!dateString) return null;
+			try {
+				const expiration = new Date(dateString);
+				const now = new Date();
+				const diffTime = expiration.getTime() - now.getTime();
+				const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+				return days > 0 ? days : 0;
+			} catch {
+				return null;
+			}
+		};
+		
+		const daysUntilExpiration = getDaysUntilExpiration(expiresAt);
+
+		// Extract membership ID - try multiple sources
+		let membershipId: string | undefined;
+		if (membershipTransaction) {
+			// First try the direct membershipId field
+			const rawMembershipId = membershipTransaction.membershipId;
+			if (rawMembershipId !== undefined && rawMembershipId !== null) {
+				// Check if it's already a valid string (and not "[object Object]")
+				if (typeof rawMembershipId === 'string') {
+					if (rawMembershipId !== '[object Object]' && rawMembershipId !== 'undefined' && rawMembershipId !== 'null') {
+						membershipId = rawMembershipId;
+					}
+				} else if (typeof rawMembershipId === 'object') {
+					// It's an object, extract the ID before it gets stringified
+					membershipId = extractId(rawMembershipId);
+				}
+			}
+			
+			// If that didn't work, try membership.id (this is usually more reliable)
+			if (!membershipId && membershipTransaction.membership) {
+				const membershipObj = membershipTransaction.membership;
+				const rawId = membershipObj.id;
+				if (rawId !== undefined && rawId !== null) {
+					if (typeof rawId === 'string') {
+						if (rawId !== '[object Object]' && rawId !== 'undefined' && rawId !== 'null') {
+							membershipId = rawId;
+						}
+					} else if (typeof rawId === 'object') {
+						membershipId = extractId(rawId);
+					}
+				}
+			}
+			
+			// Debug: Log if we couldn't extract the ID
+			if (!membershipId && membershipTransaction) {
+				console.warn('⚠️ Could not extract membershipId for member:', {
+					memberId: m.id,
+					membershipTransaction: {
+						hasMembershipId: !!membershipTransaction.membershipId,
+						membershipIdType: typeof membershipTransaction.membershipId,
+						hasMembership: !!membershipTransaction.membership,
+						hasMembershipObjId: !!membershipTransaction.membership?.id,
+						membershipObjIdType: typeof membershipTransaction.membership?.id,
+					},
+				});
+			}
+		}
 
 		return {
 			id: m.id,
@@ -226,10 +366,11 @@ export function MembersPage() {
 				workoutsCompleted: 0, // Would need session logs from API
 			},
 			transactionId: membershipTransaction?.id, // Store transaction ID for unsubscribe
+			membershipId, // Store membership ID for renewal
 			durationType,
 			startDate,
-			endDate,
-			daysLeft,
+			endDate: expirationDate, // Formatted expiration date for display
+			expiresAt: expiresAt, // Raw expiration date (ISO format) for calculations
 		};
 	});
 
@@ -287,6 +428,52 @@ export function MembersPage() {
 		setIsUnsubscribeModalOpen(true);
 	};
 
+	const handleRenew = (member: Member) => {
+		console.log('🔔 Renew button clicked for member:', member);
+		
+		if (!member || !member.id) {
+			console.error('❌ Invalid member data:', member);
+			dispatch(
+				addToast({
+					type: 'error',
+					message: 'Cannot renew: Invalid member data',
+				})
+			);
+			return;
+		}
+		
+		// Safely extract membership ID - it should already be extracted, but double-check
+		let membershipId = member.membershipId;
+		if (membershipId) {
+			membershipId = extractId(membershipId);
+		}
+		
+		if (!membershipId || membershipId === 'undefined' || membershipId === 'null' || membershipId.includes('[object')) {
+			console.error('❌ Invalid membership ID:', {
+				original: member.membershipId,
+				extracted: membershipId,
+				memberData: member,
+			});
+			dispatch(
+				addToast({
+					type: 'error',
+					message: 'Cannot renew: Invalid membership plan. Please refresh the page and try again.',
+				})
+			);
+			return;
+		}
+		
+		console.log('✅ Valid membership ID extracted:', membershipId);
+		
+		setMemberToRenew({
+			id: member.id,
+			name: member.name,
+			membershipId: membershipId,
+			membershipName: member.membership,
+		});
+		setIsRenewModalOpen(true);
+	};
+
 	const confirmDelete = async () => {
 		if (selectedMember) {
 			try {
@@ -309,6 +496,31 @@ export function MembersPage() {
 				});
 			} catch (err) {
 				console.error('Error unsubscribing member:', err);
+			}
+		}
+	};
+
+	const confirmRenew = async () => {
+		if (memberToRenew) {
+			try {
+				// Ensure membershipId is a string
+				const membershipId = String(memberToRenew.membershipId);
+				console.log('🔄 Renewing membership:', {
+					memberId: memberToRenew.id,
+					membershipId: membershipId,
+					membershipIdType: typeof membershipId,
+				});
+				
+				await renewMembershipMutation({
+					variables: {
+						input: {
+							memberId: memberToRenew.id,
+							membershipId: membershipId,
+						},
+					},
+				});
+			} catch (err) {
+				console.error('Error renewing membership:', err);
 			}
 		}
 	};
@@ -448,7 +660,7 @@ export function MembersPage() {
 									Join Date
 								</th>
 								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-									Days Left
+									Expires
 								</th>
 								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
 									Actions
@@ -514,18 +726,30 @@ export function MembersPage() {
 											{member.joinDate}
 										</td>
 										<td className="px-4 py-5 text-sm">
-											{member.status === 'Active' && member.daysLeft !== undefined ? (
+											{member.status === 'Active' && member.expiresAt ? (
+												(() => {
+													// Calculate days until expiration for color coding
+													const expiration = new Date(member.expiresAt);
+													const now = new Date();
+													const diffTime = expiration.getTime() - now.getTime();
+													const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+													const isExpiringSoon = daysUntil <= 7;
+													const isExpiringWithinMonth = daysUntil <= 30 && daysUntil > 7;
+													
+													return (
 												<span
 													className={`px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
-														member.daysLeft <= 7
+																isExpiringSoon
 															? 'bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]'
-															: member.daysLeft <= 30
+																	: isExpiringWithinMonth
 																? 'bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]'
 																: 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
 													}`}
 												>
-													{member.daysLeft} {member.daysLeft === 1 ? 'day' : 'days'}
+															{member.endDate || 'N/A'}
 												</span>
+													);
+												})()
 											) : (
 												<span className="text-[var(--text-secondary)]">—</span>
 											)}
@@ -606,6 +830,22 @@ export function MembersPage() {
 											View
 										</button>
 										{member.status === 'Active' && member.transactionId ? (
+											<>
+												<button
+													type="button"
+													onClick={(e) => {
+														e.preventDefault();
+														e.stopPropagation();
+														handleRenew(member);
+														setOpenDropdownId(null);
+														setDropdownPosition(null);
+													}}
+													onMouseDown={(e) => e.stopPropagation()}
+													className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(249,197,19,0.1)] flex items-center gap-2 cursor-pointer"
+												>
+													<RotateCw className="w-4 h-4 text-[var(--primary-yellow)]" />
+													Renew
+												</button>
 											<button
 												type="button"
 												onClick={(e) => {
@@ -621,6 +861,7 @@ export function MembersPage() {
 												<X className="w-4 h-4 text-[#EF4444]" />
 												Unsubscribe
 											</button>
+											</>
 										) : (
 											<button
 												type="button"
@@ -814,6 +1055,103 @@ export function MembersPage() {
 					</div>
 				</div>
 			)}
+
+			{/* Renew Confirmation Modal */}
+			{memberToRenew && (
+				<div
+					className={`modal-overlay ${isRenewModalOpen ? 'active' : ''}`}
+					onClick={() => {
+						setIsRenewModalOpen(false);
+						setMemberToRenew(null);
+					}}
+				>
+					<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+						<div className="modal-body">
+							<div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+								<div
+									className="modal-success-icon-large"
+									style={{
+										background: 'linear-gradient(135deg, var(--primary-red), var(--primary-yellow))',
+									}}
+								>
+									<RotateCw size={48} style={{ color: 'white' }} />
+								</div>
+							</div>
+
+							<h2 className="modal-title" style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+								Renew Membership?
+							</h2>
+
+							<p className="modal-text" style={{ textAlign: 'center', marginBottom: '2rem' }}>
+								Renew <strong>{memberToRenew.name}</strong>'s subscription to{' '}
+								<strong>{memberToRenew.membershipName}</strong>?
+							</p>
+
+							<div
+								className="modal-actions"
+								style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}
+							>
+								<button
+									type="button"
+									className="btn-secondary"
+									onClick={() => {
+										setIsRenewModalOpen(false);
+										setMemberToRenew(null);
+									}}
+									disabled={isRenewing}
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										gap: '0.5rem',
+										padding: '0.75rem 1.5rem',
+										borderRadius: '0.75rem',
+										fontWeight: '600',
+										transition: 'all 0.2s',
+										cursor: isRenewing ? 'not-allowed' : 'pointer',
+										opacity: isRenewing ? 0.6 : 1,
+									}}
+								>
+									<X className="w-4 h-4" />
+									Cancel
+								</button>
+								<button
+									type="button"
+									className="btn-primary"
+									onClick={confirmRenew}
+									disabled={isRenewing}
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										gap: '0.5rem',
+										padding: '0.75rem 1.5rem',
+										borderRadius: '0.75rem',
+										fontWeight: '600',
+										transition: 'all 0.2s',
+										cursor: isRenewing ? 'not-allowed' : 'pointer',
+										opacity: isRenewing ? 0.6 : 1,
+									}}
+								>
+									{isRenewing ? (
+										<>
+											<Loader2 className="w-4 h-4 animate-spin" />
+											Processing...
+										</>
+									) : (
+										<>
+											<RotateCw className="w-4 h-4" />
+											Renew
+										</>
+									)}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }
@@ -951,31 +1289,15 @@ function MemberViewModal({ member, onClose }: { member: Member; onClose: () => v
 									</span>
 								</div>
 							)}
-							{member.endDate && (
+							{member.expiresAt && member.status === 'Active' && (
 								<div>
-									<span className="text-[var(--text-secondary)]">End Date:</span>{' '}
+									<span className="text-[var(--text-secondary)]">Expires:</span>{' '}
 									<span className="font-medium text-[var(--text-primary)]">
-										{new Date(member.endDate).toLocaleDateString('en-US', {
-											year: 'numeric',
-											month: 'long',
+										{member.endDate || new Date(member.expiresAt).toLocaleDateString('en-US', { 
+											month: 'short', 
 											day: 'numeric',
+											year: 'numeric' 
 										})}
-									</span>
-								</div>
-							)}
-							{member.daysLeft !== undefined && member.daysLeft > 0 && (
-								<div>
-									<span className="text-[var(--text-secondary)]">Days Left:</span>{' '}
-									<span
-										className={`font-medium ${
-											member.daysLeft <= 7
-												? 'text-[#EF4444]'
-												: member.daysLeft <= 30
-													? 'text-[var(--primary-yellow)]'
-													: 'text-[#10B981]'
-										}`}
-									>
-										{member.daysLeft} {member.daysLeft === 1 ? 'day' : 'days'}
 									</span>
 								</div>
 							)}

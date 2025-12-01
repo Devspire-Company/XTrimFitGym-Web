@@ -1031,6 +1031,21 @@ export type MembershipsUpdatedSubscriptionVariables = Exact<{ [key: string]: nev
 
 export type MembershipsUpdatedSubscription = { __typename?: 'Subscription', membershipsUpdated: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, createdAt?: string | null, updatedAt?: string | null }> };
 
+export type GetCoachSessionsQueryVariables = Exact<{
+  coachId: Scalars['ID']['input'];
+  status?: InputMaybe<SessionStatus>;
+}>;
+
+
+export type GetCoachSessionsQuery = { __typename?: 'Query', getCoachSessions: Array<{ __typename?: 'Session', id: string, coachId: string, clientsIds: Array<string>, name: string, date: string, startTime: string, endTime?: string | null, gymArea: string, status: SessionStatus, note?: string | null, createdAt?: string | null, updatedAt?: string | null, clients?: Array<{ __typename?: 'User', id: string, firstName: string, lastName: string, email: string }> | null }> };
+
+export type GetCoachSessionLogsQueryVariables = Exact<{
+  coachId: Scalars['ID']['input'];
+}>;
+
+
+export type GetCoachSessionLogsQuery = { __typename?: 'Query', getCoachSessionLogs: Array<{ __typename?: 'SessionLog', id: string, sessionId: string, coachId: string, clientId: string, weight?: number | null, notes?: string | null, completedAt?: string | null, createdAt?: string | null, updatedAt?: string | null, client?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null, session?: { __typename?: 'Session', id: string, name: string, date: string, startTime: string, endTime?: string | null, status: SessionStatus } | null }> };
+
 export type GetPendingSubscriptionRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
 

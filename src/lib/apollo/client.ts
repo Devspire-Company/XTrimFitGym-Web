@@ -6,8 +6,8 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 
 const getGraphQLUrl = () => {
-	// Backend server runs on port 8080 by default (see XTrimFitGym-Api/src/server.ts)
-	const url = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
+	// Backend server runs on port 8000 by default (see XTrimFitGym-Api/src/server.ts)
+	const url = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8000/graphql';
 	// Only log in development mode
 	if (import.meta.env.DEV) {
 		console.log(`[Apollo Client] Connecting to GraphQL endpoint: ${url}`);
@@ -24,8 +24,8 @@ const httpLink = createHttpLink({
 
 // WebSocket link for real-time subscriptions
 const getWebSocketUrl = () => {
-	// Backend server runs on port 8080 by default
-	const wsUrl = import.meta.env.VITE_GRAPHQL_WS_URL || 'ws://localhost:8080/graphql';
+	// Backend server runs on port 8000 by default
+	const wsUrl = import.meta.env.VITE_GRAPHQL_WS_URL || 'ws://localhost:8000/graphql';
 	// Only log in development mode
 	if (import.meta.env.DEV) {
 		console.log(`[Apollo Client] WebSocket URL: ${wsUrl}`);
@@ -106,7 +106,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
 
 		// Only log real network errors for non-analytics queries
 		if (isRealNetworkError) {
-			const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
+			const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8000/graphql';
 			console.error(`[Network error]: ${networkError}`);
 			console.error(`Failed to connect to GraphQL endpoint: ${graphqlUrl}`);
 			console.error('Possible causes:');
@@ -114,7 +114,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
 			console.error('2. GraphQL endpoint URL is incorrect');
 			console.error('3. CORS configuration issue');
 			console.error(`4. Check if ${graphqlUrl} is accessible`);
-			console.error('5. Make sure the backend server is running on port 8080');
+			console.error('5. Make sure the backend server is running on port 8000');
 		}
 	}
 });

@@ -11,6 +11,8 @@ export {
 	GetRevenueSummaryDocument as GET_REVENUE_SUMMARY,
 	GetAnalyticsDocument as GET_ANALYTICS,
 	GetAnalyticsRangeDocument as GET_ANALYTICS_RANGE,
+	GetCoachSessionsDocument as GET_COACH_SESSIONS,
+	GetCoachSessionLogsDocument as GET_COACH_SESSION_LOGS,
 } from '../generated/graphql';
 
 // Mutations
