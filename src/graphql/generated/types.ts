@@ -838,6 +838,24 @@ export enum SessionStatus {
   Scheduled = 'scheduled'
 }
 
+export type Subscription = {
+  __typename?: 'Subscription';
+  _empty?: Maybe<Scalars['Boolean']['output']>;
+  membershipsUpdated: Array<Membership>;
+  revenueSummaryUpdated: RevenueSummary;
+  usersUpdated: Array<User>;
+};
+
+
+export type SubscriptionRevenueSummaryUpdatedArgs = {
+  dateRange?: InputMaybe<DateRangeInput>;
+};
+
+
+export type SubscriptionUsersUpdatedArgs = {
+  role?: InputMaybe<RoleType>;
+};
+
 export type SubscriptionRequest = {
   __typename?: 'SubscriptionRequest';
   approvedAt?: Maybe<Scalars['String']['output']>;
@@ -979,6 +997,13 @@ export type GetAnalyticsRangeQueryVariables = Exact<{
 
 export type GetAnalyticsRangeQuery = { __typename?: 'Query', getAnalyticsRange: Array<{ __typename?: 'Analytics', id: string, date: string, totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, createdAt?: string | null, updatedAt?: string | null, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }> }> };
 
+export type RevenueSummaryUpdatedSubscriptionVariables = Exact<{
+  dateRange?: InputMaybe<DateRangeInput>;
+}>;
+
+
+export type RevenueSummaryUpdatedSubscription = { __typename?: 'Subscription', revenueSummaryUpdated: { __typename?: 'RevenueSummary', totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }>, revenueByPeriod: Array<{ __typename?: 'PeriodRevenue', period: string, revenue: number, count: number }> } };
+
 export type GetAllMembershipsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -1000,6 +1025,11 @@ export type DirectSubscribeMemberMutationVariables = Exact<{
 
 
 export type DirectSubscribeMemberMutation = { __typename?: 'Mutation', directSubscribeMember: { __typename?: 'MembershipTransaction', id: string, clientId: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, createdAt?: string | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number } | null } };
+
+export type MembershipsUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MembershipsUpdatedSubscription = { __typename?: 'Subscription', membershipsUpdated: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, createdAt?: string | null, updatedAt?: string | null }> };
 
 export type GetPendingSubscriptionRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1098,3 +1128,10 @@ export type CancelMembershipMutationVariables = Exact<{
 
 
 export type CancelMembershipMutation = { __typename?: 'Mutation', cancelMembership: boolean };
+
+export type UsersUpdatedSubscriptionVariables = Exact<{
+  role?: InputMaybe<RoleType>;
+}>;
+
+
+export type UsersUpdatedSubscription = { __typename?: 'Subscription', usersUpdated: Array<{ __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, membershipTransaction?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null } | null, currentMembership?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null }> };

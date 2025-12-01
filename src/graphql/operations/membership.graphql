@@ -66,3 +66,18 @@ mutation DirectSubscribeMember($input: DirectSubscribeInput!) {
 		createdAt
 	}
 }
+
+# Subscriptions
+subscription MembershipsUpdated {
+	membershipsUpdated {
+		id
+		name
+		monthlyPrice
+		description
+		features
+		status
+		durationType
+		createdAt
+		updatedAt
+	}
+}

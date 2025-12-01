@@ -143,13 +143,6 @@ export function LoginPage() {
 							)}
 						</Button>
 					</form>
-
-					{/* Development Note */}
-					<div className="mt-6 p-4 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.2)] rounded-lg">
-						<p className="text-xs text-[var(--text-secondary)] text-center">
-							<strong>Development Mode:</strong> Use any admin credentials from your backend to log in.
-						</p>
-					</div>
 				</div>
 
 				{/* Footer */}

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@apollo/client';
+import { useQuery, useSubscription } from '@apollo/client';
 import { Link } from 'react-router';
-import { Users, UserCog, DollarSign, CreditCard, BarChart3, RefreshCw } from 'lucide-react';
-import { GET_USERS, GET_REVENUE_SUMMARY } from '@/graphql/operations/index';
+import { Users, UserCog, DollarSign, CreditCard, BarChart3 } from 'lucide-react';
+import { GET_USERS, GET_REVENUE_SUMMARY, REVENUE_SUMMARY_UPDATED, USERS_UPDATED } from '@/graphql/operations/index';
 import {
 	Chart as ChartJS,
 	CategoryScale,
@@ -34,45 +34,49 @@ export function DashboardPage() {
 		document.title = 'Admin Dashboard - X-TRIM FIT GYM';
 	}, []);
 
-	// Fetch members and coaches separately
-	const { data: membersData, loading: membersLoading, refetch: refetchMembers } = useQuery(GET_USERS, {
+	// Initial data fetch with queries
+	const { data: membersData, loading: membersLoading } = useQuery(GET_USERS, {
 		variables: { role: 'member' },
 		errorPolicy: 'none',
-		pollInterval: 30000,
 	});
 
-	const { data: coachesData, loading: coachesLoading, refetch: refetchCoaches } = useQuery(GET_USERS, {
+	const { data: coachesData, loading: coachesLoading } = useQuery(GET_USERS, {
 		variables: { role: 'coach' },
 		errorPolicy: 'none',
-		pollInterval: 30000,
 	});
 
-	// Fetch analytics data from stored analytics schema
-	const { data: analyticsData, loading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useQuery(GET_REVENUE_SUMMARY, {
+	const { data: analyticsData, loading: analyticsLoading, error: analyticsError } = useQuery(GET_REVENUE_SUMMARY, {
 		errorPolicy: 'all',
 		fetchPolicy: 'network-only',
-		notifyOnNetworkStatusChange: true,
-		pollInterval: 30000,
 	});
 
-	const [isRefreshing, setIsRefreshing] = useState(false);
+	// Real-time subscriptions
+	const { data: membersSubscriptionData } = useSubscription(USERS_UPDATED, {
+		variables: { role: 'member' },
+		skip: !membersData, // Skip if initial data not loaded
+	});
 
-	const handleRefresh = async () => {
-		setIsRefreshing(true);
-		try {
-			await Promise.all([refetchMembers(), refetchCoaches(), refetchAnalytics()]);
-		} finally {
-			setIsRefreshing(false);
-		}
-	};
+	const { data: coachesSubscriptionData } = useSubscription(USERS_UPDATED, {
+		variables: { role: 'coach' },
+		skip: !coachesData, // Skip if initial data not loaded
+	});
+
+	const { data: revenueSubscriptionData } = useSubscription(REVENUE_SUMMARY_UPDATED, {
+		skip: !analyticsData, // Skip if initial data not loaded
+	});
 
 	// Only block on members and coaches loading - analytics can load in background
 	const loading = membersLoading || coachesLoading;
 	const error = null; // Handle errors separately if needed
+	
+	// Use subscription data if available, otherwise fall back to query data
 	const data = {
-		members: membersData?.getUsers || [],
-		coaches: coachesData?.getUsers || [],
+		members: membersSubscriptionData?.usersUpdated || membersData?.getUsers || [],
+		coaches: coachesSubscriptionData?.usersUpdated || coachesData?.getUsers || [],
 	};
+	
+	// Use subscription data for analytics if available, otherwise fall back to query data
+	const analytics = revenueSubscriptionData?.revenueSummaryUpdated || analyticsData?.getRevenueSummary;
 
 	// Show loading state
 	if (loading) {
@@ -152,8 +156,7 @@ export function DashboardPage() {
 	const totalMembers = members.length;
 	const totalCoaches = coaches.length;
 	
-	// Use analytics data from stored analytics schema
-	const analytics = analyticsData?.getRevenueSummary;
+	// Calculate stats from analytics
 	const monthlyRevenue = analytics?.totalRevenue || 0;
 	const activeSubscriptions = analytics?.activeSubscriptions || 0;
 
@@ -185,15 +188,6 @@ export function DashboardPage() {
 							Manage your gym operations, members, coaches, and track your business performance.
 						</p>
 					</div>
-					<button
-						onClick={handleRefresh}
-						disabled={isRefreshing || loading}
-						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-						title="Refresh data"
-					>
-						<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-						Refresh
-					</button>
 				</div>
 			</div>
 

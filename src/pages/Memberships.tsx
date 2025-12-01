@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Plus, Eye, Edit, Trash2, CreditCard, Crown, RefreshCw } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, CreditCard, Crown } from 'lucide-react';
 import { MembershipFormModal, type MembershipFormData } from '@/components/modals/MembershipFormModal';
 import { MembershipViewModal } from '@/components/modals/MembershipViewModal';
 import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
@@ -11,6 +11,7 @@ import {
 	CREATE_MEMBERSHIP,
 	UPDATE_MEMBERSHIP,
 	DELETE_MEMBERSHIP,
+	MEMBERSHIPS_UPDATED,
 } from '@/graphql/operations/index';
 import type { Membership } from '@/graphql/generated/types';
 import { useAppDispatch } from '@/store/hooks';
@@ -29,28 +30,26 @@ export function MembershipsPage() {
 	const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 	const [successMessage, setSuccessMessage] = useState('');
 	const [isEditMode, setIsEditMode] = useState(false);
-	const [isRefreshing, setIsRefreshing] = useState(false);
 
-	// GraphQL queries and mutations
-	const { data, loading, error, refetch } = useQuery(GET_ALL_MEMBERSHIPS, {
+	// Initial data fetch with query
+	const { data, loading, error } = useQuery(GET_ALL_MEMBERSHIPS, {
 		errorPolicy: 'none',
 	});
 
-	const handleRefresh = async () => {
-		setIsRefreshing(true);
-		try {
-			await refetch();
-		} finally {
-			setIsRefreshing(false);
-		}
-	};
+	// Real-time subscription for membership updates
+	const { data: subscriptionData } = useSubscription(MEMBERSHIPS_UPDATED, {
+		skip: !data, // Skip if initial data not loaded
+	});
+
+	// Use subscription data if available, otherwise fall back to query data
+	const membershipsData = subscriptionData?.membershipsUpdated || data?.getMemberships || [];
 
 	const [createMembership, { loading: creating }] = useMutation(CREATE_MEMBERSHIP, {
 		onCompleted: () => {
 			setSuccessMessage('Membership plan created successfully!');
 			setIsSuccessModalOpen(true);
 			setIsFormModalOpen(false);
-			refetch();
+			// Subscription will automatically update the data
 			dispatch(addToast({ type: 'success', message: 'Membership plan created!' }));
 		},
 		onError: (error) => {
@@ -63,7 +62,7 @@ export function MembershipsPage() {
 			setSuccessMessage('Membership plan updated successfully!');
 			setIsSuccessModalOpen(true);
 			setIsFormModalOpen(false);
-			refetch();
+			// Subscription will automatically update the data
 			dispatch(addToast({ type: 'success', message: 'Membership plan updated!' }));
 		},
 		onError: (error) => {
@@ -77,7 +76,7 @@ export function MembershipsPage() {
 			setIsSuccessModalOpen(true);
 			setIsDeleteModalOpen(false);
 			setSelectedPlan(null);
-			refetch();
+			// Subscription will automatically update the data
 			dispatch(addToast({ type: 'success', message: 'Membership plan deleted!' }));
 		},
 		onError: (error) => {
@@ -191,7 +190,7 @@ export function MembershipsPage() {
 						{error?.message || 'Failed to connect to the server'}
 					</p>
 					<button 
-						onClick={() => refetch()} 
+						onClick={() => window.location.reload()} 
 						className="btn-primary"
 					>
 						Retry
@@ -201,7 +200,7 @@ export function MembershipsPage() {
 		);
 	}
 
-	const plans: Membership[] = data?.getMemberships || [];
+	const plans: Membership[] = membershipsData;
 
 	return (
 		<div className="space-y-6">
@@ -216,15 +215,6 @@ export function MembershipsPage() {
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<button
-						onClick={handleRefresh}
-						disabled={isRefreshing || loading}
-						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-						title="Refresh data"
-					>
-						<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-						Refresh
-					</button>
 					<Button onClick={handleCreatePlan}>
 						<Plus className="w-4 h-4" />
 						Add New Plan

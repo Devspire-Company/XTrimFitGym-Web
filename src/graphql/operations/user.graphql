@@ -265,3 +265,74 @@ mutation CancelMembership($transactionId: ID!) {
 	cancelMembership(transactionId: $transactionId)
 }
 
+# Subscriptions
+subscription UsersUpdated($role: RoleType) {
+	usersUpdated(role: $role) {
+		id
+		firstName
+		middleName
+		lastName
+		email
+		role
+		phoneNumber
+		dateOfBirth
+		gender
+		heardFrom
+		membershipDetails {
+			membershipId
+			physiqueGoalType
+			fitnessGoal
+			workOutTime
+			coachesIds
+			hasEnteredDetails
+			membershipTransaction {
+				id
+				membershipId
+				membership {
+					id
+					name
+					monthlyPrice
+					description
+					features
+					status
+					durationType
+				}
+				priceAtPurchase
+				startedAt
+				expiresAt
+				status
+			}
+		}
+		currentMembership {
+			id
+			membershipId
+			membership {
+				id
+				name
+				monthlyPrice
+				description
+				features
+				status
+				durationType
+			}
+			priceAtPurchase
+			startedAt
+			expiresAt
+			status
+		}
+		coachDetails {
+			clientsIds
+			sessionsIds
+			specialization
+			ratings
+			yearsOfExperience
+			moreDetails
+			teachingDate
+			teachingTime
+			clientLimit
+		}
+		createdAt
+		updatedAt
+	}
+}
+

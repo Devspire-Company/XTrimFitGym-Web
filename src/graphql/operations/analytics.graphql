@@ -60,3 +60,25 @@ query GetAnalyticsRange($dateRange: DateRangeInput!) {
 	}
 }
 
+# Subscriptions
+subscription RevenueSummaryUpdated($dateRange: DateRangeInput) {
+	revenueSummaryUpdated(dateRange: $dateRange) {
+		totalRevenue
+		activeSubscriptions
+		newSubscriptions
+		canceledSubscriptions
+		expiredSubscriptions
+		revenueByMembership {
+			membershipId
+			membershipName
+			revenue
+			count
+		}
+		revenueByPeriod {
+			period
+			revenue
+			count
+		}
+	}
+}
+

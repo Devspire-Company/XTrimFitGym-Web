@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import {
 	Settings as SettingsIcon,
 	User,
@@ -9,17 +10,28 @@ import {
 	History,
 	LogOut,
 	Pencil,
+	X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { logout } from '@/store/slices/authSlice';
 
 export function SettingsPage() {
 	useEffect(() => {
 		document.title = 'Settings - X-TRIM FIT GYM';
 	}, []);
+	const navigate = useNavigate();
+	const dispatch = useAppDispatch();
 	const { user } = useAppSelector((state) => state.auth);
 	const [activeSection, setActiveSection] = useState('account');
 	const [editMode, setEditMode] = useState<Record<string, boolean>>({});
+	const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+
+	const handleLogout = () => {
+		dispatch(logout());
+		setLogoutModalOpen(false);
+		navigate('/login');
+	};
 
 	const sections = [
 		{ id: 'account', label: 'Account Information', icon: User },
@@ -83,9 +95,7 @@ export function SettingsPage() {
 					})}
 					<div className="nav-divider h-px bg-[var(--card-border)] my-2 mx-5" />
 					<button
-						onClick={() => {
-							// Handle logout
-						}}
+						onClick={() => setLogoutModalOpen(true)}
 						className="nav-link logout-link flex items-center gap-3 px-5 py-3.5 rounded-[10px] text-[var(--text-secondary)] text-[0.95rem] font-medium transition-[var(--transition)] hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
 					>
 						<LogOut className="w-5 h-5" />
@@ -122,6 +132,38 @@ export function SettingsPage() {
 						/>
 					)}
 					{activeSection === 'security' && <SecuritySection />}
+				</div>
+			</div>
+
+			{/* Logout Modal */}
+			<div
+				className={`modal-overlay ${logoutModalOpen ? 'active' : ''}`}
+				onClick={() => setLogoutModalOpen(false)}
+			>
+				<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+					<div className="modal-body">
+						<div className="modal-logout-icon">
+							<LogOut className="w-10 h-10" />
+						</div>
+						<h3 className="modal-logout-title">Are you sure you want to logout?</h3>
+						<p className="modal-logout-text">
+							You'll need to log in again to access your admin account.
+						</p>
+						<div className="modal-logout-actions">
+							<button
+								type="button"
+								className="btn-secondary"
+								onClick={() => setLogoutModalOpen(false)}
+							>
+								<X className="w-4 h-4" />
+								Cancel
+							</button>
+							<button type="button" className="btn-primary" onClick={handleLogout}>
+								<LogOut className="w-4 h-4" />
+								Yes, Logout
+							</button>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>

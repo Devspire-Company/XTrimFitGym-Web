@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import {
 	Search,
 	Eye,
@@ -8,10 +8,17 @@ import {
 	X,
 	CreditCard,
 	Loader2,
-	RefreshCw,
 	MoreVertical,
+	UserCog,
+	Activity,
+	TrendingUp,
+	Calendar,
+	Clock,
+	Target,
+	Dumbbell,
+	FileText,
 } from 'lucide-react';
-import { GET_USERS, DELETE_USER, CANCEL_MEMBERSHIP } from '@/graphql/operations/index';
+import { GET_USERS, GET_USER, DELETE_USER, CANCEL_MEMBERSHIP, USERS_UPDATED } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
@@ -67,7 +74,6 @@ export function MembersPage() {
 		name: string;
 		transactionId: string;
 	} | null>(null);
-	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 	const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(
 		null
@@ -90,20 +96,20 @@ export function MembersPage() {
 		};
 	}, [openDropdownId]);
 
-	// GraphQL queries and mutations
-	const { data, loading, error, refetch } = useQuery(GET_USERS, {
+	// Initial data fetch with query
+	const { data, loading, error } = useQuery(GET_USERS, {
 		variables: { role: 'member' as any },
 		errorPolicy: 'none',
 	});
 
-	const handleRefresh = async () => {
-		setIsRefreshing(true);
-		try {
-			await refetch();
-		} finally {
-			setIsRefreshing(false);
-		}
-	};
+	// Real-time subscription for member updates
+	const { data: subscriptionData } = useSubscription(USERS_UPDATED, {
+		variables: { role: 'member' },
+		skip: !data, // Skip if initial data not loaded
+	});
+
+	// Use subscription data if available, otherwise fall back to query data
+	const membersData = subscriptionData?.usersUpdated || data?.getUsers || [];
 
 	const [deleteUserMutation] = useMutation(DELETE_USER, {
 		onCompleted: () => {
@@ -113,7 +119,7 @@ export function MembersPage() {
 					message: 'Member deleted successfully',
 				})
 			);
-			refetch();
+			// Subscription will automatically update the data
 		},
 		onError: (error) => {
 			dispatch(
@@ -126,10 +132,6 @@ export function MembersPage() {
 	});
 
 	const [cancelMembershipMutation, { loading: isUnsubscribing }] = useMutation(CANCEL_MEMBERSHIP, {
-		refetchQueries: [
-			{ query: GET_USERS, variables: { role: 'member' } },
-			{ query: GET_USERS, variables: { role: 'coach' } },
-		],
 		onCompleted: () => {
 			dispatch(
 				addToast({
@@ -139,7 +141,7 @@ export function MembersPage() {
 			);
 			setIsUnsubscribeModalOpen(false);
 			setMemberToUnsubscribe(null);
-			refetch();
+			// Subscription will automatically update the data
 		},
 		onError: (error) => {
 			dispatch(
@@ -182,7 +184,7 @@ export function MembersPage() {
 	};
 
 	// Transform API data
-	const apiMembers: Member[] = (data?.getUsers || []).map((m: any) => {
+	const apiMembers: Member[] = membersData.map((m: any) => {
 		// Check both currentMembership and membershipTransaction for subscription info
 		const membershipTransaction = m.currentMembership || m.membershipDetails?.membershipTransaction;
 		const membership = membershipTransaction?.membership?.name || 'No Plan';
@@ -365,7 +367,7 @@ export function MembersPage() {
 					<p className="text-[var(--text-secondary)] mb-4">
 						{error?.message || 'Failed to connect to the server'}
 					</p>
-					<button onClick={() => refetch()} className="btn-primary">
+					<button onClick={() => window.location.reload()} className="btn-primary">
 						Retry
 					</button>
 				</div>
@@ -385,17 +387,6 @@ export function MembersPage() {
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
 						Manage all gym members, view details, and update information ({apiMembers.length} total)
 					</p>
-				</div>
-				<div className="flex items-center gap-3">
-					<button
-						onClick={handleRefresh}
-						disabled={isRefreshing || loading}
-						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-						title="Refresh data"
-					>
-						<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-						Refresh
-					</button>
 				</div>
 			</div>
 
@@ -721,8 +712,7 @@ export function MembersPage() {
 					memberId={memberToSubscribe.id}
 					memberName={memberToSubscribe.name}
 					onSuccess={() => {
-						// Refetch members to show updated subscription
-						refetch();
+						// Subscription will automatically update the data
 					}}
 				/>
 			)}
@@ -829,6 +819,25 @@ export function MembersPage() {
 }
 
 function MemberViewModal({ member, onClose }: { member: Member; onClose: () => void }) {
+	// Fetch detailed member data including coach and session information
+	const { data: memberData, loading: memberLoading } = useQuery(GET_USER, {
+		variables: { id: member.id },
+		skip: !member.id,
+	});
+
+	// Fetch all coaches to match with coach IDs
+	const { data: coachesData } = useQuery(GET_USERS, {
+		variables: { role: 'coach' as any },
+		skip: !memberData?.getUser?.membershipDetails?.coachesIds || 
+			memberData?.getUser?.membershipDetails?.coachesIds?.length === 0,
+	});
+
+	const memberDetails = memberData?.getUser;
+	const coachesIds = memberDetails?.membershipDetails?.coachesIds || [];
+	const assignedCoaches = coachesData?.getUsers?.filter((coach: any) =>
+		coachesIds.includes(coach.id)
+	) || [];
+
 	return (
 		<div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
 			<div className="modal-header">
@@ -840,8 +849,15 @@ function MemberViewModal({ member, onClose }: { member: Member; onClose: () => v
 					<X className="w-5 h-5" />
 				</button>
 			</div>
-			<div className="modal-body">
-				<div className="grid grid-cols-2 gap-6">
+			<div className="modal-body max-h-[calc(100vh-200px)] overflow-y-auto">
+				{memberLoading ? (
+					<div className="flex items-center justify-center py-12">
+						<Loader2 className="w-8 h-8 animate-spin text-[var(--primary-yellow)]" />
+					</div>
+				) : (
+					<div className="space-y-6">
+						{/* Basic Information Grid */}
+						<div className="grid grid-cols-2 gap-6">
 					{/* Personal Information */}
 					<div>
 						<h3 className="font-semibold mb-3 text-[var(--text-primary)]">Personal Information</h3>
@@ -1006,6 +1022,225 @@ function MemberViewModal({ member, onClose }: { member: Member; onClose: () => v
 						</div>
 					</div>
 				</div>
+
+						{/* Assigned Coaches Section */}
+						{assignedCoaches.length > 0 && (
+							<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
+								<h3 className="font-semibold mb-4 text-[var(--text-primary)] flex items-center gap-2">
+									<UserCog className="w-5 h-5 text-[var(--primary-yellow)]" />
+									Assigned Coaches
+								</h3>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									{assignedCoaches.map((coach: any) => (
+										<div
+											key={coach.id}
+											className="p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-lg"
+										>
+											<div className="flex items-center gap-3 mb-2">
+												<div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)] flex items-center justify-center text-white font-semibold text-sm">
+													{coach.firstName?.[0] || ''}
+													{coach.lastName?.[0] || ''}
+												</div>
+												<div>
+													<p className="font-medium text-[var(--text-primary)]">
+														{coach.firstName} {coach.lastName}
+													</p>
+													<p className="text-xs text-[var(--text-secondary)]">
+														{coach.coachDetails?.specialization?.[0] || 'General Fitness'}
+													</p>
+												</div>
+											</div>
+											{coach.coachDetails?.specialization && coach.coachDetails.specialization.length > 1 && (
+												<div className="mt-2 flex flex-wrap gap-1">
+													{coach.coachDetails.specialization.slice(1).map((spec: string, idx: number) => (
+														<span
+															key={idx}
+															className="text-xs px-2 py-1 bg-[rgba(249,197,19,0.1)] text-[var(--primary-yellow)] rounded"
+														>
+															{spec}
+														</span>
+													))}
+												</div>
+											)}
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+
+						{/* Progress & Goals Section */}
+						<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
+							<h3 className="font-semibold mb-4 text-[var(--text-primary)] flex items-center gap-2">
+								<TrendingUp className="w-5 h-5 text-[var(--primary-yellow)]" />
+								Progress & Goals
+							</h3>
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+								<div className="p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-lg">
+									<div className="flex items-center gap-3 mb-2">
+										<Target className="w-5 h-5 text-[var(--primary-yellow)]" />
+										<span className="text-sm font-medium text-[var(--text-secondary)]">Fitness Goal</span>
+									</div>
+									<p className="text-lg font-semibold text-[var(--text-primary)]">
+										{memberDetails?.membershipDetails?.fitnessGoal || member.fitnessGoals || 'Not Set'}
+									</p>
+								</div>
+								<div className="p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-lg">
+									<div className="flex items-center gap-3 mb-2">
+										<Dumbbell className="w-5 h-5 text-[var(--primary-yellow)]" />
+										<span className="text-sm font-medium text-[var(--text-secondary)]">Physique Goal</span>
+									</div>
+									<p className="text-lg font-semibold text-[var(--text-primary)]">
+										{memberDetails?.membershipDetails?.physiqueGoalType || 'Not Set'}
+									</p>
+								</div>
+								<div className="p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-lg">
+									<div className="flex items-center gap-3 mb-2">
+										<Clock className="w-5 h-5 text-[var(--primary-yellow)]" />
+										<span className="text-sm font-medium text-[var(--text-secondary)]">Workout Time</span>
+									</div>
+									<p className="text-lg font-semibold text-[var(--text-primary)]">
+										{memberDetails?.membershipDetails?.workOutTime || 'Not Set'}
+									</p>
+								</div>
+							</div>
+							{member.progress && (
+								<div className="mt-4 grid grid-cols-2 gap-4">
+									<div className="p-4 bg-[rgba(16,185,129,0.1)] border border-[rgba(16,185,129,0.2)] rounded-lg">
+										<div className="flex items-center gap-2 mb-1">
+											<TrendingUp className="w-4 h-4 text-[#10B981]" />
+											<span className="text-sm font-medium text-[var(--text-secondary)]">Weight Lost</span>
+										</div>
+										<p className="text-2xl font-bold text-[#10B981]">
+											{member.progress.weightLost > 0 ? `${member.progress.weightLost} kg` : 'N/A'}
+										</p>
+									</div>
+									<div className="p-4 bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.2)] rounded-lg">
+										<div className="flex items-center gap-2 mb-1">
+											<Activity className="w-4 h-4 text-[#3B82F6]" />
+											<span className="text-sm font-medium text-[var(--text-secondary)]">Workouts Completed</span>
+										</div>
+										<p className="text-2xl font-bold text-[#3B82F6]">
+											{member.progress.workoutsCompleted || 0}
+										</p>
+									</div>
+								</div>
+							)}
+						</div>
+
+						{/* Activities & Sessions Section */}
+						<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
+							<h3 className="font-semibold mb-4 text-[var(--text-primary)] flex items-center gap-2">
+								<Activity className="w-5 h-5 text-[var(--primary-yellow)]" />
+								Activities & Sessions
+							</h3>
+							<div className="space-y-4">
+								{/* Recent Activity Timeline */}
+								<div className="space-y-3">
+									<div className="flex items-start gap-4 p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-lg">
+										<div className="w-2 h-2 rounded-full bg-[var(--primary-yellow)] mt-2"></div>
+										<div className="flex-1">
+											<p className="font-medium text-[var(--text-primary)]">Account Created</p>
+											<p className="text-sm text-[var(--text-secondary)]">
+												{member.joinDate || new Date(memberDetails?.createdAt || '').toLocaleDateString('en-US', {
+													year: 'numeric',
+													month: 'long',
+													day: 'numeric',
+												})}
+											</p>
+										</div>
+									</div>
+									{memberDetails?.currentMembership && (
+										<div className="flex items-start gap-4 p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-lg">
+											<div className="w-2 h-2 rounded-full bg-[#10B981] mt-2"></div>
+											<div className="flex-1">
+												<p className="font-medium text-[var(--text-primary)]">Membership Activated</p>
+												<p className="text-sm text-[var(--text-secondary)]">
+													{memberDetails.currentMembership.startedAt
+														? new Date(memberDetails.currentMembership.startedAt).toLocaleDateString('en-US', {
+																year: 'numeric',
+																month: 'long',
+																day: 'numeric',
+															})
+														: 'N/A'}
+												</p>
+												<p className="text-xs text-[var(--text-secondary)] mt-1">
+													Plan: {memberDetails.currentMembership.membership?.name || 'N/A'}
+												</p>
+											</div>
+										</div>
+									)}
+									{memberDetails?.membershipDetails?.hasEnteredDetails && (
+										<div className="flex items-start gap-4 p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-lg">
+											<div className="w-2 h-2 rounded-full bg-[#3B82F6] mt-2"></div>
+											<div className="flex-1">
+												<p className="font-medium text-[var(--text-primary)]">Profile Details Completed</p>
+												<p className="text-sm text-[var(--text-secondary)]">
+													Member has completed their profile setup
+												</p>
+											</div>
+										</div>
+									)}
+									{assignedCoaches.length > 0 && (
+										<div className="flex items-start gap-4 p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-lg">
+											<div className="w-2 h-2 rounded-full bg-[var(--primary-yellow)] mt-2"></div>
+											<div className="flex-1">
+												<p className="font-medium text-[var(--text-primary)]">Coach Assigned</p>
+												<p className="text-sm text-[var(--text-secondary)]">
+													{assignedCoaches.length} coach{assignedCoaches.length > 1 ? 'es' : ''} assigned
+												</p>
+											</div>
+										</div>
+									)}
+								</div>
+
+								{/* Session Information Placeholder */}
+								<div className="mt-4 p-4 bg-[rgba(255,255,255,0.02)] border border-[var(--card-border)] rounded-lg">
+									<div className="flex items-center gap-2 mb-2">
+										<Calendar className="w-4 h-4 text-[var(--text-secondary)]" />
+										<span className="text-sm font-medium text-[var(--text-secondary)]">Session History</span>
+									</div>
+									<p className="text-sm text-[var(--text-secondary)]">
+										Session logs and detailed workout history will be displayed here when available.
+									</p>
+								</div>
+							</div>
+						</div>
+
+						{/* Additional Information */}
+						<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
+							<h3 className="font-semibold mb-4 text-[var(--text-primary)] flex items-center gap-2">
+								<FileText className="w-5 h-5 text-[var(--primary-yellow)]" />
+								Additional Information
+							</h3>
+							<div className="grid grid-cols-2 gap-4 text-sm">
+								<div>
+									<span className="text-[var(--text-secondary)]">Heard From:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{memberDetails?.heardFrom || 'N/A'}
+									</span>
+								</div>
+								<div>
+									<span className="text-[var(--text-secondary)]">Profile Complete:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{memberDetails?.membershipDetails?.hasEnteredDetails ? 'Yes' : 'No'}
+									</span>
+								</div>
+								<div>
+									<span className="text-[var(--text-secondary)]">Last Updated:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{memberDetails?.updatedAt
+											? new Date(memberDetails.updatedAt).toLocaleDateString('en-US', {
+													year: 'numeric',
+													month: 'long',
+													day: 'numeric',
+												})
+											: 'N/A'}
+									</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
 			</div>
 			<div className="modal-footer">
 				<button type="button" className="btn-secondary" onClick={onClose}>

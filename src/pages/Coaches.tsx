@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import {
 	Search,
@@ -7,14 +7,14 @@ import {
 	Eye,
 	Trash2,
 	UserCog,
-	RefreshCw,
 	X,
 	Copy,
 	Save,
 	EyeOff,
 	Edit,
+	RefreshCw,
 } from 'lucide-react';
-import { GET_USERS, DELETE_USER, CREATE_USER, UPDATE_USER } from '@/graphql/operations/index';
+import { GET_USERS, DELETE_USER, CREATE_USER, UPDATE_USER, USERS_UPDATED } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import type { CreateUserMutation, CreateUserMutationVariables } from '@/graphql/generated/types';
@@ -54,24 +54,28 @@ export function CoachesPage() {
 	const dispatch = useAppDispatch();
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState<string>('all');
-	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
 	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isAddCoachModalOpen, setIsAddCoachModalOpen] = useState(false);
 	const [isEditCoachModalOpen, setIsEditCoachModalOpen] = useState(false);
 
-	// GraphQL queries and mutations
-	const { data, loading, error, refetch } = useQuery(GET_USERS, {
+	// Initial data fetch with query
+	const { data, loading, error } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Coach },
 		errorPolicy: 'none',
 	});
 
+	// Real-time subscription for coach updates
+	const { data: subscriptionData } = useSubscription(USERS_UPDATED, {
+		variables: { role: 'coach' },
+		skip: !data, // Skip if initial data not loaded
+	});
+
+	// Use subscription data if available, otherwise fall back to query data
+	const coachesData = subscriptionData?.usersUpdated || data?.getUsers || [];
+
 	const [deleteUserMutation] = useMutation(DELETE_USER, {
-		refetchQueries: [
-			{ query: GET_USERS, variables: { role: RoleType.Coach } },
-			{ query: GET_USERS, variables: { role: RoleType.Member } },
-		],
 		onCompleted: () => {
 			dispatch(
 				addToast({
@@ -81,6 +85,7 @@ export function CoachesPage() {
 			);
 			setIsDeleteModalOpen(false);
 			setSelectedCoach(null);
+			// Subscription will automatically update the data
 		},
 		onError: (error) => {
 			dispatch(
@@ -95,7 +100,6 @@ export function CoachesPage() {
 	const [createUserMutation] = useMutation<CreateUserMutation, CreateUserMutationVariables>(
 		CREATE_USER,
 		{
-			refetchQueries: [{ query: GET_USERS, variables: { role: RoleType.Coach } }],
 			onError: (error) => {
 				dispatch(
 					addToast({
@@ -104,11 +108,13 @@ export function CoachesPage() {
 					})
 				);
 			},
+			onCompleted: () => {
+				// Subscription will automatically update the data
+			},
 		}
 	);
 
 	const [updateUserMutation] = useMutation(UPDATE_USER, {
-		refetchQueries: [{ query: GET_USERS, variables: { role: RoleType.Coach } }],
 		onError: (error) => {
 			dispatch(
 				addToast({
@@ -117,16 +123,11 @@ export function CoachesPage() {
 				})
 			);
 		},
+		onCompleted: () => {
+			// Subscription will automatically update the data
+		},
 	});
 
-	const handleRefresh = async () => {
-		setIsRefreshing(true);
-		try {
-			await refetch();
-		} finally {
-			setIsRefreshing(false);
-		}
-	};
 
 	const handleView = (coach: Coach) => {
 		setSelectedCoach(coach);
@@ -160,7 +161,7 @@ export function CoachesPage() {
 	};
 
 	// Transform API data
-	const apiCoaches: Coach[] = (data?.getUsers || [])
+	const apiCoaches: Coach[] = coachesData
 		.filter((c): c is NonNullable<typeof c> => c !== null && c !== undefined)
 		.map((c) => {
 			const specialization = c.coachDetails?.specialization?.[0] || 'General fitness';
@@ -248,7 +249,7 @@ export function CoachesPage() {
 					<p className="text-[var(--text-secondary)] mb-4">
 						{error?.message || 'Failed to connect to the server'}
 					</p>
-					<button onClick={() => refetch()} className="btn-primary">
+					<button onClick={() => window.location.reload()} className="btn-primary">
 						Retry
 					</button>
 				</div>
@@ -269,15 +270,6 @@ export function CoachesPage() {
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<button
-						onClick={handleRefresh}
-						disabled={isRefreshing || loading}
-						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-						title="Refresh data"
-					>
-						<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-						Refresh
-					</button>
 					<Button onClick={handleAddCoach}>
 						<Plus className="w-4 h-4" />
 						Add New Coach
