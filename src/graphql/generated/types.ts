@@ -63,6 +63,21 @@ export type CoachDetailsInput = {
   yearsOfExperience?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type CoachRating = {
+  __typename?: 'CoachRating';
+  client?: Maybe<User>;
+  clientId: Scalars['ID']['output'];
+  coach?: Maybe<User>;
+  coachId: Scalars['ID']['output'];
+  comment?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  rating: Scalars['Int']['output'];
+  sessionLog?: Maybe<SessionLog>;
+  sessionLogId: Scalars['ID']['output'];
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 export type CoachRequest = {
   __typename?: 'CoachRequest';
   client?: Maybe<User>;
@@ -87,6 +102,13 @@ export type ConfirmSessionCompletionInput = {
   sessionLogId: Scalars['ID']['input'];
 };
 
+export type CreateCoachRatingInput = {
+  coachId: Scalars['ID']['input'];
+  comment?: InputMaybe<Scalars['String']['input']>;
+  rating: Scalars['Int']['input'];
+  sessionLogId: Scalars['ID']['input'];
+};
+
 export type CreateCoachRequestInput = {
   coachId: Scalars['ID']['input'];
   message?: InputMaybe<Scalars['String']['input']>;
@@ -95,7 +117,7 @@ export type CreateCoachRequestInput = {
 export type CreateGoalInput = {
   currentWeight?: InputMaybe<Scalars['Float']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
-  goalType: FitnessGoalType;
+  goalType: Scalars['String']['input'];
   targetDate?: InputMaybe<Scalars['String']['input']>;
   targetWeight?: InputMaybe<Scalars['Float']['input']>;
   title: Scalars['String']['input'];
@@ -110,22 +132,45 @@ export type CreateMembershipInput = {
   status: MembershipStatus;
 };
 
+export type CreateProgressRatingInput = {
+  clientId: Scalars['ID']['input'];
+  comment: Scalars['String']['input'];
+  endDate: Scalars['String']['input'];
+  goalId: Scalars['ID']['input'];
+  rating: Scalars['Int']['input'];
+  sessionLogIds: Array<Scalars['ID']['input']>;
+  startDate: Scalars['String']['input'];
+  verdict: ProgressVerdict;
+};
+
+export type CreateSessionFromTemplateInput = {
+  clientsIds: Array<Scalars['ID']['input']>;
+  date: Scalars['String']['input'];
+  endTime?: InputMaybe<Scalars['String']['input']>;
+  goalId?: InputMaybe<Scalars['ID']['input']>;
+  startTime: Scalars['String']['input'];
+  templateId: Scalars['ID']['input'];
+};
+
 export type CreateSessionInput = {
   clientsIds: Array<Scalars['ID']['input']>;
   date: Scalars['String']['input'];
   endTime?: InputMaybe<Scalars['String']['input']>;
-  goalId: Scalars['ID']['input'];
+  goalId?: InputMaybe<Scalars['ID']['input']>;
   gymArea: Scalars['String']['input'];
+  isTemplate?: InputMaybe<Scalars['Boolean']['input']>;
   name: Scalars['String']['input'];
   note?: InputMaybe<Scalars['String']['input']>;
   startTime: Scalars['String']['input'];
+  templateId?: InputMaybe<Scalars['ID']['input']>;
   workoutType?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CreateSessionLogInput = {
   notes?: InputMaybe<Scalars['String']['input']>;
+  progressImages: ProgressImagesInput;
   sessionId: Scalars['ID']['input'];
-  weight: Scalars['Float']['input'];
+  weight?: InputMaybe<Scalars['Float']['input']>;
 };
 
 export type CreateSubscriptionRequestInput = {
@@ -166,17 +211,6 @@ export enum DurationType {
   Yearly = 'YEARLY'
 }
 
-export enum FitnessGoalType {
-  AthleticPerformance = 'ATHLETIC_PERFORMANCE',
-  Endurance = 'ENDURANCE',
-  Flexibility = 'FLEXIBILITY',
-  GeneralFitness = 'GENERAL_FITNESS',
-  MuscleBuilding = 'MUSCLE_BUILDING',
-  Rehabilitation = 'REHABILITATION',
-  StrengthTraining = 'STRENGTH_TRAINING',
-  WeightLoss = 'WEIGHT_LOSS'
-}
-
 export type Goal = {
   __typename?: 'Goal';
   client?: Maybe<User>;
@@ -186,7 +220,7 @@ export type Goal = {
   createdAt?: Maybe<Scalars['String']['output']>;
   currentWeight?: Maybe<Scalars['Float']['output']>;
   description?: Maybe<Scalars['String']['output']>;
-  goalType: FitnessGoalType;
+  goalType: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   status: GoalStatus;
   targetDate?: Maybe<Scalars['String']['output']>;
@@ -279,24 +313,30 @@ export type Mutation = {
   clientConfirmWeight: SessionLog;
   completeSession: SessionLog;
   confirmSessionCompletion: SessionLog;
+  createCoachRating: CoachRating;
   createCoachRequest: CoachRequest;
   createGoal: Goal;
   createMembership: Membership;
+  createProgressRating: ProgressRating;
   createSession: Session;
+  createSessionFromTemplate: Session;
   createSubscriptionRequest: SubscriptionRequest;
   createUser: AuthResponse;
+  deleteCoachRating: Scalars['Boolean']['output'];
   deleteGoal: Scalars['Boolean']['output'];
   deleteMembership: Scalars['Boolean']['output'];
+  deleteProgressRating: Scalars['Boolean']['output'];
   deleteUser?: Maybe<Scalars['Boolean']['output']>;
   directSubscribeMember: MembershipTransaction;
   login: AuthResponse;
   purchaseMembership: MembershipTransaction;
   rejectSubscriptionRequest: Scalars['Boolean']['output'];
   removeClient: Scalars['Boolean']['output'];
-  unassignCoachFromGoal: Goal;
+  updateCoachRating: CoachRating;
   updateCoachRequest: CoachRequest;
   updateGoal: Goal;
   updateMembership: Membership;
+  updateProgressRating: ProgressRating;
   updateSession: Session;
   updateUser?: Maybe<User>;
 };
@@ -342,6 +382,11 @@ export type MutationConfirmSessionCompletionArgs = {
 };
 
 
+export type MutationCreateCoachRatingArgs = {
+  input: CreateCoachRatingInput;
+};
+
+
 export type MutationCreateCoachRequestArgs = {
   input: CreateCoachRequestInput;
 };
@@ -357,8 +402,18 @@ export type MutationCreateMembershipArgs = {
 };
 
 
+export type MutationCreateProgressRatingArgs = {
+  input: CreateProgressRatingInput;
+};
+
+
 export type MutationCreateSessionArgs = {
   input: CreateSessionInput;
+};
+
+
+export type MutationCreateSessionFromTemplateArgs = {
+  input: CreateSessionFromTemplateInput;
 };
 
 
@@ -372,12 +427,22 @@ export type MutationCreateUserArgs = {
 };
 
 
+export type MutationDeleteCoachRatingArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationDeleteGoalArgs = {
   id: Scalars['ID']['input'];
 };
 
 
 export type MutationDeleteMembershipArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteProgressRatingArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -412,8 +477,10 @@ export type MutationRemoveClientArgs = {
 };
 
 
-export type MutationUnassignCoachFromGoalArgs = {
-  goalId: Scalars['ID']['input'];
+export type MutationUpdateCoachRatingArgs = {
+  comment?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  rating?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -435,6 +502,12 @@ export type MutationUpdateMembershipArgs = {
 };
 
 
+export type MutationUpdateProgressRatingArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateProgressRatingInput;
+};
+
+
 export type MutationUpdateSessionArgs = {
   id: Scalars['ID']['input'];
   input: UpdateSessionInput;
@@ -453,20 +526,68 @@ export type PeriodRevenue = {
   revenue: Scalars['Float']['output'];
 };
 
+export type ProgressImages = {
+  __typename?: 'ProgressImages';
+  back?: Maybe<Scalars['String']['output']>;
+  front?: Maybe<Scalars['String']['output']>;
+  leftSide?: Maybe<Scalars['String']['output']>;
+  rightSide?: Maybe<Scalars['String']['output']>;
+};
+
+export type ProgressImagesInput = {
+  back?: InputMaybe<Scalars['String']['input']>;
+  front?: InputMaybe<Scalars['String']['input']>;
+  leftSide?: InputMaybe<Scalars['String']['input']>;
+  rightSide?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ProgressRating = {
+  __typename?: 'ProgressRating';
+  client?: Maybe<User>;
+  clientId: Scalars['ID']['output'];
+  coach?: Maybe<User>;
+  coachId: Scalars['ID']['output'];
+  comment: Scalars['String']['output'];
+  createdAt?: Maybe<Scalars['String']['output']>;
+  endDate: Scalars['String']['output'];
+  goal?: Maybe<Goal>;
+  goalId: Scalars['ID']['output'];
+  id: Scalars['ID']['output'];
+  rating: Scalars['Int']['output'];
+  sessionLogIds: Array<Scalars['ID']['output']>;
+  sessionLogs?: Maybe<Array<SessionLog>>;
+  startDate: Scalars['String']['output'];
+  updatedAt?: Maybe<Scalars['String']['output']>;
+  verdict: ProgressVerdict;
+};
+
+export enum ProgressVerdict {
+  Achieved = 'achieved',
+  CloseToAchievement = 'close_to_achievement',
+  Progressive = 'progressive',
+  Regressing = 'regressing'
+}
+
 export type PurchaseMembershipInput = {
   membershipId: Scalars['ID']['input'];
 };
 
 export type Query = {
   __typename?: 'Query';
+  getAllClientGoals: Array<Goal>;
   getAnalytics?: Maybe<Analytics>;
   getAnalyticsRange: Array<Analytics>;
-  getClientGoalsForCoach: Array<Goal>;
+  getClientProgressRatings: Array<ProgressRating>;
   getClientRequests: Array<CoachRequest>;
   getClientSessions: Array<Session>;
+  getCoachProgressRatings: Array<ProgressRating>;
+  getCoachRatingBySessionLog?: Maybe<CoachRating>;
+  getCoachRatings: Array<CoachRating>;
   getCoachRequests: Array<CoachRequest>;
+  getCoachSessionLogs: Array<SessionLog>;
   getCoachSessions: Array<Session>;
   getCurrentMembership?: Maybe<MembershipTransaction>;
+  getFitnessGoalTypes: Array<Scalars['String']['output']>;
   getGoal?: Maybe<Goal>;
   getGoals: Array<Goal>;
   getMembership?: Maybe<Membership>;
@@ -475,15 +596,25 @@ export type Query = {
   getMySubscriptionRequests: Array<SubscriptionRequest>;
   getPendingCoachRequests: Array<CoachRequest>;
   getPendingSubscriptionRequests: Array<SubscriptionRequest>;
+  getProgressRatings: Array<ProgressRating>;
   getRevenueSummary: RevenueSummary;
   getSession?: Maybe<Session>;
+  getSessionLogBySessionId?: Maybe<SessionLog>;
   getSessionLogs: Array<SessionLog>;
+  getSessionLogsForRating: Array<SessionLog>;
+  getSessionTemplates: Array<Session>;
   getSubscriptionRequest?: Maybe<SubscriptionRequest>;
   getUpcomingSessions: Array<Session>;
   getUser?: Maybe<User>;
   getUsers?: Maybe<Array<Maybe<User>>>;
   getWeightProgress: Array<SessionLog>;
   getWeightProgressChart: Array<WeightProgress>;
+};
+
+
+export type QueryGetAllClientGoalsArgs = {
+  coachId: Scalars['ID']['input'];
+  status?: InputMaybe<GoalStatus>;
 };
 
 
@@ -497,8 +628,8 @@ export type QueryGetAnalyticsRangeArgs = {
 };
 
 
-export type QueryGetClientGoalsForCoachArgs = {
-  status?: InputMaybe<GoalStatus>;
+export type QueryGetClientProgressRatingsArgs = {
+  clientId: Scalars['ID']['input'];
 };
 
 
@@ -514,9 +645,29 @@ export type QueryGetClientSessionsArgs = {
 };
 
 
+export type QueryGetCoachProgressRatingsArgs = {
+  coachId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetCoachRatingBySessionLogArgs = {
+  sessionLogId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetCoachRatingsArgs = {
+  coachId: Scalars['ID']['input'];
+};
+
+
 export type QueryGetCoachRequestsArgs = {
   coachId: Scalars['ID']['input'];
   status?: InputMaybe<CoachRequestStatus>;
+};
+
+
+export type QueryGetCoachSessionLogsArgs = {
+  coachId: Scalars['ID']['input'];
 };
 
 
@@ -552,6 +703,12 @@ export type QueryGetMembershipsArgs = {
 };
 
 
+export type QueryGetProgressRatingsArgs = {
+  clientId: Scalars['ID']['input'];
+  goalId: Scalars['ID']['input'];
+};
+
+
 export type QueryGetRevenueSummaryArgs = {
   dateRange?: InputMaybe<DateRangeInput>;
 };
@@ -562,8 +719,26 @@ export type QueryGetSessionArgs = {
 };
 
 
+export type QueryGetSessionLogBySessionIdArgs = {
+  sessionId: Scalars['ID']['input'];
+};
+
+
 export type QueryGetSessionLogsArgs = {
   clientId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetSessionLogsForRatingArgs = {
+  clientId: Scalars['ID']['input'];
+  endDate: Scalars['String']['input'];
+  goalId: Scalars['ID']['input'];
+  startDate: Scalars['String']['input'];
+};
+
+
+export type QueryGetSessionTemplatesArgs = {
+  coachId: Scalars['ID']['input'];
 };
 
 
@@ -627,10 +802,12 @@ export type Session = {
   goalId?: Maybe<Scalars['ID']['output']>;
   gymArea: Scalars['String']['output'];
   id: Scalars['ID']['output'];
+  isTemplate?: Maybe<Scalars['Boolean']['output']>;
   name: Scalars['String']['output'];
   note?: Maybe<Scalars['String']['output']>;
   startTime: Scalars['String']['output'];
   status: SessionStatus;
+  templateId?: Maybe<Scalars['ID']['output']>;
   time?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   workoutType?: Maybe<Scalars['String']['output']>;
@@ -648,10 +825,11 @@ export type SessionLog = {
   createdAt?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   notes?: Maybe<Scalars['String']['output']>;
+  progressImages?: Maybe<ProgressImages>;
   session?: Maybe<Session>;
   sessionId: Scalars['ID']['output'];
   updatedAt?: Maybe<Scalars['String']['output']>;
-  weight: Scalars['Float']['output'];
+  weight?: Maybe<Scalars['Float']['output']>;
 };
 
 export enum SessionStatus {
@@ -698,7 +876,7 @@ export type UpdateCoachRequestInput = {
 export type UpdateGoalInput = {
   currentWeight?: InputMaybe<Scalars['Float']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
-  goalType?: InputMaybe<FitnessGoalType>;
+  goalType?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<GoalStatus>;
   targetDate?: InputMaybe<Scalars['String']['input']>;
   targetWeight?: InputMaybe<Scalars['Float']['input']>;
@@ -712,6 +890,13 @@ export type UpdateMembershipInput = {
   monthlyPrice?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<MembershipStatus>;
+};
+
+export type UpdateProgressRatingInput = {
+  comment?: InputMaybe<Scalars['String']['input']>;
+  rating?: InputMaybe<Scalars['Int']['input']>;
+  sessionLogIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  verdict?: InputMaybe<ProgressVerdict>;
 };
 
 export type UpdateSessionInput = {

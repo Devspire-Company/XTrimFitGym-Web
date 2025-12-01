@@ -3,6 +3,31 @@ import { useQuery } from '@apollo/client';
 import { Link } from 'react-router';
 import { Users, UserCog, DollarSign, CreditCard, BarChart3, RefreshCw } from 'lucide-react';
 import { GET_USERS, GET_REVENUE_SUMMARY } from '@/graphql/operations/index';
+import {
+	Chart as ChartJS,
+	CategoryScale,
+	LinearScale,
+	PointElement,
+	LineElement,
+	BarElement,
+	Title,
+	Tooltip,
+	Legend,
+	Filler,
+} from 'chart.js';
+import { Line, Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+	CategoryScale,
+	LinearScale,
+	PointElement,
+	LineElement,
+	BarElement,
+	Title,
+	Tooltip,
+	Legend,
+	Filler
+);
 
 export function DashboardPage() {
 	useEffect(() => {
@@ -217,160 +242,167 @@ export function DashboardPage() {
 				</div>
 			</div>
 
-			{/* Content Grid */}
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Left Column */}
-				<div className="lg:col-span-2 space-y-6">
-					{/* Recent Members */}
-					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
-						<div className="section-header flex items-center justify-between mb-6 pb-4 border-b border-[rgba(255,255,255,0.08)]">
-							<h2 className="text-xl font-semibold flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
-								<Users className="w-5 h-5 text-[var(--primary-yellow)]" />
-								Recent Members
-							</h2>
-							<Link
-								to="/members"
-								className="view-all text-sm text-[var(--primary-yellow)] font-medium flex items-center gap-1"
-							>
-								View All <span>→</span>
-							</Link>
-						</div>
-						<div className="space-y-4">
-							{recentMembers.map((member) => (
-								<div
-									key={member.id}
-									className="member-item flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
-								>
-									<div className="member-avatar w-12 h-12 rounded-full bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)] flex items-center justify-center font-semibold text-white text-base flex-shrink-0">
-										{member.avatar}
-									</div>
-									<div className="member-info flex-1">
-										<h3 className="font-semibold text-[var(--text-primary)] mb-1">{member.name}</h3>
-										<p className="text-sm text-[var(--text-secondary)]">
-											{member.membership} Member • Joined {member.joinDate}
-										</p>
-									</div>
-									<button className="btn-small text-sm text-[var(--primary-yellow)] bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] px-4 py-2 rounded-lg font-semibold">
-										View
-									</button>
-								</div>
-							))}
-						</div>
+			{/* Revenue Overview Chart - Full Width */}
+			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
+				<h2 className="text-xl font-semibold mb-6 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+					<span className="text-[var(--primary-yellow)]">📈</span> Revenue Overview
+				</h2>
+				
+				{/* Revenue Chart */}
+				{analytics?.revenueByPeriod && analytics.revenueByPeriod.length > 0 ? (
+					<div className="mb-6">
+						<RevenueChart data={analytics.revenueByPeriod} />
 					</div>
+				) : (
+					<div className="mb-6 h-80 flex items-center justify-center text-[var(--text-secondary)]">
+						<p>No revenue data available</p>
+					</div>
+				)}
 
-					{/* Coaches */}
-					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
-						<div className="section-header flex items-center justify-between mb-6 pb-4 border-b border-[rgba(255,255,255,0.08)]">
-							<h2 className="text-xl font-semibold flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
-								<UserCog className="w-5 h-5 text-[var(--primary-yellow)]" />
-								Coaches
-							</h2>
-							<Link
-								to="/coaches"
-								className="view-all text-sm text-[var(--primary-yellow)] font-medium flex items-center gap-1"
+				{/* Key Stats */}
+				<div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-[rgba(255,255,255,0.08)]">
+					<div className="flex flex-col">
+						<span className="text-sm text-[var(--text-secondary)] mb-1">Total Revenue</span>
+						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+							₱{monthlyRevenue.toLocaleString()}
+						</span>
+					</div>
+					<div className="flex flex-col">
+						<span className="text-sm text-[var(--text-secondary)] mb-1">Active Subscriptions</span>
+						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+							{activeSubscriptions}
+						</span>
+					</div>
+					<div className="flex flex-col">
+						<span className="text-sm text-[var(--text-secondary)] mb-1">New This Period</span>
+						<span className="text-lg font-semibold text-[var(--primary-yellow)] font-['Poppins']">
+							+{analytics?.newSubscriptions || 0}
+						</span>
+					</div>
+					<div className="flex flex-col">
+						<span className="text-sm text-[var(--text-secondary)] mb-1">Avg. per Member</span>
+						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+							₱{activeSubscriptions > 0 ? Math.round(monthlyRevenue / activeSubscriptions) : 0}
+						</span>
+					</div>
+				</div>
+			</div>
+
+			{/* Content Grid */}
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				{/* Recent Members */}
+				<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
+					<div className="section-header flex items-center justify-between mb-6 pb-4 border-b border-[rgba(255,255,255,0.08)]">
+						<h2 className="text-xl font-semibold flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+							<Users className="w-5 h-5 text-[var(--primary-yellow)]" />
+							Recent Members
+						</h2>
+						<Link
+							to="/members"
+							className="view-all text-sm text-[var(--primary-yellow)] font-medium flex items-center gap-1"
+						>
+							View All <span>→</span>
+						</Link>
+					</div>
+					<div className="space-y-4">
+						{recentMembers.map((member) => (
+							<div
+								key={member.id}
+								className="member-item flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
 							>
-								View All <span>→</span>
-							</Link>
-						</div>
-						<div className="space-y-4">
-							{coaches.map((coach) => (
-								<div
-									key={coach.id}
-									className="coach-item flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
-								>
-									<div className="coach-avatar w-12 h-12 rounded-full bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)] flex items-center justify-center font-semibold text-white text-base flex-shrink-0">
-										{coach.avatar}
-									</div>
-									<div className="coach-info flex-1">
-										<h3 className="font-semibold text-[var(--text-primary)] mb-1">{coach.name}</h3>
-										<p className="text-sm text-[var(--text-secondary)]">
-											{coach.specialization} • {coach.yearsExperience} years experience
-										</p>
-									</div>
-									<button className="btn-small text-sm text-[var(--primary-yellow)] bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] px-4 py-2 rounded-lg font-semibold">
-										View
-									</button>
+								<div className="member-avatar w-12 h-12 rounded-full bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)] flex items-center justify-center font-semibold text-white text-base flex-shrink-0">
+									{member.avatar}
 								</div>
-							))}
-						</div>
+								<div className="member-info flex-1">
+									<h3 className="font-semibold text-[var(--text-primary)] mb-1">{member.name}</h3>
+									<p className="text-sm text-[var(--text-secondary)]">
+										{member.membership} Member • Joined {member.joinDate}
+									</p>
+								</div>
+								<button className="btn-small text-sm text-[var(--primary-yellow)] bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] px-4 py-2 rounded-lg font-semibold">
+									View
+								</button>
+							</div>
+						))}
 					</div>
 				</div>
 
-				{/* Right Column */}
-				<div className="space-y-6">
-					{/* Revenue Overview */}
-					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
-						<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
-							<span className="text-[var(--primary-yellow)]">📈</span> Revenue Overview
+				{/* Coaches */}
+				<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
+					<div className="section-header flex items-center justify-between mb-6 pb-4 border-b border-[rgba(255,255,255,0.08)]">
+						<h2 className="text-xl font-semibold flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+							<UserCog className="w-5 h-5 text-[var(--primary-yellow)]" />
+							Coaches
 						</h2>
-						<div className="space-y-4">
-							<div className="flex items-center justify-between">
-								<span className="text-[var(--text-secondary)]">Total Revenue</span>
-								<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
-									₱{monthlyRevenue.toLocaleString()}
-								</span>
-							</div>
-							<div className="flex items-center justify-between">
-								<span className="text-[var(--text-secondary)]">Active Subscriptions</span>
-								<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
-									{activeSubscriptions}
-								</span>
-							</div>
-							<div className="flex items-center justify-between">
-								<span className="text-[var(--text-secondary)]">New This Period</span>
-								<span className="text-lg font-semibold text-[var(--primary-yellow)] font-['Poppins']">
-									+{analytics?.newSubscriptions || 0}
-								</span>
-							</div>
-							<div className="flex items-center justify-between">
-								<span className="text-[var(--text-secondary)]">Avg. per Member</span>
-								<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
-									₱{activeSubscriptions > 0 ? Math.round(monthlyRevenue / activeSubscriptions) : 0}
-								</span>
-							</div>
-						</div>
+						<Link
+							to="/coaches"
+							className="view-all text-sm text-[var(--primary-yellow)] font-medium flex items-center gap-1"
+						>
+							View All <span>→</span>
+						</Link>
 					</div>
+					<div className="space-y-4">
+						{coaches.map((coach) => (
+							<div
+								key={coach.id}
+								className="coach-item flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
+							>
+								<div className="coach-avatar w-12 h-12 rounded-full bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)] flex items-center justify-center font-semibold text-white text-base flex-shrink-0">
+									{coach.avatar}
+								</div>
+								<div className="coach-info flex-1">
+									<h3 className="font-semibold text-[var(--text-primary)] mb-1">{coach.name}</h3>
+									<p className="text-sm text-[var(--text-secondary)]">
+										{coach.specialization} • {coach.yearsExperience} years experience
+									</p>
+								</div>
+								<button className="btn-small text-sm text-[var(--primary-yellow)] bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] px-4 py-2 rounded-lg font-semibold">
+									View
+								</button>
+							</div>
+						))}
+					</div>
+				</div>
+			</div>
 
-					{/* Membership Distribution */}
-					<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
-						<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
-							<span className="text-[var(--primary-yellow)]">📊</span> Membership Distribution
-						</h2>
-						<div className="membership-distribution space-y-3">
-							{Object.entries(membershipDistribution).map(([name, count]) => {
-								const percentage = totalMembers > 0 ? Math.round((count / totalMembers) * 100) : 0;
-								return (
+			{/* Membership Distribution - Full Width */}
+			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
+				<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+					<span className="text-[var(--primary-yellow)]">📊</span> Membership Distribution
+				</h2>
+				<div className="membership-distribution space-y-3">
+					{Object.entries(membershipDistribution).map(([name, count]) => {
+						const percentage = totalMembers > 0 ? Math.round((count / totalMembers) * 100) : 0;
+						return (
+							<div
+								key={name}
+								className="membership-item flex items-center justify-between p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
+							>
+								<div className="membership-info flex items-center gap-3">
 									<div
-										key={name}
-										className="membership-item flex items-center justify-between p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
-									>
-										<div className="membership-info flex items-center gap-3">
-											<div
-												className={`membership-color w-4 h-4 rounded ${
-													name === 'Student'
-														? 'bg-[var(--primary-gray)]'
-														: name === 'PROMO Student'
-															? 'bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)]'
-															: 'bg-gradient-to-br from-[#8B4513] to-[#A0522D]'
-												}`}
-											/>
-											<span className="membership-name font-medium text-[var(--text-primary)]">
-												{name}
-											</span>
-										</div>
-										<div className="membership-stats flex flex-col items-end gap-1">
-											<span className="membership-count font-bold text-[var(--text-primary)] font-['Poppins']">
-												{count}
-											</span>
-											<span className="membership-percentage text-sm text-[var(--text-secondary)]">
-												{percentage}%
-											</span>
-										</div>
-									</div>
-								);
-							})}
-						</div>
-					</div>
+										className={`membership-color w-4 h-4 rounded ${
+											name === 'Student'
+												? 'bg-[var(--primary-gray)]'
+												: name === 'PROMO Student'
+													? 'bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)]'
+													: 'bg-gradient-to-br from-[#8B4513] to-[#A0522D]'
+										}`}
+									/>
+									<span className="membership-name font-medium text-[var(--text-primary)]">
+										{name}
+									</span>
+								</div>
+								<div className="membership-stats flex flex-col items-end gap-1">
+									<span className="membership-count font-bold text-[var(--text-primary)] font-['Poppins']">
+										{count}
+									</span>
+									<span className="membership-percentage text-sm text-[var(--text-secondary)]">
+										{percentage}%
+									</span>
+								</div>
+							</div>
+						);
+					})}
 				</div>
 			</div>
 		</div>
@@ -435,5 +467,100 @@ function QuickActionButton({
 			<Icon className="w-5 h-5 text-[var(--primary-yellow)] flex-shrink-0" />
 			<span className="whitespace-nowrap">{label}</span>
 		</Link>
+	);
+}
+
+function RevenueChart({ data }: { data: Array<{ period: string; revenue: number; count: number }> }) {
+	const chartData = {
+		labels: data.map((item) => item.period),
+		datasets: [
+			{
+				label: 'Revenue',
+				data: data.map((item) => item.revenue),
+				borderColor: 'rgba(249, 197, 19, 1)',
+				backgroundColor: 'rgba(249, 197, 19, 0.1)',
+				borderWidth: 3,
+				fill: true,
+				tension: 0.4,
+				pointBackgroundColor: 'rgba(249, 197, 19, 1)',
+				pointBorderColor: '#fff',
+				pointBorderWidth: 2,
+				pointRadius: 5,
+				pointHoverRadius: 7,
+				pointHoverBackgroundColor: 'rgba(249, 197, 19, 1)',
+				pointHoverBorderColor: '#fff',
+				pointHoverBorderWidth: 2,
+			},
+		],
+	};
+
+	const chartOptions = {
+		responsive: true,
+		maintainAspectRatio: false,
+		plugins: {
+			legend: {
+				display: false,
+			},
+			tooltip: {
+				backgroundColor: 'rgba(19, 22, 31, 0.95)',
+				titleColor: 'rgba(255, 255, 255, 1)',
+				bodyColor: 'rgba(249, 197, 19, 1)',
+				borderColor: 'rgba(249, 197, 19, 0.3)',
+				borderWidth: 1,
+				padding: 12,
+				titleFont: {
+					size: 14,
+					weight: '600' as const,
+					family: "'Poppins', sans-serif",
+				},
+				bodyFont: {
+					size: 13,
+					weight: '500' as const,
+					family: "'Inter', sans-serif",
+				},
+				callbacks: {
+					label: function (context: any) {
+						return `₱${context.parsed.y.toLocaleString()}`;
+					},
+				},
+			},
+		},
+		scales: {
+			x: {
+				grid: {
+					color: 'rgba(255, 255, 255, 0.05)',
+					drawBorder: false,
+				},
+				ticks: {
+					color: 'rgba(184, 188, 200, 0.8)',
+					font: {
+						size: 11,
+						family: "'Inter', sans-serif",
+					},
+				},
+			},
+			y: {
+				grid: {
+					color: 'rgba(255, 255, 255, 0.05)',
+					drawBorder: false,
+				},
+				ticks: {
+					color: 'rgba(184, 188, 200, 0.8)',
+					font: {
+						size: 11,
+						family: "'Inter', sans-serif",
+					},
+					callback: function (value: any) {
+						return '₱' + (value / 1000).toFixed(0) + 'k';
+					},
+				},
+			},
+		},
+	};
+
+	return (
+		<div className="h-80">
+			<Line data={chartData} options={chartOptions} />
+		</div>
 	);
 }
