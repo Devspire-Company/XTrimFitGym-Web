@@ -114,6 +114,7 @@ export type CreateSessionInput = {
   clientsIds: Array<Scalars['ID']['input']>;
   date: Scalars['String']['input'];
   endTime?: InputMaybe<Scalars['String']['input']>;
+  goalId: Scalars['ID']['input'];
   gymArea: Scalars['String']['input'];
   name: Scalars['String']['input'];
   note?: InputMaybe<Scalars['String']['input']>;
@@ -180,6 +181,8 @@ export type Goal = {
   __typename?: 'Goal';
   client?: Maybe<User>;
   clientId: Scalars['ID']['output'];
+  coach?: Maybe<User>;
+  coachId?: Maybe<Scalars['ID']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   currentWeight?: Maybe<Scalars['Float']['output']>;
   description?: Maybe<Scalars['String']['output']>;
@@ -269,6 +272,7 @@ export type MembershipTransaction = {
 export type Mutation = {
   __typename?: 'Mutation';
   approveSubscriptionRequest: MembershipTransaction;
+  assignCoachToGoal: Goal;
   cancelCoachRequest: Scalars['Boolean']['output'];
   cancelMembership: Scalars['Boolean']['output'];
   cancelSession: Scalars['Boolean']['output'];
@@ -288,6 +292,8 @@ export type Mutation = {
   login: AuthResponse;
   purchaseMembership: MembershipTransaction;
   rejectSubscriptionRequest: Scalars['Boolean']['output'];
+  removeClient: Scalars['Boolean']['output'];
+  unassignCoachFromGoal: Goal;
   updateCoachRequest: CoachRequest;
   updateGoal: Goal;
   updateMembership: Membership;
@@ -298,6 +304,11 @@ export type Mutation = {
 
 export type MutationApproveSubscriptionRequestArgs = {
   input: ApproveSubscriptionRequestInput;
+};
+
+
+export type MutationAssignCoachToGoalArgs = {
+  goalId: Scalars['ID']['input'];
 };
 
 
@@ -396,6 +407,16 @@ export type MutationRejectSubscriptionRequestArgs = {
 };
 
 
+export type MutationRemoveClientArgs = {
+  clientId: Scalars['ID']['input'];
+};
+
+
+export type MutationUnassignCoachFromGoalArgs = {
+  goalId: Scalars['ID']['input'];
+};
+
+
 export type MutationUpdateCoachRequestArgs = {
   id: Scalars['ID']['input'];
   input: UpdateCoachRequestInput;
@@ -440,6 +461,7 @@ export type Query = {
   __typename?: 'Query';
   getAnalytics?: Maybe<Analytics>;
   getAnalyticsRange: Array<Analytics>;
+  getClientGoalsForCoach: Array<Goal>;
   getClientRequests: Array<CoachRequest>;
   getClientSessions: Array<Session>;
   getCoachRequests: Array<CoachRequest>;
@@ -472,6 +494,11 @@ export type QueryGetAnalyticsArgs = {
 
 export type QueryGetAnalyticsRangeArgs = {
   dateRange: DateRangeInput;
+};
+
+
+export type QueryGetClientGoalsForCoachArgs = {
+  status?: InputMaybe<GoalStatus>;
 };
 
 
@@ -596,6 +623,8 @@ export type Session = {
   createdAt?: Maybe<Scalars['String']['output']>;
   date: Scalars['String']['output'];
   endTime?: Maybe<Scalars['String']['output']>;
+  goal?: Maybe<Goal>;
+  goalId?: Maybe<Scalars['ID']['output']>;
   gymArea: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
