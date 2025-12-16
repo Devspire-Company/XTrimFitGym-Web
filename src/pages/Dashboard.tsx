@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useSubscription } from '@apollo/client';
 import { Link } from 'react-router';
-import { Users, UserCog, DollarSign, CreditCard, BarChart3 } from 'lucide-react';
-import { GET_USERS, GET_REVENUE_SUMMARY, REVENUE_SUMMARY_UPDATED, USERS_UPDATED } from '@/graphql/operations/index';
+import { Users, UserCog, DollarSign, CreditCard, BarChart3, Clock, LogIn, LogOut } from 'lucide-react';
+import { GET_USERS, GET_REVENUE_SUMMARY, REVENUE_SUMMARY_UPDATED, USERS_UPDATED, GET_ATTENDANCE_RECORDS, ATTENDANCE_RECORD_ADDED, ATTENDANCE_UPDATED } from '@/graphql/operations/index';
+import type { AttendanceRecord } from '@/graphql/generated/types';
 import {
 	Chart as ChartJS,
 	CategoryScale,
@@ -50,6 +51,18 @@ export function DashboardPage() {
 		fetchPolicy: 'network-only',
 	});
 
+	// Fetch recent attendance records
+	const { data: attendanceData, loading: attendanceLoading } = useQuery(GET_ATTENDANCE_RECORDS, {
+		variables: {
+			pagination: {
+				limit: 5,
+				offset: 0,
+			},
+		},
+		fetchPolicy: 'network-only',
+		errorPolicy: 'all',
+	});
+
 	// Real-time subscriptions
 	const { data: membersSubscriptionData } = useSubscription(USERS_UPDATED, {
 		variables: { role: 'member' },
@@ -64,6 +77,199 @@ export function DashboardPage() {
 	const { data: revenueSubscriptionData } = useSubscription(REVENUE_SUMMARY_UPDATED, {
 		skip: !analyticsData, // Skip if initial data not loaded
 	});
+
+	// Real-time attendance subscription
+	const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>([]);
+	const [subscriptionStatus, setSubscriptionStatus] = useState<string>('Initializing...');
+
+	// Initialize attendance records from query
+	useEffect(() => {
+		if (attendanceData?.getAttendanceRecords?.records) {
+			setRecentAttendance(attendanceData.getAttendanceRecords.records);
+			console.log('[Dashboard] Initial attendance records loaded:', attendanceData.getAttendanceRecords.records.length);
+		}
+	}, [attendanceData]);
+
+	// Log when component mounts to verify subscription is being set up
+	useEffect(() => {
+		console.log('[Dashboard] Component mounted, setting up attendance subscription...');
+		setSubscriptionStatus('Setting up subscription...');
+	}, []);
+
+	// Subscribe to new attendance records - using both data and onData for immediate updates
+	const { data: attendanceSubscriptionData, error: attendanceSubError, loading: attendanceSubLoading } = useSubscription(ATTENDANCE_RECORD_ADDED, {
+		skip: false, // Always subscribe
+		shouldResubscribe: true, // Re-subscribe if connection is lost
+		onData: ({ data: subData, error: subError }) => {
+			console.log('[Dashboard Attendance Subscription] 📨 onData called:', { 
+				subData, 
+				subError,
+				hasData: !!subData,
+				dataKeys: subData ? Object.keys(subData) : [],
+				fullData: JSON.stringify(subData, null, 2),
+			});
+			setSubscriptionStatus('Data received');
+			if (subError) {
+				console.error('[Dashboard Attendance Subscription] ❌ Error in onData:', subError);
+				return;
+			}
+			// Try multiple paths to get the record
+			// Try multiple paths to extract the record
+			let newRecord = null;
+			
+			// Path 1: Standard GraphQL subscription response
+			if (subData?.data?.attendanceRecordAdded) {
+				newRecord = subData.data.attendanceRecordAdded;
+				console.log('[Dashboard Attendance Subscription] ✅ Found record in subData.data.attendanceRecordAdded');
+			}
+			// Path 2: Direct property
+			else if (subData?.attendanceRecordAdded) {
+				newRecord = subData.attendanceRecordAdded;
+				console.log('[Dashboard Attendance Subscription] ✅ Found record in subData.attendanceRecordAdded');
+			}
+			// Path 3: Check if subData itself is the record
+			else if (subData && typeof subData === 'object' && 'id' in subData && 'personName' in subData) {
+				newRecord = subData;
+				console.log('[Dashboard Attendance Subscription] ✅ subData itself is the record');
+			}
+			// Path 4: Check nested structures
+			else if ((subData as any)?.attendanceRecordAdded) {
+				newRecord = (subData as any).attendanceRecordAdded;
+				console.log('[Dashboard Attendance Subscription] ✅ Found record in nested structure');
+			}
+			
+			console.log('[Dashboard Attendance Subscription] Extracted record:', newRecord);
+			console.log('[Dashboard Attendance Subscription] Full subData structure:', JSON.stringify(subData, null, 2));
+			
+			if (newRecord) {
+				console.log('[Dashboard Attendance Subscription] ✅ New record received in onData:', newRecord);
+				setSubscriptionStatus(`New record: ${newRecord.personName}`);
+				// Use functional update to ensure state is updated correctly
+				setRecentAttendance((prevRecords) => {
+					// Check if record already exists
+					const exists = prevRecords.some(
+						(r) => r.id === newRecord.id && r.authDateTime === newRecord.authDateTime
+					);
+					if (exists) {
+						console.log('[Dashboard Attendance Subscription] ⚠️ Record already exists, skipping');
+						return prevRecords;
+					}
+					console.log('[Dashboard Attendance Subscription] ✅ Adding new record to list (prev count:', prevRecords.length, ')');
+					// Add new record at the beginning (most recent first) and force re-render
+					const updated = [newRecord, ...prevRecords].slice(0, 5);
+					console.log('[Dashboard Attendance Subscription] ✅ Updated list (new count:', updated.length, ')');
+					return updated;
+				});
+			} else {
+				console.warn('[Dashboard Attendance Subscription] ⚠️ No record found in data. Full subData:', JSON.stringify(subData, null, 2));
+			}
+		},
+		onError: (error) => {
+			console.error('[Dashboard Attendance Subscription] ❌ Subscription error:', error);
+			setSubscriptionStatus(`Error: ${error.message || 'Unknown error'}`);
+		},
+		onComplete: () => {
+			console.log('[Dashboard Attendance Subscription] Subscription completed');
+			setSubscriptionStatus('Completed');
+		},
+		onComplete: () => {
+			console.log('[Dashboard Attendance Subscription] Subscription completed');
+		},
+	});
+
+	// Log subscription status
+	useEffect(() => {
+		const status = {
+			loading: attendanceSubLoading,
+			hasData: !!attendanceSubscriptionData,
+			error: attendanceSubError,
+			data: attendanceSubscriptionData,
+		};
+		console.log('[Dashboard Attendance Subscription] Status:', status);
+		
+		if (attendanceSubLoading) {
+			setSubscriptionStatus('Connecting...');
+		} else if (attendanceSubError) {
+			setSubscriptionStatus(`Error: ${attendanceSubError.message || 'Unknown'}`);
+		} else if (attendanceSubscriptionData) {
+			setSubscriptionStatus('Connected and waiting for data');
+		} else {
+			setSubscriptionStatus('Connected');
+		}
+	}, [attendanceSubLoading, attendanceSubscriptionData, attendanceSubError]);
+
+	// Also handle subscription data property for additional updates
+	useEffect(() => {
+		if (attendanceSubscriptionData?.attendanceRecordAdded) {
+			const newRecord = attendanceSubscriptionData.attendanceRecordAdded;
+			console.log('[Dashboard Attendance Subscription] ✅ New record from data property:', newRecord);
+			setSubscriptionStatus(`New record from data: ${newRecord.personName}`);
+			setRecentAttendance((prevRecords) => {
+				const exists = prevRecords.some(
+					(r) => r.id === newRecord.id && r.authDateTime === newRecord.authDateTime
+				);
+				if (exists) {
+					console.log('[Dashboard Attendance Subscription] ⚠️ Record already exists (from data property)');
+					return prevRecords;
+				}
+				console.log('[Dashboard Attendance Subscription] ✅ Adding record from data property');
+				return [newRecord, ...prevRecords].slice(0, 5);
+			});
+		}
+	}, [attendanceSubscriptionData]);
+
+	// Also subscribe to batch updates
+	const { data: batchSubscriptionData, error: batchSubError } = useSubscription(ATTENDANCE_UPDATED, {
+		skip: false,
+		onData: ({ data: subData, error: subError }) => {
+			console.log('[Dashboard Attendance Batch Subscription] 📨 onData called:', { subData, subError });
+			if (subError) {
+				console.error('[Dashboard Attendance Batch Subscription] ❌ Error in onData:', subError);
+				return;
+			}
+			if (subData?.data?.attendanceUpdated && subData.data.attendanceUpdated.length > 0) {
+				const newRecords = subData.data.attendanceUpdated;
+				console.log('[Dashboard Attendance Batch Subscription] ✅ New records received:', newRecords.length);
+				setRecentAttendance((prevRecords) => {
+					// Merge new records, avoiding duplicates
+					const existingIds = new Set(
+						prevRecords.map((r) => `${r.id}-${r.authDateTime}`)
+					);
+					const uniqueNewRecords = newRecords.filter(
+						(r) => !existingIds.has(`${r.id}-${r.authDateTime}`)
+					);
+					if (uniqueNewRecords.length > 0) {
+						console.log('[Dashboard Attendance Batch Subscription] ✅ Adding', uniqueNewRecords.length, 'new records');
+						return [...uniqueNewRecords, ...prevRecords].slice(0, 5); // Keep only 5 most recent
+					}
+					return prevRecords;
+				});
+			}
+		},
+		onError: (error) => {
+			console.error('[Dashboard Attendance Batch Subscription] ❌ Subscription error:', error);
+		},
+	});
+
+	// Also handle batch subscription data property
+	useEffect(() => {
+		if (batchSubscriptionData?.attendanceUpdated && batchSubscriptionData.attendanceUpdated.length > 0) {
+			const newRecords = batchSubscriptionData.attendanceUpdated;
+			console.log('[Dashboard Attendance Batch Subscription] ✅ New records from data property:', newRecords.length);
+			setRecentAttendance((prevRecords) => {
+				const existingIds = new Set(
+					prevRecords.map((r) => `${r.id}-${r.authDateTime}`)
+				);
+				const uniqueNewRecords = newRecords.filter(
+					(r) => !existingIds.has(`${r.id}-${r.authDateTime}`)
+				);
+				if (uniqueNewRecords.length > 0) {
+					return [...uniqueNewRecords, ...prevRecords].slice(0, 5);
+				}
+				return prevRecords;
+			});
+		}
+	}, [batchSubscriptionData]);
 
 	// Only block on members and coaches loading - analytics can load in background
 	const loading = membersLoading || coachesLoading;
@@ -280,6 +486,91 @@ export function DashboardPage() {
 					<QuickActionButton href="/memberships" icon={CreditCard} label="Manage Plans" />
 					<QuickActionButton href="/reports" icon={BarChart3} label="View Reports" />
 				</div>
+			</div>
+
+			{/* Recent Attendance Logs - Full Width */}
+			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
+				<div className="section-header flex items-center justify-between mb-6 pb-4 border-b border-[rgba(255,255,255,0.08)]">
+					<h2 className="text-xl font-semibold flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
+						<Clock className="w-5 h-5 text-[var(--primary-yellow)]" />
+						Recent Attendance Logs
+						<span className="w-2 h-2 bg-green-500 rounded-full animate-pulse ml-2" title="Real-time updates active"></span>
+						{(attendanceSubError || batchSubError) && (
+							<span className="text-xs text-red-400 ml-2" title="Subscription error">
+								⚠️ Connection issue
+							</span>
+						)}
+						<span className="text-xs text-[var(--text-secondary)] ml-2" title={`Status: ${subscriptionStatus}`}>
+							({subscriptionStatus})
+						</span>
+					</h2>
+					<Link
+						to="/attendance"
+						className="view-all text-sm text-[var(--primary-yellow)] font-medium flex items-center gap-1"
+					>
+						View All <span>→</span>
+					</Link>
+				</div>
+				{attendanceLoading ? (
+					<div className="flex items-center justify-center py-8">
+						<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-yellow)]"></div>
+					</div>
+				) : recentAttendance.length > 0 ? (
+					<div className="space-y-3">
+						{recentAttendance.map((record) => (
+							<div
+								key={`${record.id}-${record.authDateTime}`}
+								className="attendance-item flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+							>
+								<div
+									className={`attendance-icon w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+										record.direction === 'IN'
+											? 'bg-green-500/20 border-2 border-green-500/50'
+											: 'bg-red-500/20 border-2 border-red-500/50'
+									}`}
+								>
+									{record.direction === 'IN' ? (
+										<LogIn className="w-6 h-6 text-green-400" />
+									) : (
+										<LogOut className="w-6 h-6 text-red-400" />
+									)}
+								</div>
+								<div className="attendance-info flex-1 min-w-0">
+									<h3 className="font-semibold text-[var(--text-primary)] mb-1 truncate">
+										{record.personName}
+									</h3>
+									<div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+										<span className="flex items-center gap-1">
+											<Clock className="w-3 h-3" />
+											{record.authTime}
+										</span>
+										<span className="flex items-center gap-1">
+											📅 {record.authDate}
+										</span>
+										{record.deviceName && (
+											<span className="text-xs opacity-75">• {record.deviceName}</span>
+										)}
+									</div>
+								</div>
+								<div className="attendance-direction flex-shrink-0">
+									<span
+										className={`px-3 py-1 rounded-full text-xs font-semibold ${
+											record.direction === 'IN'
+												? 'bg-green-500/20 text-green-400 border border-green-500/50'
+												: 'bg-red-500/20 text-red-400 border border-red-500/50'
+										}`}
+									>
+										{record.direction}
+									</span>
+								</div>
+							</div>
+						))}
+					</div>
+				) : (
+					<div className="text-center py-8 text-[var(--text-secondary)]">
+						<p>No attendance records yet</p>
+					</div>
+				)}
 			</div>
 
 			{/* Content Grid */}

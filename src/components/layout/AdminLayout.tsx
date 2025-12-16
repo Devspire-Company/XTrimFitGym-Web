@@ -12,6 +12,8 @@ import {
 	ChevronDown,
 	LogOut,
 	X,
+	Fingerprint,
+	Clock,
 } from 'lucide-react';
 import { SubscriptionRequestNotification } from '../SubscriptionRequestNotification';
 
@@ -37,6 +39,8 @@ export function AdminLayout() {
 		{ path: '/members', label: 'Member Management', icon: Users },
 		{ path: '/coaches', label: 'Coach Management', icon: UserCog },
 		{ path: '/memberships', label: 'Membership Management', icon: CreditCard },
+		{ path: '/subscription-requests', label: 'Subscription Requests', icon: Clock },
+		{ path: '/attendance', label: 'Attendance Logs', icon: Fingerprint },
 		{ path: '/reports', label: 'Reports & Analytics', icon: BarChart3 },
 	];
 

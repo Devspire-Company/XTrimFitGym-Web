@@ -218,6 +218,7 @@ mutation CreateMembership($input: CreateMembershipInput!) {
 		features
 		status
 		durationType
+		monthDuration
 		createdAt
 		updatedAt
 	}
@@ -232,6 +233,7 @@ mutation UpdateMembership($id: ID!, $input: UpdateMembershipInput!) {
 		features
 		status
 		durationType
+		monthDuration
 		updatedAt
 	}
 }

@@ -133,6 +133,7 @@ export function MembershipsPage() {
 						features: formData.features,
 						status,
 						durationType,
+						monthDuration: formData.monthDuration,
 					},
 				},
 			});
@@ -147,6 +148,7 @@ export function MembershipsPage() {
 						features: formData.features,
 						status,
 						durationType,
+						monthDuration: formData.monthDuration,
 					},
 				},
 			});

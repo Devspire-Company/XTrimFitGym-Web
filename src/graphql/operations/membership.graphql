@@ -8,6 +8,7 @@ query GetAllMemberships {
 		features
 		status
 		durationType
+		monthDuration
 		createdAt
 		updatedAt
 	}
@@ -22,6 +23,7 @@ query GetActiveMemberships {
 		features
 		status
 		durationType
+		monthDuration
 		createdAt
 		updatedAt
 	}
@@ -39,6 +41,7 @@ query GetCurrentMembership {
 			description
 			features
 			durationType
+			monthDuration
 		}
 		priceAtPurchase
 		startedAt
@@ -77,6 +80,7 @@ subscription MembershipsUpdated {
 		features
 		status
 		durationType
+		monthDuration
 		createdAt
 		updatedAt
 	}

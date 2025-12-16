@@ -52,6 +52,7 @@ interface Member {
 	startDate?: string; // Subscription start date
 	endDate?: string; // Subscription expiration date
 	expiresAt?: string; // Subscription expiration date (ISO format)
+	createdAt?: string; // Account creation date (ISO format) for filtering
 }
 
 export function MembersPage() {
@@ -371,6 +372,7 @@ export function MembersPage() {
 			startDate,
 			endDate: expirationDate, // Formatted expiration date for display
 			expiresAt: expiresAt, // Raw expiration date (ISO format) for calculations
+			createdAt: m.createdAt, // Raw creation date for filtering
 		};
 	});
 
@@ -384,6 +386,7 @@ export function MembersPage() {
 			const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
 			const matchesMembership =
 				membershipFilter === 'all' || member.membership === membershipFilter;
+			
 			return matchesSearch && matchesStatus && matchesMembership;
 		});
 	}, [apiMembers, searchTerm, statusFilter, membershipFilter]);
@@ -525,6 +528,7 @@ export function MembersPage() {
 		}
 	};
 
+
 	// Debug: Log when modal state changes
 	useEffect(() => {
 		console.log('📊 Subscribe modal state changed:', {
@@ -597,7 +601,7 @@ export function MembersPage() {
 						Member Management
 					</h1>
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
-						Manage all gym members, view details, and update information ({apiMembers.length} total)
+						Manage all gym members, view details, and update information ({apiMembers.length} total, {filteredMembers.length} filtered)
 					</p>
 				</div>
 			</div>

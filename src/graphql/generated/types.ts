@@ -32,6 +32,39 @@ export type ApproveSubscriptionRequestInput = {
   requestId: Scalars['ID']['input'];
 };
 
+export type AttendanceConnection = {
+  __typename?: 'AttendanceConnection';
+  hasMore: Scalars['Boolean']['output'];
+  records: Array<AttendanceRecord>;
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AttendanceFilter = {
+  deviceName?: InputMaybe<Scalars['String']['input']>;
+  direction?: InputMaybe<Scalars['String']['input']>;
+  endDate?: InputMaybe<Scalars['String']['input']>;
+  personName?: InputMaybe<Scalars['String']['input']>;
+  startDate?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type AttendancePagination = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type AttendanceRecord = {
+  __typename?: 'AttendanceRecord';
+  authDate: Scalars['String']['output'];
+  authDateTime: Scalars['String']['output'];
+  authTime: Scalars['String']['output'];
+  cardNo?: Maybe<Scalars['String']['output']>;
+  deviceName: Scalars['String']['output'];
+  deviceSerNum: Scalars['String']['output'];
+  direction: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  personName: Scalars['String']['output'];
+};
+
 export type AuthResponse = {
   __typename?: 'AuthResponse';
   token: Scalars['String']['output'];
@@ -127,6 +160,7 @@ export type CreateMembershipInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   durationType: DurationType;
   features: Array<Scalars['String']['input']>;
+  monthDuration: Scalars['Int']['input'];
   monthlyPrice: Scalars['Float']['input'];
   name: Scalars['String']['input'];
   status: MembershipStatus;
@@ -150,6 +184,7 @@ export type CreateSessionFromTemplateInput = {
   goalId?: InputMaybe<Scalars['ID']['input']>;
   startTime: Scalars['String']['input'];
   templateId: Scalars['ID']['input'];
+  workoutType?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CreateSessionInput = {
@@ -268,6 +303,7 @@ export type Membership = {
   durationType: DurationType;
   features: Array<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
+  monthDuration: Scalars['Int']['output'];
   monthlyPrice: Scalars['Float']['output'];
   name: Scalars['String']['output'];
   status: MembershipStatus;
@@ -326,6 +362,7 @@ export type Mutation = {
   deleteGoal: Scalars['Boolean']['output'];
   deleteMembership: Scalars['Boolean']['output'];
   deleteProgressRating: Scalars['Boolean']['output'];
+  deleteSubscriptionRequest: Scalars['Boolean']['output'];
   deleteUser?: Maybe<Scalars['Boolean']['output']>;
   directSubscribeMember: MembershipTransaction;
   login: AuthResponse;
@@ -443,6 +480,11 @@ export type MutationDeleteMembershipArgs = {
 
 
 export type MutationDeleteProgressRatingArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteSubscriptionRequestArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -575,8 +617,11 @@ export type PurchaseMembershipInput = {
 export type Query = {
   __typename?: 'Query';
   getAllClientGoals: Array<Goal>;
+  getAllSubscriptionRequests: Array<SubscriptionRequest>;
   getAnalytics?: Maybe<Analytics>;
   getAnalyticsRange: Array<Analytics>;
+  getAttendanceRecord?: Maybe<AttendanceRecord>;
+  getAttendanceRecords: AttendanceConnection;
   getClientProgressRatings: Array<ProgressRating>;
   getClientRequests: Array<CoachRequest>;
   getClientSessions: Array<Session>;
@@ -625,6 +670,17 @@ export type QueryGetAnalyticsArgs = {
 
 export type QueryGetAnalyticsRangeArgs = {
   dateRange: DateRangeInput;
+};
+
+
+export type QueryGetAttendanceRecordArgs = {
+  id: Scalars['String']['input'];
+};
+
+
+export type QueryGetAttendanceRecordsArgs = {
+  filter?: InputMaybe<AttendanceFilter>;
+  pagination?: InputMaybe<AttendancePagination>;
 };
 
 
@@ -841,6 +897,8 @@ export enum SessionStatus {
 export type Subscription = {
   __typename?: 'Subscription';
   _empty?: Maybe<Scalars['Boolean']['output']>;
+  attendanceRecordAdded: AttendanceRecord;
+  attendanceUpdated: Array<AttendanceRecord>;
   membershipsUpdated: Array<Membership>;
   revenueSummaryUpdated: RevenueSummary;
   usersUpdated: Array<User>;
@@ -861,7 +919,6 @@ export type SubscriptionRequest = {
   approvedAt?: Maybe<Scalars['String']['output']>;
   approvedBy?: Maybe<User>;
   createdAt?: Maybe<Scalars['String']['output']>;
-  expiresAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   member?: Maybe<User>;
   memberId: Scalars['ID']['output'];
@@ -876,7 +933,6 @@ export type SubscriptionRequest = {
 
 export enum SubscriptionRequestStatus {
   Approved = 'APPROVED',
-  Expired = 'EXPIRED',
   Pending = 'PENDING',
   Rejected = 'REJECTED'
 }
@@ -905,6 +961,7 @@ export type UpdateMembershipInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   durationType?: InputMaybe<DurationType>;
   features?: InputMaybe<Array<Scalars['String']['input']>>;
+  monthDuration?: InputMaybe<Scalars['Int']['input']>;
   monthlyPrice?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<MembershipStatus>;
@@ -1004,20 +1061,45 @@ export type RevenueSummaryUpdatedSubscriptionVariables = Exact<{
 
 export type RevenueSummaryUpdatedSubscription = { __typename?: 'Subscription', revenueSummaryUpdated: { __typename?: 'RevenueSummary', totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }>, revenueByPeriod: Array<{ __typename?: 'PeriodRevenue', period: string, revenue: number, count: number }> } };
 
+export type GetAttendanceRecordsQueryVariables = Exact<{
+  filter?: InputMaybe<AttendanceFilter>;
+  pagination?: InputMaybe<AttendancePagination>;
+}>;
+
+
+export type GetAttendanceRecordsQuery = { __typename?: 'Query', getAttendanceRecords: { __typename?: 'AttendanceConnection', totalCount: number, hasMore: boolean, records: Array<{ __typename?: 'AttendanceRecord', id: string, authDateTime: string, authDate: string, authTime: string, direction: string, deviceName: string, deviceSerNum: string, personName: string, cardNo?: string | null }> } };
+
+export type GetAttendanceRecordQueryVariables = Exact<{
+  id: Scalars['String']['input'];
+}>;
+
+
+export type GetAttendanceRecordQuery = { __typename?: 'Query', getAttendanceRecord?: { __typename?: 'AttendanceRecord', id: string, authDateTime: string, authDate: string, authTime: string, direction: string, deviceName: string, deviceSerNum: string, personName: string, cardNo?: string | null } | null };
+
+export type AttendanceRecordAddedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AttendanceRecordAddedSubscription = { __typename?: 'Subscription', attendanceRecordAdded: { __typename?: 'AttendanceRecord', id: string, authDateTime: string, authDate: string, authTime: string, direction: string, deviceName: string, deviceSerNum: string, personName: string, cardNo?: string | null } };
+
+export type AttendanceUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AttendanceUpdatedSubscription = { __typename?: 'Subscription', attendanceUpdated: Array<{ __typename?: 'AttendanceRecord', id: string, authDateTime: string, authDate: string, authTime: string, direction: string, deviceName: string, deviceSerNum: string, personName: string, cardNo?: string | null }> };
+
 export type GetAllMembershipsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAllMembershipsQuery = { __typename?: 'Query', getMemberships: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, createdAt?: string | null, updatedAt?: string | null }> };
+export type GetAllMembershipsQuery = { __typename?: 'Query', getMemberships: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
 
 export type GetActiveMembershipsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetActiveMembershipsQuery = { __typename?: 'Query', getMemberships: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, createdAt?: string | null, updatedAt?: string | null }> };
+export type GetActiveMembershipsQuery = { __typename?: 'Query', getMemberships: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
 
 export type GetCurrentMembershipQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetCurrentMembershipQuery = { __typename?: 'Query', getCurrentMembership?: { __typename?: 'MembershipTransaction', id: string, clientId: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, createdAt?: string | null, updatedAt?: string | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, durationType: DurationType } | null } | null };
+export type GetCurrentMembershipQuery = { __typename?: 'Query', getCurrentMembership?: { __typename?: 'MembershipTransaction', id: string, clientId: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, createdAt?: string | null, updatedAt?: string | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, durationType: DurationType, monthDuration: number } | null } | null };
 
 export type DirectSubscribeMemberMutationVariables = Exact<{
   input: DirectSubscribeInput;
@@ -1029,7 +1111,7 @@ export type DirectSubscribeMemberMutation = { __typename?: 'Mutation', directSub
 export type MembershipsUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MembershipsUpdatedSubscription = { __typename?: 'Subscription', membershipsUpdated: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, createdAt?: string | null, updatedAt?: string | null }> };
+export type MembershipsUpdatedSubscription = { __typename?: 'Subscription', membershipsUpdated: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
 
 export type GetCoachSessionsQueryVariables = Exact<{
   coachId: Scalars['ID']['input'];
@@ -1049,7 +1131,12 @@ export type GetCoachSessionLogsQuery = { __typename?: 'Query', getCoachSessionLo
 export type GetPendingSubscriptionRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetPendingSubscriptionRequestsQuery = { __typename?: 'Query', getPendingSubscriptionRequests: Array<{ __typename?: 'SubscriptionRequest', id: string, memberId: string, membershipId: string, status: SubscriptionRequestStatus, requestedAt: string, expiresAt: string, createdAt?: string | null, member?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null }> };
+export type GetPendingSubscriptionRequestsQuery = { __typename?: 'Query', getPendingSubscriptionRequests: Array<{ __typename?: 'SubscriptionRequest', id: string, memberId: string, membershipId: string, status: SubscriptionRequestStatus, requestedAt: string, createdAt?: string | null, member?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number } | null }> };
+
+export type GetAllSubscriptionRequestsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetAllSubscriptionRequestsQuery = { __typename?: 'Query', getAllSubscriptionRequests: Array<{ __typename?: 'SubscriptionRequest', id: string, memberId: string, membershipId: string, status: SubscriptionRequestStatus, requestedAt: string, approvedAt?: string | null, rejectedAt?: string | null, createdAt?: string | null, updatedAt?: string | null, member?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number } | null, approvedBy?: { __typename?: 'User', id: string, firstName: string, lastName: string } | null, rejectedBy?: { __typename?: 'User', id: string, firstName: string, lastName: string } | null }> };
 
 export type ApproveSubscriptionRequestMutationVariables = Exact<{
   input: ApproveSubscriptionRequestInput;
@@ -1064,6 +1151,13 @@ export type RejectSubscriptionRequestMutationVariables = Exact<{
 
 
 export type RejectSubscriptionRequestMutation = { __typename?: 'Mutation', rejectSubscriptionRequest: boolean };
+
+export type DeleteSubscriptionRequestMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type DeleteSubscriptionRequestMutation = { __typename?: 'Mutation', deleteSubscriptionRequest: boolean };
 
 export type GetUsersQueryVariables = Exact<{
   role?: InputMaybe<RoleType>;
@@ -1113,7 +1207,7 @@ export type CreateMembershipMutationVariables = Exact<{
 }>;
 
 
-export type CreateMembershipMutation = { __typename?: 'Mutation', createMembership: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, createdAt?: string | null, updatedAt?: string | null } };
+export type CreateMembershipMutation = { __typename?: 'Mutation', createMembership: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null } };
 
 export type UpdateMembershipMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1121,7 +1215,7 @@ export type UpdateMembershipMutationVariables = Exact<{
 }>;
 
 
-export type UpdateMembershipMutation = { __typename?: 'Mutation', updateMembership: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, updatedAt?: string | null } };
+export type UpdateMembershipMutation = { __typename?: 'Mutation', updateMembership: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, updatedAt?: string | null } };
 
 export type DeleteMembershipMutationVariables = Exact<{
   id: Scalars['ID']['input'];

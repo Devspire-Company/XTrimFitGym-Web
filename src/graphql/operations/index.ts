@@ -8,6 +8,7 @@ export {
 	GetUsersDocument as GET_USERS,
 	GetUserDocument as GET_USER,
 	GetPendingSubscriptionRequestsDocument as GET_PENDING_SUBSCRIPTION_REQUESTS,
+	GetAllSubscriptionRequestsDocument as GET_ALL_SUBSCRIPTION_REQUESTS,
 	GetRevenueSummaryDocument as GET_REVENUE_SUMMARY,
 	GetAnalyticsDocument as GET_ANALYTICS,
 	GetAnalyticsRangeDocument as GET_ANALYTICS_RANGE,
@@ -29,6 +30,7 @@ export {
 	DirectSubscribeMemberDocument as DIRECT_SUBSCRIBE_MEMBER,
 	ApproveSubscriptionRequestDocument as APPROVE_SUBSCRIPTION_REQUEST,
 	RejectSubscriptionRequestDocument as REJECT_SUBSCRIPTION_REQUEST,
+	DeleteSubscriptionRequestDocument as DELETE_SUBSCRIPTION_REQUEST,
 } from '../generated/graphql';
 
 // Subscriptions
@@ -36,5 +38,13 @@ export {
 	RevenueSummaryUpdatedDocument as REVENUE_SUMMARY_UPDATED,
 	UsersUpdatedDocument as USERS_UPDATED,
 	MembershipsUpdatedDocument as MEMBERSHIPS_UPDATED,
+	AttendanceRecordAddedDocument as ATTENDANCE_RECORD_ADDED,
+	AttendanceUpdatedDocument as ATTENDANCE_UPDATED,
+} from '../generated/graphql';
+
+// Attendance Queries
+export {
+	GetAttendanceRecordsDocument as GET_ATTENDANCE_RECORDS,
+	GetAttendanceRecordDocument as GET_ATTENDANCE_RECORD,
 } from '../generated/graphql';
 

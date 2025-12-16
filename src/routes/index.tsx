@@ -8,6 +8,8 @@ import { CoachesPage } from '@/pages/Coaches';
 import { MembershipsPage } from '@/pages/Memberships';
 import { ReportsPage } from '@/pages/Reports';
 import { SettingsPage } from '@/pages/Settings';
+import { AttendancePage } from '@/pages/Attendance';
+import { SubscriptionRequestsPage } from '@/pages/SubscriptionRequests';
 
 export const router = createBrowserRouter([
 	{
@@ -50,6 +52,14 @@ export const router = createBrowserRouter([
 			{
 				path: 'settings',
 				element: <SettingsPage />,
+			},
+			{
+				path: 'attendance',
+				element: <AttendancePage />,
+			},
+			{
+				path: 'subscription-requests',
+				element: <SubscriptionRequestsPage />,
 			},
 		],
 	},

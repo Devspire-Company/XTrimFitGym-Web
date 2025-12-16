@@ -17,6 +17,7 @@ export interface MembershipFormData {
 	features: string[];
 	status: 'Active' | 'Inactive' | 'Coming Soon';
 	durationType: 'Monthly' | 'Quarterly' | 'Yearly';
+	monthDuration: number;
 }
 
 export function MembershipFormModal({
@@ -43,6 +44,7 @@ export function MembershipFormModal({
 			features,
 			status: formData.get('status') as MembershipFormData['status'],
 			durationType: formData.get('durationType') as MembershipFormData['durationType'],
+			monthDuration: Number(formData.get('monthDuration')) || 1,
 		};
 
 		onSubmit(data);
@@ -120,7 +122,7 @@ export function MembershipFormModal({
 							</div>
 
 							<div className="form-group">
-								<label htmlFor="durationType">Duration *</label>
+								<label htmlFor="durationType">Duration Type *</label>
 								<select
 									id="durationType"
 									name="durationType"
@@ -131,6 +133,25 @@ export function MembershipFormModal({
 									<option value="Quarterly">Quarterly</option>
 									<option value="Yearly">Yearly</option>
 								</select>
+							</div>
+
+							<div className="form-group">
+								<label htmlFor="monthDuration">Month Duration *</label>
+								<input
+									type="number"
+									id="monthDuration"
+									name="monthDuration"
+									defaultValue={membership?.monthDuration || 1}
+									required
+									min="1"
+									step="1"
+									placeholder="e.g., 3 for 3 months"
+								/>
+								<small
+									style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'block' }}
+								>
+									Number of months the plan lasts (e.g., 1, 3, 6, 12)
+								</small>
 							</div>
 
 							<div className="form-group">

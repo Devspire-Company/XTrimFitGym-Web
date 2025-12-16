@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useQuery, useSubscription } from '@apollo/client';
 import {
 	Chart as ChartJS,
@@ -14,7 +14,7 @@ import {
 	Filler,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
-import { BarChart3, DollarSign, Users, TrendingUp, Activity, Download } from 'lucide-react';
+import { BarChart3, DollarSign, Users, TrendingUp, Activity, Download, Calendar } from 'lucide-react';
 import {
 	GET_USERS,
 	GET_REVENUE_SUMMARY,
@@ -41,6 +41,11 @@ export function ReportsPage() {
 		document.title = 'Reports & Analytics - X-TRIM FIT GYM';
 	}, []);
 
+	// State for user export filters
+	const [userExportStartDate, setUserExportStartDate] = useState<string>('');
+	const [userExportEndDate, setUserExportEndDate] = useState<string>('');
+	const [userExportType, setUserExportType] = useState<string>('all'); // 'all', 'member', 'coach', 'admin'
+
 	// Initial data fetch with queries
 	const { data: membersData, loading: membersLoading } = useQuery(GET_USERS, {
 		variables: { role: 'member' },
@@ -50,6 +55,13 @@ export function ReportsPage() {
 	const { data: coachesData, loading: coachesLoading } = useQuery(GET_USERS, {
 		variables: { role: 'coach' },
 		errorPolicy: 'none',
+	});
+
+	// Fetch admins for export
+	const { data: adminsData } = useQuery(GET_USERS, {
+		variables: { role: 'admin' },
+		errorPolicy: 'none',
+		skip: userExportType !== 'all' && userExportType !== 'admin', // Only fetch if needed
 	});
 
 	const { data: analyticsData, error: analyticsError } = useQuery(GET_REVENUE_SUMMARY, {
@@ -101,6 +113,7 @@ export function ReportsPage() {
 	const data = {
 		members: membersSubscriptionData?.usersUpdated || membersData?.getUsers || [],
 		coaches: coachesSubscriptionData?.usersUpdated || coachesData?.getUsers || [],
+		admins: adminsData?.getUsers || [],
 	};
 
 	// Use subscription data for analytics if available, otherwise fall back to query data
@@ -1044,6 +1057,222 @@ export function ReportsPage() {
 		URL.revokeObjectURL(url);
 	};
 
+	// User Export Function with Date Range Filtering
+	const exportUsersToCSV = () => {
+		// Collect all users based on filter
+		let allUsers: any[] = [];
+		
+		if (userExportType === 'all' || userExportType === 'member') {
+			allUsers = [...allUsers, ...(data?.members || []).map((u: any) => ({ ...u, role: 'member' }))];
+		}
+		if (userExportType === 'all' || userExportType === 'coach') {
+			allUsers = [...allUsers, ...(data?.coaches || []).map((u: any) => ({ ...u, role: 'coach' }))];
+		}
+		if (userExportType === 'all' || userExportType === 'admin') {
+			allUsers = [...allUsers, ...(data?.admins || []).map((u: any) => ({ ...u, role: 'admin' }))];
+		}
+
+		// Filter by date range
+		let filteredUsers = allUsers;
+		if (userExportStartDate || userExportEndDate) {
+			filteredUsers = allUsers.filter((user) => {
+				if (!user.createdAt) return false;
+				
+				const userDate = new Date(user.createdAt);
+				userDate.setHours(0, 0, 0, 0);
+				
+				if (userExportStartDate) {
+					const start = new Date(userExportStartDate);
+					start.setHours(0, 0, 0, 0);
+					if (userDate < start) return false;
+				}
+				
+				if (userExportEndDate) {
+					const end = new Date(userExportEndDate);
+					end.setHours(23, 59, 59, 999);
+					if (userDate > end) return false;
+				}
+				
+				return true;
+			});
+		}
+
+		if (filteredUsers.length === 0) {
+			alert('No users found matching the selected criteria.');
+			return;
+		}
+
+		// Helper functions
+		const escapeCSV = (value: any): string => {
+			if (value === null || value === undefined) return '';
+			const str = String(value);
+			if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+				return `"${str.replace(/"/g, '""')}"`;
+			}
+			return str;
+		};
+
+		const formatDate = (dateString: string | undefined | null): string => {
+			if (!dateString || dateString === 'N/A') return '';
+			try {
+				const date = new Date(dateString);
+				if (isNaN(date.getTime())) return '';
+				return date.toLocaleDateString('en-US', {
+					year: 'numeric',
+					month: '2-digit',
+					day: '2-digit',
+				});
+			} catch {
+				return '';
+			}
+		};
+
+		const calculateAge = (dob: string | null | undefined): string => {
+			if (!dob) return 'N/A';
+			try {
+				const birthDate = new Date(dob);
+				const today = new Date();
+				let age = today.getFullYear() - birthDate.getFullYear();
+				const monthDiff = today.getMonth() - birthDate.getMonth();
+				if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+					age--;
+				}
+				return age.toString();
+			} catch {
+				return 'N/A';
+			}
+		};
+
+		// CSV Headers
+		const headers = [
+			'ID',
+			'Role',
+			'First Name',
+			'Middle Name',
+			'Last Name',
+			'Full Name',
+			'Email',
+			'Phone Number',
+			'Date of Birth',
+			'Age',
+			'Gender',
+			'Join Date',
+			'Heard From',
+		];
+
+		// Add role-specific headers
+		const memberHeaders = [
+			'Membership Plan',
+			'Membership Status',
+			'Subscription Start Date',
+			'Subscription End Date',
+			'Monthly Price',
+			'Fitness Goals',
+			'Physique Goal',
+			'Workout Time',
+			'Has Entered Details',
+		];
+
+		const coachHeaders = [
+			'Specialization',
+			'All Specializations',
+		];
+
+		// Build CSV content
+		let csvContent = headers.join(',');
+		
+		// Add role-specific headers conditionally
+		if (userExportType === 'all' || userExportType === 'member') {
+			csvContent += ',' + memberHeaders.join(',');
+		}
+		if (userExportType === 'all' || userExportType === 'coach') {
+			csvContent += ',' + coachHeaders.join(',');
+		}
+		csvContent += '\n';
+
+		// Add user rows
+		filteredUsers.forEach((user: any) => {
+			const row = [
+				escapeCSV(user.id),
+				escapeCSV(user.role || 'N/A'),
+				escapeCSV(user.firstName || ''),
+				escapeCSV(user.middleName || ''),
+				escapeCSV(user.lastName || ''),
+				escapeCSV(`${user.firstName || ''} ${user.middleName || ''} ${user.lastName || ''}`.trim()),
+				escapeCSV(user.email || 'N/A'),
+				escapeCSV(user.phoneNumber || 'N/A'),
+				formatDate(user.dateOfBirth),
+				calculateAge(user.dateOfBirth),
+				escapeCSV(user.gender || 'N/A'),
+				formatDate(user.createdAt),
+				escapeCSV(user.heardFrom || 'N/A'),
+			];
+
+			// Add member-specific data
+			if (user.role === 'member') {
+				const membershipTransaction = user.currentMembership;
+				const isActive = membershipTransaction?.status === 'ACTIVE';
+				const membershipDetails = user.membershipDetails || {};
+				
+				row.push(
+					escapeCSV(isActive ? membershipTransaction?.membership?.name || 'No Plan' : 'No Plan'),
+					escapeCSV(isActive ? 'Active' : 'Inactive'),
+					formatDate(membershipTransaction?.startedAt),
+					formatDate(membershipTransaction?.expiresAt),
+					escapeCSV(isActive ? `₱${(membershipTransaction?.membership?.monthlyPrice || 0).toLocaleString()}` : 'N/A'),
+					escapeCSV(Array.isArray(membershipDetails.fitnessGoal) ? membershipDetails.fitnessGoal.join('; ') : (membershipDetails.fitnessGoal || 'N/A')),
+					escapeCSV(membershipDetails.physiqueGoalType || 'N/A'),
+					escapeCSV(membershipDetails.workOutTime || 'N/A'),
+					escapeCSV(membershipDetails.hasEnteredDetails ? 'Yes' : 'No'),
+				);
+			} else if (userExportType === 'all') {
+				// Add empty columns for non-members when exporting all
+				row.push(...Array(memberHeaders.length).fill(''));
+			}
+
+			// Add coach-specific data
+			if (user.role === 'coach') {
+				const coachDetails = user.coachDetails || {};
+				const specializations = coachDetails.specialization || [];
+				row.push(
+					escapeCSV(specializations[0] || 'General Fitness'),
+					escapeCSV(specializations.join('; ') || 'N/A'),
+				);
+			} else if (userExportType === 'all') {
+				// Add empty columns for non-coaches when exporting all
+				row.push(...Array(coachHeaders.length).fill(''));
+			}
+
+			csvContent += row.join(',') + '\n';
+		});
+
+		// Generate filename
+		let filename = 'users_export';
+		if (userExportType !== 'all') {
+			filename += `_${userExportType}`;
+		}
+		if (userExportStartDate || userExportEndDate) {
+			const start = userExportStartDate ? userExportStartDate.replace(/-/g, '') : 'all';
+			const end = userExportEndDate ? userExportEndDate.replace(/-/g, '') : 'all';
+			filename += `_${start}_to_${end}`;
+		} else {
+			filename += '_all';
+		}
+		filename += `_${new Date().toISOString().split('T')[0]}.csv`;
+
+		// Create blob and download
+		const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+		const link = document.createElement('a');
+		const url = URL.createObjectURL(blob);
+		link.setAttribute('href', url);
+		link.setAttribute('download', filename);
+		link.style.visibility = 'hidden';
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+	};
+
 	// Show loading state only for essential data (members and coaches)
 	if (loading) {
 		return (
@@ -1102,14 +1331,89 @@ export function ReportsPage() {
 						Comprehensive insights and analytics for your gym operations
 					</p>
 				</div>
-				<button
-					onClick={exportToCSV}
-					className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all"
-					title="Export all analytics data to CSV"
-				>
-					<Download className="w-4 h-4" />
-					Export CSV
-				</button>
+				<div className="flex items-center gap-3">
+					<button
+						onClick={exportToCSV}
+						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all"
+						title="Export all analytics data to CSV"
+					>
+						<Download className="w-4 h-4" />
+						Export Analytics
+					</button>
+					<button
+						onClick={exportUsersToCSV}
+						className="flex items-center gap-2 px-4 py-2 bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] rounded-lg text-[#3B82F6] font-medium hover:bg-[rgba(59,130,246,0.2)] transition-all"
+						title="Export users data to CSV"
+					>
+						<Download className="w-4 h-4" />
+						Export Users
+					</button>
+				</div>
+			</div>
+
+			{/* User Export Filters */}
+			<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 backdrop-blur-md">
+				<div className="flex flex-col gap-4">
+					<div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+						<Users className="w-4 h-4" />
+						<span>User Export Filters</span>
+					</div>
+					<div className="flex flex-col sm:flex-row gap-4">
+						<div className="flex items-center gap-2">
+							<label htmlFor="userExportType" className="text-sm text-[var(--text-secondary)] whitespace-nowrap">
+								User Type:
+							</label>
+							<select
+								id="userExportType"
+								value={userExportType}
+								onChange={(e) => setUserExportType(e.target.value)}
+								className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+							>
+								<option value="all">All Users</option>
+								<option value="member">Members Only</option>
+								<option value="coach">Coaches Only</option>
+								<option value="admin">Admins Only</option>
+							</select>
+						</div>
+						<div className="flex items-center gap-2">
+							<Calendar className="w-4 h-4 text-[var(--text-secondary)]" />
+							<label htmlFor="userExportStartDate" className="text-sm text-[var(--text-secondary)] whitespace-nowrap">
+								Join Date From:
+							</label>
+							<input
+								id="userExportStartDate"
+								type="date"
+								value={userExportStartDate}
+								onChange={(e) => setUserExportStartDate(e.target.value)}
+								className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+							/>
+						</div>
+						<div className="flex items-center gap-2">
+							<label htmlFor="userExportEndDate" className="text-sm text-[var(--text-secondary)] whitespace-nowrap">
+								To:
+							</label>
+							<input
+								id="userExportEndDate"
+								type="date"
+								value={userExportEndDate}
+								onChange={(e) => setUserExportEndDate(e.target.value)}
+								className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+							/>
+						</div>
+						{(userExportStartDate || userExportEndDate) && (
+							<button
+								onClick={() => {
+									setUserExportStartDate('');
+									setUserExportEndDate('');
+								}}
+								className="px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors whitespace-nowrap"
+								title="Clear date filter"
+							>
+								Clear dates
+							</button>
+						)}
+					</div>
+				</div>
 			</div>
 
 			{/* Analytics Error Banner - Only show if there's an actual error */}

@@ -45,9 +45,18 @@ const wsLink = new GraphQLWsLink(
 		retryAttempts: 5,
 		shouldRetry: () => true,
 		on: {
-			connected: () => console.log('Real-time connection established'),
-			closed: () => console.log('Real-time connection closed'),
-			error: (error) => console.error('Real-time connection error:', error),
+			connected: () => {
+				console.log('✅ [WebSocket] Real-time connection established');
+			},
+			closed: () => {
+				console.warn('⚠️ [WebSocket] Real-time connection closed');
+			},
+			error: (error) => {
+				console.error('❌ [WebSocket] Real-time connection error:', error);
+			},
+			opened: () => {
+				console.log('✅ [WebSocket] Connection opened');
+			},
 		},
 	})
 );
