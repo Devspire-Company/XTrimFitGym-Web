@@ -14,7 +14,15 @@ import {
 	Filler,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
-import { BarChart3, DollarSign, Users, TrendingUp, Activity, Download, Calendar } from 'lucide-react';
+import {
+	BarChart3,
+	DollarSign,
+	Users,
+	TrendingUp,
+	Activity,
+	Download,
+	Calendar,
+} from 'lucide-react';
 import {
 	GET_USERS,
 	GET_REVENUE_SUMMARY,
@@ -465,6 +473,7 @@ export function ReportsPage() {
 		csvContent += '=== DETAILED MEMBER INFORMATION ===\n';
 		csvContent += createRow([
 			'ID',
+			'Attendance ID',
 			'First Name',
 			'Middle Name',
 			'Last Name',
@@ -498,6 +507,7 @@ export function ReportsPage() {
 
 			csvContent += createRow([
 				m.id,
+				m.attendanceId || 'N/A',
 				m.firstName || '',
 				m.middleName || '',
 				m.lastName || '',
@@ -1061,9 +1071,12 @@ export function ReportsPage() {
 	const exportUsersToCSV = () => {
 		// Collect all users based on filter
 		let allUsers: any[] = [];
-		
+
 		if (userExportType === 'all' || userExportType === 'member') {
-			allUsers = [...allUsers, ...(data?.members || []).map((u: any) => ({ ...u, role: 'member' }))];
+			allUsers = [
+				...allUsers,
+				...(data?.members || []).map((u: any) => ({ ...u, role: 'member' })),
+			];
 		}
 		if (userExportType === 'all' || userExportType === 'coach') {
 			allUsers = [...allUsers, ...(data?.coaches || []).map((u: any) => ({ ...u, role: 'coach' }))];
@@ -1077,22 +1090,22 @@ export function ReportsPage() {
 		if (userExportStartDate || userExportEndDate) {
 			filteredUsers = allUsers.filter((user) => {
 				if (!user.createdAt) return false;
-				
+
 				const userDate = new Date(user.createdAt);
 				userDate.setHours(0, 0, 0, 0);
-				
+
 				if (userExportStartDate) {
 					const start = new Date(userExportStartDate);
 					start.setHours(0, 0, 0, 0);
 					if (userDate < start) return false;
 				}
-				
+
 				if (userExportEndDate) {
 					const end = new Date(userExportEndDate);
 					end.setHours(23, 59, 59, 999);
 					if (userDate > end) return false;
 				}
-				
+
 				return true;
 			});
 		}
@@ -1112,136 +1125,57 @@ export function ReportsPage() {
 			return str;
 		};
 
-		const formatDate = (dateString: string | undefined | null): string => {
-			if (!dateString || dateString === 'N/A') return '';
-			try {
-				const date = new Date(dateString);
-				if (isNaN(date.getTime())) return '';
-				return date.toLocaleDateString('en-US', {
-					year: 'numeric',
-					month: '2-digit',
-					day: '2-digit',
-				});
-			} catch {
-				return '';
-			}
+		// Map gender to numeric value
+		const mapGender = (gender: string | null | undefined): string => {
+			if (!gender) return '1';
+			const genderLower = gender.toLowerCase().trim();
+			if (genderLower === 'male' || genderLower === 'm') return '1';
+			if (genderLower === 'female' || genderLower === 'f') return '2';
+			// For "Prefer not to say" or "N/A", default to 1
+			return '1';
 		};
 
-		const calculateAge = (dob: string | null | undefined): string => {
-			if (!dob) return 'N/A';
-			try {
-				const birthDate = new Date(dob);
-				const today = new Date();
-				let age = today.getFullYear() - birthDate.getFullYear();
-				const monthDiff = today.getMonth() - birthDate.getMonth();
-				if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-					age--;
-				}
-				return age.toString();
-			} catch {
-				return 'N/A';
-			}
+		// Format person name: first name + middle name + last name
+		const formatPersonName = (user: any): string => {
+			const firstName = user.firstName || '';
+			const middleName = user.middleName || '';
+			const lastName = user.lastName || '';
+			return `${firstName} ${middleName} ${lastName}`.trim().replace(/\s+/g, ' ');
 		};
 
-		// CSV Headers
+		// CSV Headers - New format
 		const headers = [
-			'ID',
-			'Role',
-			'First Name',
-			'Middle Name',
-			'Last Name',
-			'Full Name',
+			'*Person ID',
+			'*Organization',
+			'*Person Name',
+			'*Gender',
+			'Contact',
 			'Email',
-			'Phone Number',
-			'Date of Birth',
-			'Age',
-			'Gender',
-			'Join Date',
-			'Heard From',
-		];
-
-		// Add role-specific headers
-		const memberHeaders = [
-			'Membership Plan',
-			'Membership Status',
-			'Subscription Start Date',
-			'Subscription End Date',
-			'Monthly Price',
-			'Fitness Goals',
-			'Physique Goal',
-			'Workout Time',
-			'Has Entered Details',
-		];
-
-		const coachHeaders = [
-			'Specialization',
-			'All Specializations',
+			'Effective Time',
+			'Expiry Time',
+			'Card No.',
+			'Room No.',
+			'Floor No.',
 		];
 
 		// Build CSV content
-		let csvContent = headers.join(',');
-		
-		// Add role-specific headers conditionally
-		if (userExportType === 'all' || userExportType === 'member') {
-			csvContent += ',' + memberHeaders.join(',');
-		}
-		if (userExportType === 'all' || userExportType === 'coach') {
-			csvContent += ',' + coachHeaders.join(',');
-		}
-		csvContent += '\n';
+		let csvContent = headers.join(',') + '\n';
 
 		// Add user rows
 		filteredUsers.forEach((user: any) => {
 			const row = [
-				escapeCSV(user.id),
-				escapeCSV(user.role || 'N/A'),
-				escapeCSV(user.firstName || ''),
-				escapeCSV(user.middleName || ''),
-				escapeCSV(user.lastName || ''),
-				escapeCSV(`${user.firstName || ''} ${user.middleName || ''} ${user.lastName || ''}`.trim()),
-				escapeCSV(user.email || 'N/A'),
-				escapeCSV(user.phoneNumber || 'N/A'),
-				formatDate(user.dateOfBirth),
-				calculateAge(user.dateOfBirth),
-				escapeCSV(user.gender || 'N/A'),
-				formatDate(user.createdAt),
-				escapeCSV(user.heardFrom || 'N/A'),
+				escapeCSV(user.attendanceId || ''),
+				escapeCSV('Xtrimfitgym-users'),
+				escapeCSV(formatPersonName(user)),
+				escapeCSV(mapGender(user.gender)),
+				'', // Contact - leave blank
+				escapeCSV(user.email || ''),
+				'2026/01/01', // Effective Time - default value
+				'2026/12/01', // Expiry Time - default value
+				'', // Card No. - leave blank
+				'', // Room No. - leave blank
+				'', // Floor No. - leave blank
 			];
-
-			// Add member-specific data
-			if (user.role === 'member') {
-				const membershipTransaction = user.currentMembership;
-				const isActive = membershipTransaction?.status === 'ACTIVE';
-				const membershipDetails = user.membershipDetails || {};
-				
-				row.push(
-					escapeCSV(isActive ? membershipTransaction?.membership?.name || 'No Plan' : 'No Plan'),
-					escapeCSV(isActive ? 'Active' : 'Inactive'),
-					formatDate(membershipTransaction?.startedAt),
-					formatDate(membershipTransaction?.expiresAt),
-					escapeCSV(isActive ? `₱${(membershipTransaction?.membership?.monthlyPrice || 0).toLocaleString()}` : 'N/A'),
-					escapeCSV(Array.isArray(membershipDetails.fitnessGoal) ? membershipDetails.fitnessGoal.join('; ') : (membershipDetails.fitnessGoal || 'N/A')),
-					escapeCSV(membershipDetails.physiqueGoalType || 'N/A'),
-					escapeCSV(membershipDetails.workOutTime || 'N/A'),
-					escapeCSV(membershipDetails.hasEnteredDetails ? 'Yes' : 'No'),
-				);
-			} else if (userExportType === 'all') {
-				// Add empty columns for non-members when exporting all
-				row.push(...Array(memberHeaders.length).fill(''));
-			}
-
-			// Add coach-specific data
-			if (user.role === 'coach') {
-				const coachDetails = user.coachDetails || {};
-				const specializations = coachDetails.specialization || [];
-				row.push(
-					escapeCSV(specializations[0] || 'General Fitness'),
-					escapeCSV(specializations.join('; ') || 'N/A'),
-				);
-			} else if (userExportType === 'all') {
-				// Add empty columns for non-coaches when exporting all
-				row.push(...Array(coachHeaders.length).fill(''));
-			}
 
 			csvContent += row.join(',') + '\n';
 		});
@@ -1360,7 +1294,10 @@ export function ReportsPage() {
 					</div>
 					<div className="flex flex-col sm:flex-row gap-4">
 						<div className="flex items-center gap-2">
-							<label htmlFor="userExportType" className="text-sm text-[var(--text-secondary)] whitespace-nowrap">
+							<label
+								htmlFor="userExportType"
+								className="text-sm text-[var(--text-secondary)] whitespace-nowrap"
+							>
 								User Type:
 							</label>
 							<select
@@ -1377,7 +1314,10 @@ export function ReportsPage() {
 						</div>
 						<div className="flex items-center gap-2">
 							<Calendar className="w-4 h-4 text-[var(--text-secondary)]" />
-							<label htmlFor="userExportStartDate" className="text-sm text-[var(--text-secondary)] whitespace-nowrap">
+							<label
+								htmlFor="userExportStartDate"
+								className="text-sm text-[var(--text-secondary)] whitespace-nowrap"
+							>
 								Join Date From:
 							</label>
 							<input
@@ -1389,7 +1329,10 @@ export function ReportsPage() {
 							/>
 						</div>
 						<div className="flex items-center gap-2">
-							<label htmlFor="userExportEndDate" className="text-sm text-[var(--text-secondary)] whitespace-nowrap">
+							<label
+								htmlFor="userExportEndDate"
+								className="text-sm text-[var(--text-secondary)] whitespace-nowrap"
+							>
 								To:
 							</label>
 							<input

@@ -419,7 +419,7 @@ export function AttendancePage() {
 			</div>
 
 			{/* Stats */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 				<div className="bg-[var(--bg-secondary)] rounded-lg p-4">
 					<div className="flex items-center justify-between">
 						<div>
@@ -438,43 +438,6 @@ export function AttendancePage() {
 							</p>
 						</div>
 						<Calendar className="w-8 h-8 text-[var(--primary-yellow)]" />
-					</div>
-				</div>
-				<div className="bg-[var(--bg-secondary)] rounded-lg p-4">
-					<div className="flex items-center justify-between">
-						<div>
-							<p className="text-sm text-[var(--text-secondary)]">Real-time Status</p>
-							<p
-								className={`text-lg font-bold flex items-center gap-2 ${
-									subscriptionConnected ? 'text-green-500' : 'text-yellow-500'
-								}`}
-							>
-								<span
-									className={`w-2 h-2 rounded-full ${
-										subscriptionConnected
-											? 'bg-green-500 animate-pulse'
-											: 'bg-yellow-500'
-									}`}
-								></span>
-								{subscriptionConnected ? 'Connected' : 'Connecting...'}
-							</p>
-							{lastUpdateTime && (
-								<p className="text-xs text-[var(--text-secondary)] mt-1">
-									Last update: {lastUpdateTime.toLocaleTimeString('en-PH', {
-										timeZone: 'Asia/Manila',
-										hour: '2-digit',
-										minute: '2-digit',
-										second: '2-digit',
-										hour12: true,
-									})}
-								</p>
-							)}
-						</div>
-						<RefreshCw
-							className={`w-8 h-8 ${
-								subscriptionConnected ? 'text-green-500' : 'text-yellow-500'
-							} ${subscriptionConnected ? 'animate-spin' : ''}`}
-						/>
 					</div>
 				</div>
 			</div>

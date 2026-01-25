@@ -147,7 +147,7 @@ export function LoginPage() {
 
 				{/* Footer */}
 				<p className="text-center text-sm text-[var(--text-secondary)] mt-6">
-					© 2024 X-TRIM FIT GYM. All rights reserved.
+					© 2025 X-TRIM FIT GYM. All rights reserved.
 				</p>
 			</div>
 		</div>

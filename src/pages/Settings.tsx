@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
-	Settings as SettingsIcon,
 	User,
 	Sliders,
 	Bell,
@@ -11,10 +10,16 @@ import {
 	LogOut,
 	Pencil,
 	X,
+	UserPlus,
+	Eye,
+	EyeOff,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { logout } from '@/store/slices/authSlice';
+import { logout, updateUser } from '@/store/slices/authSlice';
+import { addToast } from '@/store/slices/uiSlice';
+import { useMutation, useQuery } from '@apollo/client';
+import { UPDATE_USER, CREATE_USER, GET_USERS, GET_USER } from '@/graphql/operations';
+import { RoleType } from '@/graphql/generated/graphql';
 
 export function SettingsPage() {
 	useEffect(() => {
@@ -38,6 +43,7 @@ export function SettingsPage() {
 		{ id: 'preferences', label: 'System Preferences', icon: Sliders },
 		{ id: 'notifications', label: 'Notification Settings', icon: Bell },
 		{ id: 'security', label: 'Account Security', icon: Shield },
+		{ id: 'admin', label: 'Admin Accounts', icon: UserPlus },
 	];
 
 	const toggleEditMode = (section: string) => {
@@ -115,14 +121,7 @@ export function SettingsPage() {
 							onSave={() => saveChanges('account')}
 						/>
 					)}
-					{activeSection === 'preferences' && (
-						<PreferencesSection
-							editMode={editMode.preferences}
-							onToggleEdit={() => toggleEditMode('preferences')}
-							onCancel={() => cancelEdit('preferences')}
-							onSave={() => saveChanges('preferences')}
-						/>
-					)}
+					{activeSection === 'preferences' && <PreferencesSection />}
 					{activeSection === 'notifications' && (
 						<NotificationsSection
 							editMode={editMode.notifications}
@@ -132,6 +131,7 @@ export function SettingsPage() {
 						/>
 					)}
 					{activeSection === 'security' && <SecuritySection />}
+					{activeSection === 'admin' && <AdminAccountsSection />}
 				</div>
 			</div>
 
@@ -182,6 +182,55 @@ function AccountSection({
 	onSave: () => void;
 }) {
 	const { user } = useAppSelector((state) => state.auth);
+	const dispatch = useAppDispatch();
+	const [firstName, setFirstName] = useState(user?.firstName || '');
+	const [lastName, setLastName] = useState(user?.lastName || '');
+	const [updateUserMutation] = useMutation(UPDATE_USER);
+
+	useEffect(() => {
+		if (user) {
+			setFirstName(user.firstName || '');
+			setLastName(user.lastName || '');
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [user?.id]);
+
+	const handleCancel = () => {
+		setFirstName(user?.firstName || '');
+		setLastName(user?.lastName || '');
+		onCancel();
+	};
+
+	const handleSave = async () => {
+		if (!user?.id) return;
+
+		try {
+			const result = await updateUserMutation({
+				variables: {
+					id: user.id,
+					input: {
+						firstName,
+						lastName,
+					},
+				},
+			});
+
+			if (result.data?.updateUser) {
+				const updatedUser = result.data.updateUser;
+				dispatch(updateUser({
+					...updatedUser,
+					middleName: updatedUser.middleName ?? undefined,
+					phoneNumber: updatedUser.phoneNumber ?? undefined,
+				}));
+				dispatch(addToast({ type: 'success', message: 'Account information updated successfully!' }));
+				onSave();
+			}
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : 'Failed to update account information';
+			dispatch(addToast({ type: 'error', message }));
+		}
+	};
+
 	return (
 		<div className="settings-section bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-8">
 			<div className="section-header-modern flex items-center justify-between mb-8 pb-6 border-b border-[var(--card-border)]">
@@ -200,12 +249,13 @@ function AccountSection({
 				<div className="form-grid grid grid-cols-2 gap-6 mb-6">
 					<div className="form-group flex flex-col gap-2">
 						<label className="text-sm font-medium text-[var(--text-secondary)] mb-2 block">
-							Email Address
+							First Name
 						</label>
 						<div className="input-wrapper relative">
 							<input
-								type="email"
-								value={user?.email || ''}
+								type="text"
+								value={firstName}
+								onChange={(e) => setFirstName(e.target.value)}
 								readOnly={!editMode}
 								className={`w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] ${
 									editMode ? 'edit-mode' : 'read-only'
@@ -215,16 +265,44 @@ function AccountSection({
 					</div>
 					<div className="form-group flex flex-col gap-2">
 						<label className="text-sm font-medium text-[var(--text-secondary)] mb-2 block">
+							Last Name
+						</label>
+						<div className="input-wrapper relative">
+							<input
+								type="text"
+								value={lastName}
+								onChange={(e) => setLastName(e.target.value)}
+								readOnly={!editMode}
+								className={`w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] ${
+									editMode ? 'edit-mode' : 'read-only'
+								} focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]`}
+							/>
+						</div>
+					</div>
+					<div className="form-group flex flex-col gap-2">
+						<label className="text-sm font-medium text-[var(--text-secondary)] mb-2 block">
+							Email Address
+						</label>
+						<div className="input-wrapper relative">
+							<input
+								type="email"
+								value={user?.email || ''}
+								disabled
+								className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] opacity-60 cursor-not-allowed"
+							/>
+						</div>
+						<p className="text-xs text-[var(--text-secondary)] mt-1">Email cannot be changed</p>
+					</div>
+					<div className="form-group flex flex-col gap-2">
+						<label className="text-sm font-medium text-[var(--text-secondary)] mb-2 block">
 							Role
 						</label>
 						<div className="input-wrapper relative">
 							<input
 								type="text"
 								value="System Administrator"
-								readOnly={!editMode}
-								className={`w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] ${
-									editMode ? 'edit-mode' : 'read-only'
-								} focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]`}
+								disabled
+								className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] opacity-60 cursor-not-allowed"
 							/>
 						</div>
 					</div>
@@ -234,14 +312,14 @@ function AccountSection({
 				>
 					<button
 						type="button"
-						onClick={onCancel}
+						onClick={handleCancel}
 						className="btn-discard px-6 py-3 bg-transparent text-[var(--primary-yellow)] border border-[var(--primary-yellow)] rounded-lg font-medium text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[var(--primary-yellow)] hover:text-[#1a1a1a]"
 					>
 						Discard Changes
 					</button>
 					<button
 						type="button"
-						onClick={onSave}
+						onClick={handleSave}
 						className="btn-save px-6 py-3 bg-[var(--primary-yellow)] text-[#1a1a1a] border-none rounded-lg font-semibold text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[#E6B800] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(249,197,19,0.3)]"
 					>
 						Save Changes
@@ -252,17 +330,12 @@ function AccountSection({
 	);
 }
 
-function PreferencesSection({
-	editMode,
-	onToggleEdit,
-	onCancel,
-	onSave,
-}: {
-	editMode?: boolean;
-	onToggleEdit: () => void;
-	onCancel: () => void;
-	onSave: () => void;
-}) {
+function PreferencesSection() {
+	const dispatch = useAppDispatch();
+	const handleEditClick = () => {
+		dispatch(addToast({ type: 'info', message: 'System preferences editing is currently not available.' }));
+	};
+
 	return (
 		<div className="settings-section bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-8">
 			<div className="section-header-modern flex items-center justify-between mb-8 pb-6 border-b border-[var(--card-border)]">
@@ -270,8 +343,8 @@ function PreferencesSection({
 					System Preferences
 				</h2>
 				<button
-					onClick={onToggleEdit}
-					className={`btn-edit-modern flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] text-[var(--text-secondary)] text-sm font-medium transition-[var(--transition)] hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(249,197,19,0.3)] hover:text-[var(--primary-yellow)] ${editMode ? 'editing' : ''}`}
+					onClick={handleEditClick}
+					className="btn-edit-modern flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] text-[var(--text-secondary)] text-sm font-medium transition-[var(--transition)] hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(249,197,19,0.3)] hover:text-[var(--primary-yellow)]"
 				>
 					<Pencil className="w-4 h-4" />
 					Edit
@@ -285,10 +358,8 @@ function PreferencesSection({
 						</label>
 						<div className="input-wrapper relative">
 							<select
-								disabled={!editMode}
-								className={`w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] ${
-									editMode ? 'edit-mode' : ''
-								} focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]`}
+								disabled
+								className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] opacity-60 cursor-not-allowed"
 							>
 								<option>Asia/Manila (GMT+8)</option>
 								<option>UTC (GMT+0)</option>
@@ -303,10 +374,8 @@ function PreferencesSection({
 						</label>
 						<div className="input-wrapper relative">
 							<select
-								disabled={!editMode}
-								className={`w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] ${
-									editMode ? 'edit-mode' : ''
-								} focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]`}
+								disabled
+								className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] opacity-60 cursor-not-allowed"
 							>
 								<option>MM/DD/YYYY</option>
 								<option>DD/MM/YYYY</option>
@@ -320,10 +389,8 @@ function PreferencesSection({
 						</label>
 						<div className="input-wrapper relative">
 							<select
-								disabled={!editMode}
-								className={`w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] ${
-									editMode ? 'edit-mode' : ''
-								} focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]`}
+								disabled
+								className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] opacity-60 cursor-not-allowed"
 							>
 								<option>English</option>
 								<option>Filipino</option>
@@ -336,10 +403,8 @@ function PreferencesSection({
 						</label>
 						<div className="input-wrapper relative">
 							<select
-								disabled={!editMode}
-								className={`w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] ${
-									editMode ? 'edit-mode' : ''
-								} focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]`}
+								disabled
+								className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] opacity-60 cursor-not-allowed"
 							>
 								<option>Philippine Peso (₱)</option>
 								<option>US Dollar ($)</option>
@@ -347,24 +412,6 @@ function PreferencesSection({
 							</select>
 						</div>
 					</div>
-				</div>
-				<div
-					className={`form-actions flex gap-4 justify-end mt-8 pt-6 border-t border-[var(--card-border)] ${editMode ? '' : 'hidden'}`}
-				>
-					<button
-						type="button"
-						onClick={onCancel}
-						className="btn-discard px-6 py-3 bg-transparent text-[var(--primary-yellow)] border border-[var(--primary-yellow)] rounded-lg font-medium text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[var(--primary-yellow)] hover:text-[#1a1a1a]"
-					>
-						Discard Changes
-					</button>
-					<button
-						type="button"
-						onClick={onSave}
-						className="btn-save px-6 py-3 bg-[var(--primary-yellow)] text-[#1a1a1a] border-none rounded-lg font-semibold text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[#E6B800] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(249,197,19,0.3)]"
-					>
-						Save Changes
-					</button>
 				</div>
 			</div>
 		</div>
@@ -496,50 +543,609 @@ function NotificationsSection({
 }
 
 function SecuritySection() {
+	const { user } = useAppSelector((state) => state.auth);
+	const dispatch = useAppDispatch();
+	const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+	const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+	const [passwordData, setPasswordData] = useState({
+		currentPassword: '',
+		newPassword: '',
+		confirmPassword: '',
+	});
+	const [showPasswords, setShowPasswords] = useState({
+		current: false,
+		new: false,
+		confirm: false,
+	});
+	const [updateUserMutation] = useMutation(UPDATE_USER);
+
+	const handlePasswordChange = async (e: React.FormEvent) => {
+		e.preventDefault();
+
+		if (!passwordData.currentPassword) {
+			dispatch(addToast({ type: 'error', message: 'Current password is required' }));
+			return;
+		}
+
+		if (passwordData.newPassword !== passwordData.confirmPassword) {
+			dispatch(addToast({ type: 'error', message: 'New passwords do not match' }));
+			return;
+		}
+
+		if (passwordData.newPassword.length < 6) {
+			dispatch(addToast({ type: 'error', message: 'Password must be at least 6 characters long' }));
+			return;
+		}
+
+		if (!user?.id) return;
+
+		try {
+			await updateUserMutation({
+				variables: {
+					id: user.id,
+					input: {
+						password: passwordData.newPassword,
+						currentPassword: passwordData.currentPassword,
+					},
+				},
+			});
+
+			dispatch(addToast({ type: 'success', message: 'Password changed successfully!' }));
+			setPasswordData({
+				currentPassword: '',
+				newPassword: '',
+				confirmPassword: '',
+			});
+			setIsPasswordModalOpen(false);
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : 'Failed to change password';
+			dispatch(addToast({ type: 'error', message }));
+		}
+	};
+
+	return (
+		<>
+			<div className="settings-section bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-8">
+				<h2 className="section-title text-[1.75rem] font-semibold text-[var(--text-primary)] font-['Poppins'] mb-6">
+					Account Security
+				</h2>
+				<div className="section-content flex flex-col gap-6">
+					<div className="security-actions flex flex-col gap-4">
+						<div className="security-item flex items-center justify-between p-6 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-xl transition-[var(--transition)] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.12)]">
+							<div className="security-info flex items-center gap-4 flex-1">
+								<div className="w-12 h-12 rounded-xl bg-[rgba(249,197,19,0.1)] flex items-center justify-center text-[var(--primary-yellow)] text-2xl">
+									<Key className="w-6 h-6" />
+								</div>
+								<div>
+									<h3 className="text-[0.95rem] font-semibold text-[var(--text-primary)] mb-1">
+										Change Password
+									</h3>
+									<p className="text-xs text-[var(--text-secondary)]">
+										Update your password to keep your account secure
+									</p>
+								</div>
+							</div>
+							<button
+								onClick={() => setIsPasswordModalOpen(true)}
+								className="btn-secondary px-6 py-3 bg-[rgba(255,255,255,0.05)] text-[var(--text-secondary)] border border-[var(--card-border)] rounded-lg font-medium text-sm cursor-pointer transition-[var(--transition)] flex items-center gap-2 hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]"
+							>
+								<Pencil className="w-4 h-4" />
+								Change Password
+							</button>
+						</div>
+						<div className="security-item flex items-center justify-between p-6 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-xl transition-[var(--transition)] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.12)]">
+							<div className="security-info flex items-center gap-4 flex-1">
+								<div className="w-12 h-12 rounded-xl bg-[rgba(249,197,19,0.1)] flex items-center justify-center text-[var(--primary-yellow)] text-2xl">
+									<History className="w-6 h-6" />
+								</div>
+								<div>
+									<h3 className="text-[0.95rem] font-semibold text-[var(--text-primary)] mb-1">
+										Login History
+									</h3>
+									<p className="text-xs text-[var(--text-secondary)]">
+										View your recent login activity and sessions
+									</p>
+								</div>
+							</div>
+							<button
+								onClick={() => setIsHistoryModalOpen(true)}
+								className="btn-secondary px-6 py-3 bg-[rgba(255,255,255,0.05)] text-[var(--text-secondary)] border border-[var(--card-border)] rounded-lg font-medium text-sm cursor-pointer transition-[var(--transition)] flex items-center gap-2 hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]"
+							>
+								<History className="w-4 h-4" />
+								View History
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{/* Change Password Modal */}
+			<div
+				className={`modal-overlay ${isPasswordModalOpen ? 'active' : ''}`}
+				onClick={() => setIsPasswordModalOpen(false)}
+			>
+				<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+					<div className="modal-body">
+						<div className="flex items-center justify-between mb-6">
+							<h3 className="text-xl font-semibold text-[var(--text-primary)] font-['Poppins']">
+								Change Password
+							</h3>
+							<button
+								onClick={() => setIsPasswordModalOpen(false)}
+								className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+							>
+								<X className="w-5 h-5" />
+							</button>
+						</div>
+						<form onSubmit={handlePasswordChange} className="flex flex-col gap-4">
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									Current Password *
+								</label>
+								<div className="input-wrapper relative">
+									<input
+										type={showPasswords.current ? 'text' : 'password'}
+										value={passwordData.currentPassword}
+										onChange={(e) =>
+											setPasswordData({ ...passwordData, currentPassword: e.target.value })
+										}
+										required
+										className="w-full px-4 py-3 pr-12 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+									/>
+									<button
+										type="button"
+										onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+										className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+									>
+										{showPasswords.current ? (
+											<EyeOff className="w-5 h-5" />
+										) : (
+											<Eye className="w-5 h-5" />
+										)}
+									</button>
+								</div>
+							</div>
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									New Password *
+								</label>
+								<div className="input-wrapper relative">
+									<input
+										type={showPasswords.new ? 'text' : 'password'}
+										value={passwordData.newPassword}
+										onChange={(e) =>
+											setPasswordData({ ...passwordData, newPassword: e.target.value })
+										}
+										required
+										minLength={6}
+										className="w-full px-4 py-3 pr-12 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+									/>
+									<button
+										type="button"
+										onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+										className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+									>
+										{showPasswords.new ? (
+											<EyeOff className="w-5 h-5" />
+										) : (
+											<Eye className="w-5 h-5" />
+										)}
+									</button>
+								</div>
+							</div>
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									Confirm New Password *
+								</label>
+								<div className="input-wrapper relative">
+									<input
+										type={showPasswords.confirm ? 'text' : 'password'}
+										value={passwordData.confirmPassword}
+										onChange={(e) =>
+											setPasswordData({ ...passwordData, confirmPassword: e.target.value })
+										}
+										required
+										minLength={6}
+										className="w-full px-4 py-3 pr-12 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+									/>
+									<button
+										type="button"
+										onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+										className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+									>
+										{showPasswords.confirm ? (
+											<EyeOff className="w-5 h-5" />
+										) : (
+											<Eye className="w-5 h-5" />
+										)}
+									</button>
+								</div>
+							</div>
+							<div className="flex gap-4 justify-end mt-4 pt-4 border-t border-[var(--card-border)]">
+								<button
+									type="button"
+									onClick={() => setIsPasswordModalOpen(false)}
+									className="btn-discard px-6 py-3 bg-transparent text-[var(--primary-yellow)] border border-[var(--primary-yellow)] rounded-lg font-medium text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[var(--primary-yellow)] hover:text-[#1a1a1a]"
+								>
+									Cancel
+								</button>
+								<button
+									type="submit"
+									className="btn-save px-6 py-3 bg-[var(--primary-yellow)] text-[#1a1a1a] border-none rounded-lg font-semibold text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[#E6B800] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(249,197,19,0.3)]"
+								>
+									Change Password
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			</div>
+
+			{/* Login History Modal */}
+			<LoginHistoryModal
+				isOpen={isHistoryModalOpen}
+				onClose={() => setIsHistoryModalOpen(false)}
+			/>
+		</>
+	);
+}
+
+function AdminAccountsSection() {
+	const { user } = useAppSelector((state) => state.auth);
+	const dispatch = useAppDispatch();
+	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [formData, setFormData] = useState({
+		firstName: '',
+		lastName: '',
+		email: '',
+		password: '',
+		confirmPassword: '',
+		currentPassword: '',
+	});
+	const [showPasswords, setShowPasswords] = useState({
+		current: false,
+		password: false,
+		confirm: false,
+	});
+	const [createUserMutation] = useMutation(CREATE_USER);
+	const { data: adminsData, refetch } = useQuery(GET_USERS, {
+		variables: { role: RoleType.Admin },
+	});
+
+	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const { name, value } = e.target;
+		setFormData((prev) => ({ ...prev, [name]: value }));
+	};
+
+	const handleSubmit = async (e: React.FormEvent) => {
+		e.preventDefault();
+
+		if (!formData.currentPassword) {
+			dispatch(addToast({ type: 'error', message: 'Current password is required' }));
+			return;
+		}
+
+		if (formData.password !== formData.confirmPassword) {
+			dispatch(addToast({ type: 'error', message: 'Passwords do not match' }));
+			return;
+		}
+
+		if (formData.password.length < 6) {
+			dispatch(addToast({ type: 'error', message: 'Password must be at least 6 characters long' }));
+			return;
+		}
+
+		if (!user?.id) return;
+
+		// Create admin account (password verification is done in backend)
+		try {
+			const result = await createUserMutation({
+				variables: {
+					input: {
+						firstName: formData.firstName,
+						lastName: formData.lastName,
+						email: formData.email,
+						password: formData.password,
+						role: RoleType.Admin,
+						// gender is optional, so we omit it instead of sending empty string
+						currentPassword: formData.currentPassword,
+					} as any,
+				},
+			});
+
+			if (result.data?.createUser) {
+				dispatch(addToast({ type: 'success', message: 'Admin account created successfully!' }));
+				setFormData({
+					firstName: '',
+					lastName: '',
+					email: '',
+					password: '',
+					confirmPassword: '',
+					currentPassword: '',
+				});
+				setIsModalOpen(false);
+				refetch();
+			}
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : 'Failed to create admin account';
+			dispatch(addToast({ type: 'error', message }));
+		}
+	};
+
+	const admins = adminsData?.getUsers || [];
+
 	return (
 		<div className="settings-section bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-8">
-			<h2 className="section-title text-[1.75rem] font-semibold text-[var(--text-primary)] font-['Poppins'] mb-6">
-				Account Security
-			</h2>
+			<div className="section-header-modern flex items-center justify-between mb-8 pb-6 border-b border-[var(--card-border)]">
+				<h2 className="section-title text-[1.75rem] font-semibold text-[var(--text-primary)] font-['Poppins'] m-0">
+					Admin Accounts
+				</h2>
+				<button
+					onClick={() => setIsModalOpen(true)}
+					className="btn-edit-modern flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--primary-yellow)] text-[#1a1a1a] text-sm font-semibold transition-[var(--transition)] hover:bg-[#E6B800] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(249,197,19,0.3)]"
+				>
+					<UserPlus className="w-4 h-4" />
+					Add Admin
+				</button>
+			</div>
 			<div className="section-content flex flex-col gap-6">
-				<div className="security-actions flex flex-col gap-4">
-					<div className="security-item flex items-center justify-between p-6 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-xl transition-[var(--transition)] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.12)]">
-						<div className="security-info flex items-center gap-4 flex-1">
-							<div className="w-12 h-12 rounded-xl bg-[rgba(249,197,19,0.1)] flex items-center justify-center text-[var(--primary-yellow)] text-2xl">
-								<Key className="w-6 h-6" />
-							</div>
-							<div>
-								<h3 className="text-[0.95rem] font-semibold text-[var(--text-primary)] mb-1">
-									Change Password
-								</h3>
-								<p className="text-xs text-[var(--text-secondary)]">
-									Update your password to keep your account secure
+				<p className="text-[var(--text-secondary)] text-sm mb-4">
+					Manage administrator accounts for the system. Only existing admins can create new admin accounts.
+				</p>
+				{admins.length > 0 && (
+					<div className="admin-list">
+						<h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Current Admin Accounts</h3>
+						<div className="grid grid-cols-1 gap-4">
+							{admins.map((admin) => {
+								if (!admin) return null;
+								return (
+									<div
+										key={admin.id}
+										className="p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-xl"
+									>
+										<div className="flex items-center justify-between">
+											<div>
+												<h4 className="text-[var(--text-primary)] font-medium">
+													{admin.firstName} {admin.lastName}
+												</h4>
+												<p className="text-sm text-[var(--text-secondary)]">{admin.email}</p>
+											</div>
+											{admin.id === user?.id && (
+												<span className="px-3 py-1 bg-[var(--primary-yellow)] text-[#1a1a1a] text-xs font-semibold rounded-full">
+													You
+												</span>
+											)}
+										</div>
+									</div>
+								);
+							})}
+						</div>
+					</div>
+				)}
+			</div>
+
+			{/* Add Admin Modal */}
+			<div
+				className={`modal-overlay ${isModalOpen ? 'active' : ''}`}
+				onClick={() => setIsModalOpen(false)}
+			>
+				<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+					<div className="modal-body">
+						<div className="flex items-center justify-between mb-6">
+							<h3 className="text-xl font-semibold text-[var(--text-primary)] font-['Poppins']">
+								Add New Admin Account
+							</h3>
+							<button
+								onClick={() => setIsModalOpen(false)}
+								className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+							>
+								<X className="w-5 h-5" />
+							</button>
+						</div>
+						<form onSubmit={handleSubmit} className="flex flex-col gap-4">
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									Your Current Password *
+								</label>
+								<div className="input-wrapper relative">
+									<input
+										type={showPasswords.current ? 'text' : 'password'}
+										name="currentPassword"
+										value={formData.currentPassword}
+										onChange={handleInputChange}
+										required
+										className="w-full px-4 py-3 pr-12 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+									/>
+									<button
+										type="button"
+										onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+										className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+									>
+										{showPasswords.current ? (
+											<EyeOff className="w-5 h-5" />
+										) : (
+											<Eye className="w-5 h-5" />
+										)}
+									</button>
+								</div>
+								<p className="text-xs text-[var(--text-secondary)] mt-1">
+									Confirm your password to create a new admin account
 								</p>
 							</div>
-						</div>
-						<button className="btn-secondary px-6 py-3 bg-[rgba(255,255,255,0.05)] text-[var(--text-secondary)] border border-[var(--card-border)] rounded-lg font-medium text-sm cursor-pointer transition-[var(--transition)] flex items-center gap-2 hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]">
-							<Pencil className="w-4 h-4" />
-							Change Password
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									First Name *
+								</label>
+								<input
+									type="text"
+									name="firstName"
+									value={formData.firstName}
+									onChange={handleInputChange}
+									required
+									className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+								/>
+							</div>
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									Last Name *
+								</label>
+								<input
+									type="text"
+									name="lastName"
+									value={formData.lastName}
+									onChange={handleInputChange}
+									required
+									className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+								/>
+							</div>
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									Email Address *
+								</label>
+								<input
+									type="email"
+									name="email"
+									value={formData.email}
+									onChange={handleInputChange}
+									required
+									className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+								/>
+							</div>
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									Password *
+								</label>
+								<div className="input-wrapper relative">
+									<input
+										type={showPasswords.password ? 'text' : 'password'}
+										name="password"
+										value={formData.password}
+										onChange={handleInputChange}
+										required
+										minLength={6}
+										className="w-full px-4 py-3 pr-12 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+									/>
+									<button
+										type="button"
+										onClick={() => setShowPasswords({ ...showPasswords, password: !showPasswords.password })}
+										className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+									>
+										{showPasswords.password ? (
+											<EyeOff className="w-5 h-5" />
+										) : (
+											<Eye className="w-5 h-5" />
+										)}
+									</button>
+								</div>
+							</div>
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									Confirm Password *
+								</label>
+								<div className="input-wrapper relative">
+									<input
+										type={showPasswords.confirm ? 'text' : 'password'}
+										name="confirmPassword"
+										value={formData.confirmPassword}
+										onChange={handleInputChange}
+										required
+										minLength={6}
+										className="w-full px-4 py-3 pr-12 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+									/>
+									<button
+										type="button"
+										onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+										className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+									>
+										{showPasswords.confirm ? (
+											<EyeOff className="w-5 h-5" />
+										) : (
+											<Eye className="w-5 h-5" />
+										)}
+									</button>
+								</div>
+							</div>
+							<div className="flex gap-4 justify-end mt-4 pt-4 border-t border-[var(--card-border)]">
+								<button
+									type="button"
+									onClick={() => setIsModalOpen(false)}
+									className="btn-discard px-6 py-3 bg-transparent text-[var(--primary-yellow)] border border-[var(--primary-yellow)] rounded-lg font-medium text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[var(--primary-yellow)] hover:text-[#1a1a1a]"
+								>
+									Cancel
+								</button>
+								<button
+									type="submit"
+									className="btn-save px-6 py-3 bg-[var(--primary-yellow)] text-[#1a1a1a] border-none rounded-lg font-semibold text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[#E6B800] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(249,197,19,0.3)]"
+								>
+									Create Admin
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function LoginHistoryModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+	const { user } = useAppSelector((state) => state.auth);
+	const { data, loading } = useQuery(GET_USER, {
+		variables: { id: user?.id || '' },
+		skip: !user?.id || !isOpen,
+	});
+
+	const loginHistory = (data?.getUser as any)?.loginHistory || [];
+
+	return (
+		<div
+			className={`modal-overlay ${isOpen ? 'active' : ''}`}
+			onClick={onClose}
+		>
+			<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+				<div className="modal-body">
+					<div className="flex items-center justify-between mb-6">
+						<h3 className="text-xl font-semibold text-[var(--text-primary)] font-['Poppins']">
+							Login History
+						</h3>
+						<button
+							onClick={onClose}
+							className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+						>
+							<X className="w-5 h-5" />
 						</button>
 					</div>
-					<div className="security-item flex items-center justify-between p-6 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-xl transition-[var(--transition)] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.12)]">
-						<div className="security-info flex items-center gap-4 flex-1">
-							<div className="w-12 h-12 rounded-xl bg-[rgba(249,197,19,0.1)] flex items-center justify-center text-[var(--primary-yellow)] text-2xl">
-								<History className="w-6 h-6" />
+					<div className="max-h-[60vh] overflow-y-auto">
+						{loading ? (
+							<p className="text-[var(--text-secondary)] text-center py-8">Loading...</p>
+						) : loginHistory.length === 0 ? (
+							<p className="text-[var(--text-secondary)] text-center py-8">No login history available</p>
+						) : (
+							<div className="flex flex-col gap-3">
+								{loginHistory.map((entry: any, index: number) => (
+									<div
+										key={index}
+										className="p-4 bg-[rgba(255,255,255,0.03)] border border-[var(--card-border)] rounded-xl"
+									>
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="text-[var(--text-primary)] font-medium">
+													{entry.ipAddress || 'Unknown IP'}
+												</p>
+												<p className="text-sm text-[var(--text-secondary)]">
+													{entry.userAgent || 'Unknown device'}
+												</p>
+											</div>
+											<div className="text-right">
+												<p className="text-sm text-[var(--text-primary)]">
+													{entry.loginAt ? new Date(entry.loginAt).toLocaleString() : 'Unknown date'}
+												</p>
+											</div>
+										</div>
+									</div>
+								))}
 							</div>
-							<div>
-								<h3 className="text-[0.95rem] font-semibold text-[var(--text-primary)] mb-1">
-									Login History
-								</h3>
-								<p className="text-xs text-[var(--text-secondary)]">
-									View your recent login activity and sessions
-								</p>
-							</div>
-						</div>
-						<button className="btn-secondary px-6 py-3 bg-[rgba(255,255,255,0.05)] text-[var(--text-secondary)] border border-[var(--card-border)] rounded-lg font-medium text-sm cursor-pointer transition-[var(--transition)] flex items-center gap-2 hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]">
-							<History className="w-4 h-4" />
-							View History
-						</button>
+						)}
 					</div>
 				</div>
 			</div>
