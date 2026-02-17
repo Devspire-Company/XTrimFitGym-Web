@@ -6,20 +6,24 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 
 const getGraphQLUrl = (): string => {
-	// In production (e.g. Vercel), you MUST set VITE_GRAPHQL_URL to your deployed API URL.
-	// Example: https://your-api.railway.app/graphql or https://xtrimfitgym-api.onrender.com/graphql
+	// In production (e.g. Vercel), you MUST set VITE_GRAPHQL_URL to your deployed API URL + /graphql.
+	// Example: https://xtrimfitgym-api.onrender.com/graphql
 	const url =
-		import.meta.env.VITE_GRAPHQL_URL ||
+		(import.meta.env.VITE_GRAPHQL_URL || '').trim() ||
 		(import.meta.env.DEV ? 'http://localhost:8000/graphql' : '');
 	if (import.meta.env.DEV) {
-		console.log(`[Apollo Client] Connecting to GraphQL endpoint: ${url}`);
+		console.log(`[Apollo Client] GraphQL endpoint: ${url}`);
+	} else {
+		// In production, log once so you can verify in DevTools that the app points to your API
+		if (url) {
+			console.info(`[Apollo Client] GraphQL endpoint: ${url.replace(/\/graphql\/?$/, '/graphql')}`);
+		} else {
+			console.error(
+				'[Apollo Client] VITE_GRAPHQL_URL is not set. Login will fail. Set it in Vercel → Settings → Environment Variables to e.g. https://xtrimfitgym-api.onrender.com/graphql then redeploy.'
+			);
+		}
 	}
-	if (!import.meta.env.DEV && !url) {
-		console.error(
-			'[Apollo Client] VITE_GRAPHQL_URL is not set. Set it in your host (e.g. Vercel Environment Variables) to your deployed API URL, e.g. https://your-api.example.com/graphql'
-		);
-	}
-	return url;
+	return url || (import.meta.env.DEV ? 'http://localhost:8000/graphql' : '');
 };
 
 const httpLink = createHttpLink({
