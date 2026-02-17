@@ -3,6 +3,7 @@ import { useQuery, useSubscription } from '@apollo/client';
 import { Link } from 'react-router';
 import { Users, UserCog, DollarSign, CreditCard, BarChart3, Clock, LogIn, LogOut } from 'lucide-react';
 import { GET_USERS, GET_REVENUE_SUMMARY, REVENUE_SUMMARY_UPDATED, USERS_UPDATED, GET_ATTENDANCE_RECORDS, ATTENDANCE_RECORD_ADDED, ATTENDANCE_UPDATED } from '@/graphql/operations/index';
+import { RoleType } from '@/graphql/generated/graphql';
 import type { AttendanceRecord } from '@/graphql/generated/types';
 import {
 	Chart as ChartJS,
@@ -16,7 +17,7 @@ import {
 	Legend,
 	Filler,
 } from 'chart.js';
-import { Line, Bar } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 
 ChartJS.register(
 	CategoryScale,
@@ -37,16 +38,16 @@ export function DashboardPage() {
 
 	// Initial data fetch with queries
 	const { data: membersData, loading: membersLoading } = useQuery(GET_USERS, {
-		variables: { role: 'member' },
+		variables: { role: RoleType.Member },
 		errorPolicy: 'none',
 	});
 
 	const { data: coachesData, loading: coachesLoading } = useQuery(GET_USERS, {
-		variables: { role: 'coach' },
+		variables: { role: RoleType.Coach },
 		errorPolicy: 'none',
 	});
 
-	const { data: analyticsData, loading: analyticsLoading, error: analyticsError } = useQuery(GET_REVENUE_SUMMARY, {
+	const { data: analyticsData } = useQuery(GET_REVENUE_SUMMARY, {
 		errorPolicy: 'all',
 		fetchPolicy: 'network-only',
 	});
@@ -65,12 +66,12 @@ export function DashboardPage() {
 
 	// Real-time subscriptions
 	const { data: membersSubscriptionData } = useSubscription(USERS_UPDATED, {
-		variables: { role: 'member' },
+		variables: { role: RoleType.Member },
 		skip: !membersData, // Skip if initial data not loaded
 	});
 
 	const { data: coachesSubscriptionData } = useSubscription(USERS_UPDATED, {
-		variables: { role: 'coach' },
+		variables: { role: RoleType.Coach },
 		skip: !coachesData, // Skip if initial data not loaded
 	});
 
@@ -100,12 +101,12 @@ export function DashboardPage() {
 	const { data: attendanceSubscriptionData, error: attendanceSubError, loading: attendanceSubLoading } = useSubscription(ATTENDANCE_RECORD_ADDED, {
 		skip: false, // Always subscribe
 		shouldResubscribe: true, // Re-subscribe if connection is lost
-		onData: ({ data: subData, error: subError }) => {
+		onData: ({ data: subData, error: subError }: { data?: unknown; error?: Error }) => {
 			console.log('[Dashboard Attendance Subscription] 📨 onData called:', { 
 				subData, 
 				subError,
 				hasData: !!subData,
-				dataKeys: subData ? Object.keys(subData) : [],
+				dataKeys: subData ? Object.keys(subData as object) : [],
 				fullData: JSON.stringify(subData, null, 2),
 			});
 			setSubscriptionStatus('Data received');
@@ -118,13 +119,14 @@ export function DashboardPage() {
 			let newRecord = null;
 			
 			// Path 1: Standard GraphQL subscription response
-			if (subData?.data?.attendanceRecordAdded) {
-				newRecord = subData.data.attendanceRecordAdded;
+			const subDataObj = subData as { data?: { attendanceRecordAdded?: unknown }; attendanceRecordAdded?: unknown };
+			if (subDataObj?.data?.attendanceRecordAdded) {
+				newRecord = subDataObj.data.attendanceRecordAdded;
 				console.log('[Dashboard Attendance Subscription] ✅ Found record in subData.data.attendanceRecordAdded');
 			}
 			// Path 2: Direct property
-			else if (subData?.attendanceRecordAdded) {
-				newRecord = subData.attendanceRecordAdded;
+			else if (subDataObj?.attendanceRecordAdded) {
+				newRecord = subDataObj.attendanceRecordAdded;
 				console.log('[Dashboard Attendance Subscription] ✅ Found record in subData.attendanceRecordAdded');
 			}
 			// Path 3: Check if subData itself is the record
@@ -172,9 +174,6 @@ export function DashboardPage() {
 			console.log('[Dashboard Attendance Subscription] Subscription completed');
 			setSubscriptionStatus('Completed');
 		},
-		onComplete: () => {
-			console.log('[Dashboard Attendance Subscription] Subscription completed');
-		},
 	});
 
 	// Log subscription status
@@ -221,14 +220,15 @@ export function DashboardPage() {
 	// Also subscribe to batch updates
 	const { data: batchSubscriptionData, error: batchSubError } = useSubscription(ATTENDANCE_UPDATED, {
 		skip: false,
-		onData: ({ data: subData, error: subError }) => {
+		onData: ({ data: subData, error: subError }: { data?: { data?: { attendanceUpdated?: AttendanceRecord[] } }; error?: Error }) => {
 			console.log('[Dashboard Attendance Batch Subscription] 📨 onData called:', { subData, subError });
 			if (subError) {
 				console.error('[Dashboard Attendance Batch Subscription] ❌ Error in onData:', subError);
 				return;
 			}
-			if (subData?.data?.attendanceUpdated && subData.data.attendanceUpdated.length > 0) {
-				const newRecords = subData.data.attendanceUpdated;
+			const batchData = subData?.data?.attendanceUpdated;
+			if (batchData && batchData.length > 0) {
+				const newRecords = batchData;
 				console.log('[Dashboard Attendance Batch Subscription] ✅ New records received:', newRecords.length);
 				setRecentAttendance((prevRecords) => {
 					// Merge new records, avoiding duplicates
@@ -236,7 +236,7 @@ export function DashboardPage() {
 						prevRecords.map((r) => `${r.id}-${r.authDateTime}`)
 					);
 					const uniqueNewRecords = newRecords.filter(
-						(r) => !existingIds.has(`${r.id}-${r.authDateTime}`)
+						(r: AttendanceRecord) => !existingIds.has(`${r.id}-${r.authDateTime}`)
 					);
 					if (uniqueNewRecords.length > 0) {
 						console.log('[Dashboard Attendance Batch Subscription] ✅ Adding', uniqueNewRecords.length, 'new records');
@@ -308,7 +308,7 @@ export function DashboardPage() {
 					</div>
 					<h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Load Dashboard</h2>
 					<p className="text-[var(--text-secondary)] mb-4">
-						{error?.message || 'Failed to connect to the server'}
+						{(error as Error | null)?.message || 'Failed to connect to the server'}
 					</p>
 					<button 
 						onClick={() => window.location.reload()} 
@@ -795,12 +795,12 @@ function RevenueChart({ data }: { data: Array<{ period: string; revenue: number;
 				padding: 12,
 				titleFont: {
 					size: 14,
-					weight: '600' as const,
+					weight: 600,
 					family: "'Poppins', sans-serif",
 				},
 				bodyFont: {
 					size: 13,
-					weight: '500' as const,
+					weight: 500,
 					family: "'Inter', sans-serif",
 				},
 				callbacks: {

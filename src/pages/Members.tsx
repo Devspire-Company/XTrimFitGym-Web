@@ -20,6 +20,7 @@ import {
 	RotateCw,
 } from 'lucide-react';
 import { GET_USERS, GET_USER, DELETE_USER, CANCEL_MEMBERSHIP, DIRECT_SUBSCRIBE_MEMBER, USERS_UPDATED } from '@/graphql/operations/index';
+import { RoleType } from '@/graphql/generated/graphql';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
@@ -108,13 +109,13 @@ export function MembersPage() {
 
 	// Initial data fetch with query
 	const { data, loading, error } = useQuery(GET_USERS, {
-		variables: { role: 'member' as any },
+		variables: { role: RoleType.Member },
 		errorPolicy: 'none',
 	});
 
 	// Real-time subscription for member updates
 	const { data: subscriptionData } = useSubscription(USERS_UPDATED, {
-		variables: { role: 'member' },
+		variables: { role: RoleType.Member },
 		skip: !data, // Skip if initial data not loaded
 	});
 
@@ -295,7 +296,7 @@ export function MembersPage() {
 			}
 		};
 		
-		const daysUntilExpiration = getDaysUntilExpiration(expiresAt);
+		void getDaysUntilExpiration(expiresAt);
 
 		// Extract membership ID - try multiple sources
 		let membershipId: string | undefined;

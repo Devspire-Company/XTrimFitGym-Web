@@ -221,6 +221,7 @@ function AccountSection({
 					...updatedUser,
 					middleName: updatedUser.middleName ?? undefined,
 					phoneNumber: updatedUser.phoneNumber ?? undefined,
+					dateOfBirth: updatedUser.dateOfBirth ?? undefined,
 				}));
 				dispatch(addToast({ type: 'success', message: 'Account information updated successfully!' }));
 				onSave();

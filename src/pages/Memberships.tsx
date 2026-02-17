@@ -14,6 +14,7 @@ import {
 	MEMBERSHIPS_UPDATED,
 } from '@/graphql/operations/index';
 import type { Membership } from '@/graphql/generated/types';
+import { MembershipStatus, DurationType } from '@/graphql/generated/graphql';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 
@@ -105,21 +106,21 @@ export function MembershipsPage() {
 
 	const handleFormSubmit = (formData: MembershipFormData) => {
 		// Map status from form format to API format
-		const statusMap: Record<string, 'ACTIVE' | 'INACTIVE' | 'COMING_SOON'> = {
-			'Active': 'ACTIVE',
-			'Inactive': 'INACTIVE',
-			'Coming Soon': 'COMING_SOON',
+		const statusMap: Record<string, MembershipStatus> = {
+			'Active': MembershipStatus.Active,
+			'Inactive': MembershipStatus.Inactive,
+			'Coming Soon': MembershipStatus.ComingSoon,
 		};
 
 		// Map durationType from form format to API format
-		const durationMap: Record<string, 'MONTHLY' | 'QUARTERLY' | 'YEARLY'> = {
-			'Monthly': 'MONTHLY',
-			'Quarterly': 'QUARTERLY',
-			'Yearly': 'YEARLY',
+		const durationMap: Record<string, DurationType> = {
+			'Monthly': DurationType.Monthly,
+			'Quarterly': DurationType.Quarterly,
+			'Yearly': DurationType.Yearly,
 		};
 
-		const status = statusMap[formData.status] || 'ACTIVE';
-		const durationType = durationMap[formData.durationType] || 'MONTHLY';
+		const status = statusMap[formData.status] ?? MembershipStatus.Active;
+		const durationType = durationMap[formData.durationType] ?? DurationType.Monthly;
 
 		if (isEditMode && selectedPlan) {
 			// Update existing plan

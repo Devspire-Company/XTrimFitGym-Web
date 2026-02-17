@@ -30,6 +30,7 @@ import {
 	REVENUE_SUMMARY_UPDATED,
 	USERS_UPDATED,
 } from '@/graphql/operations/index';
+import { RoleType } from '@/graphql/generated/graphql';
 
 ChartJS.register(
 	CategoryScale,
@@ -56,18 +57,18 @@ export function ReportsPage() {
 
 	// Initial data fetch with queries
 	const { data: membersData, loading: membersLoading } = useQuery(GET_USERS, {
-		variables: { role: 'member' },
+		variables: { role: RoleType.Member },
 		errorPolicy: 'none',
 	});
 
 	const { data: coachesData, loading: coachesLoading } = useQuery(GET_USERS, {
-		variables: { role: 'coach' },
+		variables: { role: RoleType.Coach },
 		errorPolicy: 'none',
 	});
 
 	// Fetch admins for export
 	const { data: adminsData } = useQuery(GET_USERS, {
-		variables: { role: 'admin' },
+		variables: { role: RoleType.Admin },
 		errorPolicy: 'none',
 		skip: userExportType !== 'all' && userExportType !== 'admin', // Only fetch if needed
 	});
@@ -83,12 +84,12 @@ export function ReportsPage() {
 
 	// Real-time subscriptions
 	const { data: membersSubscriptionData } = useSubscription(USERS_UPDATED, {
-		variables: { role: 'member' },
+		variables: { role: RoleType.Member },
 		skip: !membersData,
 	});
 
 	const { data: coachesSubscriptionData } = useSubscription(USERS_UPDATED, {
-		variables: { role: 'coach' },
+		variables: { role: RoleType.Coach },
 		skip: !coachesData,
 	});
 

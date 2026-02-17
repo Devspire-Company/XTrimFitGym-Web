@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useSubscription } from '@apollo/client';
 import {
 	Search,
@@ -28,7 +28,7 @@ export function AttendancePage() {
 	const [dateFilter, setDateFilter] = useState<string>('');
 	const [currentPage, setCurrentPage] = useState(1);
 	const [subscriptionConnected, setSubscriptionConnected] = useState(false);
-	const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
+	const [, setLastUpdateTime] = useState<Date | null>(null);
 	const recordsPerPage = 50;
 
 	// Build filter object (date filter sent to API for efficiency, but also applied client-side for accuracy)
@@ -71,7 +71,7 @@ export function AttendancePage() {
 		ATTENDANCE_RECORD_ADDED,
 		{
 			skip: false, // Always subscribe, don't wait for initial data
-			onData: ({ data: subData, error: subError }) => {
+			onData: ({ data: subData, error: subError }: { data?: unknown; error?: Error }) => {
 				console.log('[Attendance Subscription] 📨 onData called:', { subData, subError });
 				if (subError) {
 					console.error('[Attendance Subscription] ❌ Error in onData:', subError);
@@ -81,7 +81,8 @@ export function AttendancePage() {
 				// Only set connected if we successfully received data
 				setSubscriptionConnected(true);
 				// Check multiple possible data structures
-				const newRecord = subData?.data?.attendanceRecordAdded || subData?.attendanceRecordAdded;
+				const raw = (subData as { data?: { attendanceRecordAdded?: AttendanceRecord }; attendanceRecordAdded?: AttendanceRecord })?.data?.attendanceRecordAdded ?? (subData as { attendanceRecordAdded?: AttendanceRecord })?.attendanceRecordAdded;
+				const newRecord = raw as AttendanceRecord | undefined;
 				if (newRecord) {
 					console.log('[Attendance Subscription] ✅ New record received:', newRecord);
 					setLastUpdateTime(new Date());
@@ -128,7 +129,7 @@ export function AttendancePage() {
 	// Also subscribe to batch updates
 	const { data: batchSubscriptionData, error: batchError } = useSubscription(ATTENDANCE_UPDATED, {
 		skip: false, // Always subscribe
-		onData: ({ data: subData, error: subError }) => {
+		onData: ({ data: subData, error: subError }: { data?: { data?: { attendanceUpdated?: AttendanceRecord[] } }; error?: Error }) => {
 			if (subError) {
 				console.error('[Attendance Batch Subscription] Error:', subError);
 				setSubscriptionConnected(false);
@@ -136,8 +137,9 @@ export function AttendancePage() {
 			}
 			// Only set connected if we successfully received data
 			setSubscriptionConnected(true);
-			if (subData?.data?.attendanceUpdated && subData.data.attendanceUpdated.length > 0) {
-				const newRecords = subData.data.attendanceUpdated;
+			const batchData = subData?.data?.attendanceUpdated;
+			if (batchData && batchData.length > 0) {
+				const newRecords = batchData;
 				console.log('[Attendance Batch Subscription] ✅ New records received:', newRecords.length);
 				setLastUpdateTime(new Date());
 				setRecords((prevRecords) => {
@@ -146,7 +148,7 @@ export function AttendancePage() {
 						prevRecords.map((r) => `${r.id}-${r.authDateTime}`)
 					);
 					const uniqueNewRecords = newRecords.filter(
-						(r) => !existingIds.has(`${r.id}-${r.authDateTime}`)
+						(r: AttendanceRecord) => !existingIds.has(`${r.id}-${r.authDateTime}`)
 					);
 					if (uniqueNewRecords.length > 0) {
 						console.log(
@@ -188,7 +190,6 @@ export function AttendancePage() {
 		});
 	}, [subscriptionData, batchSubscriptionData, subscriptionError, batchError, subscriptionLoading, subscriptionConnected]);
 
-	const hasMore = data?.getAttendanceRecords?.hasMore || false;
 
 	// Format date for display (Philippine format)
 	const formatDateTime = (dateTime: string) => {

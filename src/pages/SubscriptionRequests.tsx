@@ -10,7 +10,7 @@ import {
 	REJECT_SUBSCRIPTION_REQUEST,
 	DELETE_SUBSCRIPTION_REQUEST,
 } from '@/graphql/operations/index';
-import type { SubscriptionRequest } from '@/graphql/generated/types';
+import type { GetAllSubscriptionRequestsQuery } from '@/graphql/generated/types';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 
@@ -20,7 +20,8 @@ export function SubscriptionRequestsPage() {
 	}, []);
 
 	const dispatch = useAppDispatch();
-	const [selectedRequest, setSelectedRequest] = useState<SubscriptionRequest | null>(null);
+	type SubscriptionRequestItem = GetAllSubscriptionRequestsQuery['getAllSubscriptionRequests'][number];
+	const [selectedRequest, setSelectedRequest] = useState<SubscriptionRequestItem | null>(null);
 	const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -74,7 +75,7 @@ export function SubscriptionRequestsPage() {
 		},
 	});
 
-	const handleApprove = (request: SubscriptionRequest) => {
+	const handleApprove = (request: SubscriptionRequestItem) => {
 		approveRequest({
 			variables: {
 				input: {
@@ -84,7 +85,7 @@ export function SubscriptionRequestsPage() {
 		});
 	};
 
-	const handleReject = (request: SubscriptionRequest) => {
+	const handleReject = (request: SubscriptionRequestItem) => {
 		setSelectedRequest(request);
 		setIsRejectModalOpen(true);
 	};
@@ -101,7 +102,7 @@ export function SubscriptionRequestsPage() {
 		}
 	};
 
-	const handleDelete = (request: SubscriptionRequest) => {
+	const handleDelete = (request: SubscriptionRequestItem) => {
 		setSelectedRequest(request);
 		setIsDeleteModalOpen(true);
 	};
@@ -117,7 +118,7 @@ export function SubscriptionRequestsPage() {
 	};
 
 	// Process data - must be before conditional returns to follow Rules of Hooks
-	const requests: SubscriptionRequest[] = data?.getAllSubscriptionRequests || [];
+	const requests: SubscriptionRequestItem[] = data?.getAllSubscriptionRequests || [];
 
 	// Filter requests based on search term and status
 	const filteredRequests = useMemo(() => {

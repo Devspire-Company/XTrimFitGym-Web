@@ -168,7 +168,7 @@ export function MembershipFormModal({
 								<textarea
 									id="description"
 									name="description"
-									defaultValue={membership?.description}
+									defaultValue={membership?.description ?? ''}
 									required
 									rows={3}
 									placeholder="Brief description of the membership plan"

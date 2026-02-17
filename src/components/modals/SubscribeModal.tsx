@@ -1,5 +1,6 @@
-import { X, Check, Calendar, CreditCard } from 'lucide-react';
+import { Check, Calendar, CreditCard } from 'lucide-react';
 import type { Membership } from '@/graphql/generated/types';
+import { DurationType } from '@/graphql/generated/graphql';
 
 interface SubscribeModalProps {
 	isOpen: boolean;
@@ -22,8 +23,8 @@ export function SubscribeModal({
 		const today = new Date();
 		let months = 1;
 		
-		if (membership.durationType === 'Quarterly') months = 3;
-		else if (membership.durationType === 'Yearly') months = 12;
+		if (membership.durationType === DurationType.Quarterly) months = 3;
+		else if (membership.durationType === DurationType.Yearly) months = 12;
 
 		const endDate = new Date(today.setMonth(today.getMonth() + months));
 		return endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });

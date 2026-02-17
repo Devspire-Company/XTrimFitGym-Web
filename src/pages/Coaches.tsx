@@ -19,7 +19,7 @@ import {
 	Clock,
 	MapPin,
 } from 'lucide-react';
-import { GET_USERS, GET_USER, GET_COACH_SESSIONS, GET_COACH_SESSION_LOGS, DELETE_USER, CREATE_USER, UPDATE_USER, USERS_UPDATED } from '@/graphql/operations/index';
+import { GET_USERS, GET_COACH_SESSIONS, GET_COACH_SESSION_LOGS, DELETE_USER, CREATE_USER, UPDATE_USER, USERS_UPDATED } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import type { CreateUserMutation, CreateUserMutationVariables } from '@/graphql/generated/types';
@@ -73,7 +73,7 @@ export function CoachesPage() {
 
 	// Real-time subscription for coach updates
 	const { data: subscriptionData } = useSubscription(USERS_UPDATED, {
-		variables: { role: 'coach' },
+		variables: { role: RoleType.Coach },
 		skip: !data, // Skip if initial data not loaded
 	});
 
@@ -673,36 +673,6 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 		variables: { coachId: coach.id },
 		skip: !coach.id,
 	});
-
-	// Get unique client IDs from sessions and session logs
-	const clientIds = useMemo(() => {
-		const ids = new Set<string>();
-		if (sessionsData?.getCoachSessions) {
-			sessionsData.getCoachSessions.forEach((session: any) => {
-				if (session.clientsIds) {
-					session.clientsIds.forEach((id: string) => ids.add(id));
-				}
-				// Also get clients from populated clients array
-				if (session.clients) {
-					session.clients.forEach((client: any) => {
-						if (client?.id) ids.add(client.id);
-					});
-				}
-			});
-		}
-		if (sessionLogsData?.getCoachSessionLogs) {
-			sessionLogsData.getCoachSessionLogs.forEach((log: any) => {
-				if (log.clientId) {
-					ids.add(log.clientId);
-				}
-				// Also get client from populated client object
-				if (log.client?.id) {
-					ids.add(log.client.id);
-				}
-			});
-		}
-		return Array.from(ids);
-	}, [sessionsData, sessionLogsData]);
 
 	// Extract clients from sessions and session logs (they're already populated)
 	const clients = useMemo(() => {

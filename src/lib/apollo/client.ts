@@ -7,7 +7,7 @@ import { createClient } from 'graphql-ws';
 
 const getGraphQLUrl = () => {
 	// Backend server runs on port 8000 by default (see XTrimFitGym-Api/src/server.ts)
-	const url = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8000/graphql';
+	const url = import.meta.env.VITE_GRAPHQL_URL;
 	// Only log in development mode
 	if (import.meta.env.DEV) {
 		console.log(`[Apollo Client] Connecting to GraphQL endpoint: ${url}`);
@@ -115,7 +115,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
 
 		// Only log real network errors for non-analytics queries
 		if (isRealNetworkError) {
-			const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8000/graphql';
+			const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL;
 			console.error(`[Network error]: ${networkError}`);
 			console.error(`Failed to connect to GraphQL endpoint: ${graphqlUrl}`);
 			console.error('Possible causes:');
