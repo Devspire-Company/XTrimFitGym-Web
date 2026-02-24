@@ -66,7 +66,7 @@ export function AttendancePage() {
 	const [pollIntervalMs, setPollIntervalMs] = useState(5000);
 	useEffect(() => {
 		const handleVisibility = () => {
-			setPollIntervalMs((prev) => (document.hidden ? 0 : 5000));
+			setPollIntervalMs(() => (document.hidden ? 0 : 5000));
 		};
 		handleVisibility();
 		document.addEventListener('visibilitychange', handleVisibility);
@@ -123,7 +123,7 @@ export function AttendancePage() {
 	}, [data, dateFilter]);
 
 	// Real-time subscription for new records
-	const { data: subscriptionData, error: subscriptionError, loading: subscriptionLoading } = useSubscription(
+	const { error: subscriptionError, loading: subscriptionLoading } = useSubscription(
 		ATTENDANCE_RECORD_ADDED,
 		{
 			skip: false, // Always subscribe, don't wait for initial data
@@ -157,7 +157,7 @@ export function AttendancePage() {
 	);
 
 	// Also subscribe to batch updates
-	const { data: batchSubscriptionData, error: batchError } = useSubscription(ATTENDANCE_UPDATED, {
+	const { error: batchError } = useSubscription(ATTENDANCE_UPDATED, {
 		skip: false, // Always subscribe
 		onData: ({ data: subData, error: subError }: { data?: { data?: { attendanceUpdated?: AttendanceRecord[] } }; error?: Error }) => {
 			if (subError) {
