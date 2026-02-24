@@ -31,9 +31,9 @@ export function AttendancePage() {
 	const [, setLastUpdateTime] = useState<Date | null>(null);
 	const recordsPerPage = 50;
 
-	// Build filter object (date filter sent to API for efficiency, but also applied client-side for accuracy)
+	// Build filter object (date filter sent to API; API filters by authDateTime for correct results)
 	const filter = useMemo(() => {
-		const f: any = {};
+		const f: Record<string, string> = {};
 		if (dateFilter) {
 			f.startDate = dateFilter;
 			f.endDate = dateFilter;
@@ -41,7 +41,49 @@ export function AttendancePage() {
 		return Object.keys(f).length > 0 ? f : undefined;
 	}, [dateFilter]);
 
-	// Initial data fetch
+	// Reset to page 1 when date filter changes so we don't request offset 50 for a single day
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [dateFilter]);
+
+	// Today's date (Asia/Manila) for the "Today's Records" stat - never affected by date filter; updates past midnight
+	const [todayStr, setTodayStr] = useState(() =>
+		new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+	);
+	useEffect(() => {
+		const interval = setInterval(() => {
+			const next = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+			setTodayStr((prev) => (next !== prev ? next : prev));
+		}, 60_000);
+		return () => clearInterval(interval);
+	}, []);
+	const todayFilter = useMemo(
+		() => ({ startDate: todayStr, endDate: todayStr }),
+		[todayStr]
+	);
+
+	// Poll only when tab is visible so we don't refetch in background
+	const [pollIntervalMs, setPollIntervalMs] = useState(5000);
+	useEffect(() => {
+		const handleVisibility = () => {
+			setPollIntervalMs((prev) => (document.hidden ? 0 : 5000));
+		};
+		handleVisibility();
+		document.addEventListener('visibilitychange', handleVisibility);
+		return () => document.removeEventListener('visibilitychange', handleVisibility);
+	}, []);
+
+	// Always fetch today's count for the stat; independent of the list date filter
+	const { data: dataToday } = useQuery(GET_ATTENDANCE_RECORDS, {
+		variables: {
+			filter: todayFilter,
+			pagination: { limit: 1, offset: 0 },
+		},
+		fetchPolicy: 'cache-and-network',
+		pollInterval: pollIntervalMs,
+	});
+
+	// Initial data fetch; poll so list updates automatically without pressing Refresh
 	const { data, loading, error, refetch } = useQuery(GET_ATTENDANCE_RECORDS, {
 		variables: {
 			filter,
@@ -52,19 +94,33 @@ export function AttendancePage() {
 		},
 		errorPolicy: 'all',
 		fetchPolicy: 'cache-and-network',
+		pollInterval: pollIntervalMs, // 5s when visible, 0 when tab hidden
 	});
 
 	// State to hold records with real-time updates
 	const [records, setRecords] = useState<AttendanceRecord[]>([]);
 	const [totalCount, setTotalCount] = useState(0);
 
-	// Update records when query data changes
+	// Update records when query data arrives. With date filter: use query result only. Without: merge so subscription updates aren't lost.
 	useEffect(() => {
-		if (data?.getAttendanceRecords) {
-			setRecords(data.getAttendanceRecords.records);
-			setTotalCount(data.getAttendanceRecords.totalCount);
+		if (!data?.getAttendanceRecords) return;
+		const fromQuery = data.getAttendanceRecords.records;
+		const queryTotal = data.getAttendanceRecords.totalCount;
+		if (dateFilter) {
+			// Date filter is active: show only what the API returned for that date (no merge)
+			setRecords(fromQuery);
+		} else {
+			setRecords((prev) => {
+				const byKey = new Set(fromQuery.map((r) => `${r.id}-${r.authDateTime}`));
+				const fromSubscription = prev.filter((r) => !byKey.has(`${r.id}-${r.authDateTime}`));
+				const merged = [...fromQuery, ...fromSubscription].sort(
+					(a, b) => new Date(b.authDateTime).getTime() - new Date(a.authDateTime).getTime()
+				);
+				return merged;
+			});
 		}
-	}, [data]);
+		setTotalCount(queryTotal);
+	}, [data, dateFilter]);
 
 	// Real-time subscription for new records
 	const { data: subscriptionData, error: subscriptionError, loading: subscriptionLoading } = useSubscription(
@@ -72,78 +128,48 @@ export function AttendancePage() {
 		{
 			skip: false, // Always subscribe, don't wait for initial data
 			onData: ({ data: subData, error: subError }: { data?: unknown; error?: Error }) => {
-				console.log('[Attendance Subscription] 📨 onData called:', { subData, subError });
 				if (subError) {
-					console.error('[Attendance Subscription] ❌ Error in onData:', subError);
 					setSubscriptionConnected(false);
 					return;
 				}
-				// Only set connected if we successfully received data
 				setSubscriptionConnected(true);
-				// Check multiple possible data structures
 				const raw = (subData as { data?: { attendanceRecordAdded?: AttendanceRecord }; attendanceRecordAdded?: AttendanceRecord })?.data?.attendanceRecordAdded ?? (subData as { attendanceRecordAdded?: AttendanceRecord })?.attendanceRecordAdded;
 				const newRecord = raw as AttendanceRecord | undefined;
 				if (newRecord) {
-					console.log('[Attendance Subscription] ✅ New record received:', newRecord);
 					setLastUpdateTime(new Date());
-					// Add new record to the beginning of the list (most recent first)
 					setRecords((prevRecords) => {
-						// Check if record already exists to avoid duplicates
 						const exists = prevRecords.some(
 							(r) => r.id === newRecord.id && r.authDateTime === newRecord.authDateTime
 						);
-						if (exists) {
-							console.log('[Attendance Subscription] ⚠️ Record already exists, skipping');
-							return prevRecords;
-						}
-						console.log('[Attendance Subscription] ✅ Adding new record to list');
-						// Add new record at the beginning and update total count
+						if (exists) return prevRecords;
 						setTotalCount((prev) => prev + 1);
 						return [newRecord, ...prevRecords];
 					});
-				} else {
-					console.warn('[Attendance Subscription] ⚠️ No record found in data:', subData);
 				}
 			},
-			onError: (error) => {
-				console.error('[Attendance Subscription] ❌ Subscription error:', error);
+			onError: () => {
 				setSubscriptionConnected(false);
 			},
 			onComplete: () => {
-				console.log('[Attendance Subscription] Subscription completed');
 				setSubscriptionConnected(false);
 			},
 		}
 	);
-
-	// Log subscription status
-	useEffect(() => {
-		console.log('[Attendance Subscription] Status:', {
-			loading: subscriptionLoading,
-			hasData: !!subscriptionData,
-			error: subscriptionError,
-			data: subscriptionData,
-		});
-	}, [subscriptionLoading, subscriptionData, subscriptionError]);
 
 	// Also subscribe to batch updates
 	const { data: batchSubscriptionData, error: batchError } = useSubscription(ATTENDANCE_UPDATED, {
 		skip: false, // Always subscribe
 		onData: ({ data: subData, error: subError }: { data?: { data?: { attendanceUpdated?: AttendanceRecord[] } }; error?: Error }) => {
 			if (subError) {
-				console.error('[Attendance Batch Subscription] Error:', subError);
 				setSubscriptionConnected(false);
 				return;
 			}
-			// Only set connected if we successfully received data
 			setSubscriptionConnected(true);
 			const batchData = subData?.data?.attendanceUpdated;
 			if (batchData && batchData.length > 0) {
 				const newRecords = batchData;
-				console.log('[Attendance Batch Subscription] ✅ New records received:', newRecords.length);
 				setLastUpdateTime(new Date());
 				setRecords((prevRecords) => {
-					// Merge new records, avoiding duplicates
 					const existingIds = new Set(
 						prevRecords.map((r) => `${r.id}-${r.authDateTime}`)
 					);
@@ -151,11 +177,6 @@ export function AttendancePage() {
 						(r: AttendanceRecord) => !existingIds.has(`${r.id}-${r.authDateTime}`)
 					);
 					if (uniqueNewRecords.length > 0) {
-						console.log(
-							'[Attendance Batch Subscription] ✅ Adding',
-							uniqueNewRecords.length,
-							'new records'
-						);
 						setTotalCount((prev) => prev + uniqueNewRecords.length);
 						return [...uniqueNewRecords, ...prevRecords];
 					}
@@ -163,8 +184,7 @@ export function AttendancePage() {
 				});
 			}
 		},
-		onError: (error) => {
-			console.error('[Attendance Batch Subscription] ❌ Subscription error:', error);
+		onError: () => {
 			setSubscriptionConnected(false);
 		},
 	});
@@ -177,19 +197,6 @@ export function AttendancePage() {
 			setSubscriptionConnected(isConnected);
 		}
 	}, [subscriptionLoading, subscriptionError, batchError, subscriptionConnected]);
-
-	// Debug subscription status
-	useEffect(() => {
-		console.log('[Attendance] Subscription status:', {
-			hasSubscriptionData: !!subscriptionData,
-			hasBatchData: !!batchSubscriptionData,
-			subscriptionError,
-			batchError,
-			subscriptionLoading,
-			subscriptionConnected,
-		});
-	}, [subscriptionData, batchSubscriptionData, subscriptionError, batchError, subscriptionLoading, subscriptionConnected]);
-
 
 	// Format date for display (Philippine format)
 	const formatDateTime = (dateTime: string) => {
@@ -233,48 +240,18 @@ export function AttendancePage() {
 		}
 	};
 
-	// Process records to alternate IN/OUT based on person's attendance order
-	const processedRecords = useMemo(() => {
-		// Group records by person name
-		const recordsByPerson = new Map<string, AttendanceRecord[]>();
-		records.forEach((record) => {
-			const personName = record.personName || 'Unknown';
-			if (!recordsByPerson.has(personName)) {
-				recordsByPerson.set(personName, []);
-			}
-			recordsByPerson.get(personName)!.push(record);
-		});
-
-		// Process each person's records
-		const processed: AttendanceRecord[] = [];
-		recordsByPerson.forEach((personRecords) => {
-			// Sort by authDateTime (oldest first) to ensure chronological order
-			const sorted = [...personRecords].sort((a, b) => {
-				const dateA = new Date(a.authDateTime).getTime();
-				const dateB = new Date(b.authDateTime).getTime();
-				return dateA - dateB;
-			});
-
-			// Assign IN/OUT alternately: 1st = IN, 2nd = OUT, 3rd = IN, etc.
-			sorted.forEach((record, index) => {
-				processed.push({
-					...record,
-					direction: index % 2 === 0 ? 'IN' : 'OUT',
-				});
-			});
-		});
-
-		// Sort all processed records by date (newest first) for display
-		return processed.sort((a, b) => {
+	// Display records exactly as fetched from the database (no client-side direction manipulation)
+	const sortedRecords = useMemo(() => {
+		return [...records].sort((a, b) => {
 			const dateA = new Date(a.authDateTime).getTime();
 			const dateB = new Date(b.authDateTime).getTime();
 			return dateB - dateA;
 		});
 	}, [records]);
 
-	// Filter processed records by search term, direction, and date
+	// Filter records by search term and direction only; date filtering is done by the API (authDateTime)
 	const filteredRecords = useMemo(() => {
-		let filtered = processedRecords;
+		let filtered = sortedRecords;
 
 		// Apply search filter
 		if (searchTerm) {
@@ -288,29 +265,11 @@ export function AttendancePage() {
 			filtered = filtered.filter((record) => record.direction === directionFilter);
 		}
 
-		// Apply date filter (client-side for accuracy)
-		if (dateFilter) {
-			filtered = filtered.filter((record) => {
-				if (!record.authDateTime) return false;
-				const recordDate = new Date(record.authDateTime).toISOString().split('T')[0];
-				return recordDate === dateFilter;
-			});
-		}
-
 		return filtered;
-	}, [processedRecords, searchTerm, directionFilter, dateFilter]);
+	}, [sortedRecords, searchTerm, directionFilter]);
 
-	// Calculate today's records count from processed records (using authDateTime for accuracy)
-	const todaysRecordsCount = useMemo(() => {
-		const today = new Date();
-		const todayStr = today.toISOString().split('T')[0];
-		return processedRecords.filter((r) => {
-			if (!r.authDateTime) return false;
-			// Use authDateTime for accurate date comparison
-			const recordDate = new Date(r.authDateTime).toISOString().split('T')[0];
-			return recordDate === todayStr;
-		}).length;
-	}, [processedRecords]);
+	// Today's records count: always current day from API, not affected by list date filter
+	const todaysRecordsCount = dataToday?.getAttendanceRecords?.totalCount ?? 0;
 
 	const totalPages = Math.ceil(totalCount / recordsPerPage);
 
@@ -502,15 +461,17 @@ export function AttendancePage() {
 												className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
 													record.direction === 'IN'
 														? 'bg-green-100 text-green-800'
-														: 'bg-red-100 text-red-800'
+														: record.direction === 'OUT'
+															? 'bg-red-100 text-red-800'
+															: 'bg-gray-100 text-gray-700'
 												}`}
 											>
 												{record.direction === 'IN' ? (
 													<LogIn className="w-3 h-3" />
-												) : (
+												) : record.direction === 'OUT' ? (
 													<LogOut className="w-3 h-3" />
-												)}
-												{record.direction}
+												) : null}
+												{record.direction || '—'}
 											</div>
 										</td>
 										<td className="px-6 py-4">

@@ -47,14 +47,23 @@ const getWebSocketUrl = (): string => {
 const wsLink = new GraphQLWsLink(
 	createClient({
 		url: getWebSocketUrl(),
+		// Connect as soon as the client is created so subscriptions on Attendance/Dashboard get data immediately
+		lazy: false,
+		// Keep the socket alive so proxies don't close it; reduces reconnects and missed messages
+		keepAlive: 15_000,
 		connectionParams: () => {
 			const token = localStorage.getItem('authToken');
 			return {
 				authorization: token ? `Bearer ${token}` : '',
 			};
 		},
-		retryAttempts: 5,
+		retryAttempts: 10,
 		shouldRetry: () => true,
+		retryWait: async (retries) => {
+			// Back off: 1s, 2s, 3s... cap at 5s so reconnects don't take too long
+			const delay = Math.min(1000 * (retries + 1), 5000);
+			await new Promise((r) => setTimeout(r, delay));
+		},
 		on: {
 			connected: () => {
 				console.log('✅ [WebSocket] Real-time connection established');
