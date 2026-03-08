@@ -1651,7 +1651,7 @@ function SummaryCard({
 	change,
 	changeType,
 }: {
-	icon: typeof DollarSign;
+	icon: typeof PhilippinePeso;
 	title: string;
 	value: string | number;
 	change: string;
