@@ -16,7 +16,7 @@ import {
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
 	BarChart3,
-	DollarSign,
+	PhilippinePeso,
 	Users,
 	TrendingUp,
 	Activity,
@@ -1383,7 +1383,7 @@ export function ReportsPage() {
 			{/* Summary Cards */}
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 				<SummaryCard
-					icon={DollarSign}
+					icon={PhilippinePeso}
 					title="Total Revenue"
 					value={`₱${totalRevenue.toLocaleString()}`}
 					change={`${activeSubscriptions > 0 ? '+' : ''}${activeSubscriptions} active`}
