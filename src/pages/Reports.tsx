@@ -67,7 +67,7 @@ export function ReportsPage() {
 	});
 
 	// Fetch admins for export
-	const { data: adminsData } = useQuery(GET_USERS, {
+	const { data: adminsData, loading: adminsLoading } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Admin },
 		errorPolicy: 'none',
 		skip: userExportType !== 'all' && userExportType !== 'admin', // Only fetch if needed
@@ -132,6 +132,11 @@ export function ReportsPage() {
 	// Only block on members and coaches loading - analytics can load in background
 	const loading = membersLoading || coachesLoading;
 	const error = analyticsError || analyticsRangeError || null;
+
+	const userExportLoading =
+		((userExportType === 'all' || userExportType === 'member') && membersLoading) ||
+		((userExportType === 'all' || userExportType === 'coach') && coachesLoading) ||
+		((userExportType === 'all' || userExportType === 'admin') && adminsLoading);
 
 	// Update analytics range data when revenue subscription updates
 	// Note: Analytics range query is still used for historical data, but we could trigger a refetch
@@ -1070,20 +1075,37 @@ export function ReportsPage() {
 
 	// User Export Function with Date Range Filtering
 	const exportUsersToCSV = () => {
-		// Collect all users based on filter
-		let allUsers: any[] = [];
+		const needMembers = userExportType === 'all' || userExportType === 'member';
+		const needCoaches = userExportType === 'all' || userExportType === 'coach';
+		const needAdmins = userExportType === 'all' || userExportType === 'admin';
 
-		if (userExportType === 'all' || userExportType === 'member') {
-			allUsers = [
-				...allUsers,
-				...(data?.members || []).map((u: any) => ({ ...u, role: 'member' })),
-			];
+		if (needMembers && membersLoading) {
+			alert('Please wait for user data to finish loading.');
+			return;
 		}
-		if (userExportType === 'all' || userExportType === 'coach') {
-			allUsers = [...allUsers, ...(data?.coaches || []).map((u: any) => ({ ...u, role: 'coach' }))];
+		if (needCoaches && coachesLoading) {
+			alert('Please wait for user data to finish loading.');
+			return;
 		}
-		if (userExportType === 'all' || userExportType === 'admin') {
-			allUsers = [...allUsers, ...(data?.admins || []).map((u: any) => ({ ...u, role: 'admin' }))];
+		if (needAdmins && adminsLoading) {
+			alert('Please wait for user data to finish loading.');
+			return;
+		}
+
+		// Collect all users based on filter from current query data (not stale cache)
+		const membersList = data?.members ?? [];
+		const coachesList = data?.coaches ?? [];
+		const adminsList = data?.admins ?? [];
+
+		let allUsers: any[] = [];
+		if (needMembers) {
+			allUsers = [...allUsers, ...membersList.map((u: any) => ({ ...u, role: 'member' }))];
+		}
+		if (needCoaches) {
+			allUsers = [...allUsers, ...coachesList.map((u: any) => ({ ...u, role: 'coach' }))];
+		}
+		if (needAdmins) {
+			allUsers = [...allUsers, ...adminsList.map((u: any) => ({ ...u, role: 'admin' }))];
 		}
 
 		// Filter by date range
@@ -1277,11 +1299,12 @@ export function ReportsPage() {
 					</button>
 					<button
 						onClick={exportUsersToCSV}
-						className="flex items-center gap-2 px-4 py-2 bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] rounded-lg text-[#3B82F6] font-medium hover:bg-[rgba(59,130,246,0.2)] transition-all"
-						title="Export users data to CSV"
+						disabled={userExportLoading}
+						className="flex items-center gap-2 px-4 py-2 bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] rounded-lg text-[#3B82F6] font-medium hover:bg-[rgba(59,130,246,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+						title={userExportLoading ? 'Loading user data...' : 'Export users data to CSV'}
 					>
 						<Download className="w-4 h-4" />
-						Export Users
+						{userExportLoading ? 'Loading...' : 'Export Users'}
 					</button>
 				</div>
 			</div>
