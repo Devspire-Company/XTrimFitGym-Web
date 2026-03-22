@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react';
-import { X, Upload } from 'lucide-react';
+import { X } from 'lucide-react';
 import { EquipmentStatus, type Equipment } from '@/graphql/generated/graphql';
 
 export interface EquipmentFormData {

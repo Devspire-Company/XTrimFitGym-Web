@@ -10,10 +10,14 @@ const config: CodegenConfig = {
 			presetConfig: {
 				gqlTagName: 'gql',
 			},
+			config: {
+				useTypeImports: true,
+			},
 		},
 		'./src/graphql/generated/types.ts': {
 			plugins: ['typescript', 'typescript-operations'],
 			config: {
+				useTypeImports: true,
 				scalars: {
 					DateTime: 'string',
 				},
