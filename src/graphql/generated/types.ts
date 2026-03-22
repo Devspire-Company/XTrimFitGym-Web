@@ -148,6 +148,15 @@ export type CreateCoachRequestInput = {
   message?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type CreateEquipmentInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  imageUrl: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  notes?: InputMaybe<Scalars['String']['input']>;
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
+  status?: InputMaybe<EquipmentStatus>;
+};
+
 export type CreateGoalInput = {
   currentWeight?: InputMaybe<Scalars['Float']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
@@ -218,6 +227,7 @@ export type CreateUserInput = {
   agreedToPrivacyPolicy?: InputMaybe<Scalars['Boolean']['input']>;
   agreedToTermsAndConditions?: InputMaybe<Scalars['Boolean']['input']>;
   coachDetails?: InputMaybe<CoachDetailsInput>;
+  currentPassword?: InputMaybe<Scalars['String']['input']>;
   dateOfBirth?: InputMaybe<Scalars['String']['input']>;
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
@@ -229,6 +239,22 @@ export type CreateUserInput = {
   password: Scalars['String']['input'];
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   role: RoleType;
+};
+
+export type CreateWalkInClientInput = {
+  email?: InputMaybe<Scalars['String']['input']>;
+  firstName: Scalars['String']['input'];
+  gender: WalkInGender;
+  lastName: Scalars['String']['input'];
+  middleName?: InputMaybe<Scalars['String']['input']>;
+  notes?: InputMaybe<Scalars['String']['input']>;
+  phoneNumber?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type CreateWalkInClientResult = {
+  __typename?: 'CreateWalkInClientResult';
+  client: WalkInClient;
+  log?: Maybe<WalkInAttendanceLog>;
 };
 
 export type DateRangeInput = {
@@ -245,6 +271,25 @@ export enum DurationType {
   Monthly = 'MONTHLY',
   Quarterly = 'QUARTERLY',
   Yearly = 'YEARLY'
+}
+
+export type Equipment = {
+  __typename?: 'Equipment';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  imageUrl: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  notes?: Maybe<Scalars['String']['output']>;
+  sortOrder: Scalars['Int']['output'];
+  status: EquipmentStatus;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export enum EquipmentStatus {
+  Available = 'AVAILABLE',
+  Damaged = 'DAMAGED',
+  Undermaintenance = 'UNDERMAINTENANCE'
 }
 
 export type Goal = {
@@ -272,17 +317,11 @@ export enum GoalStatus {
   Paused = 'paused'
 }
 
-export type LoginHistory = {
-  __typename?: 'LoginHistory';
-  createdAt?: Maybe<Scalars['String']['output']>;
-  device?: Maybe<Scalars['String']['output']>;
-  id: Scalars['ID']['output'];
+export type LoginHistoryEntry = {
+  __typename?: 'LoginHistoryEntry';
   ipAddress?: Maybe<Scalars['String']['output']>;
-  location?: Maybe<Scalars['String']['output']>;
-  loginAt: Scalars['String']['output'];
-  updatedAt?: Maybe<Scalars['String']['output']>;
+  loginAt?: Maybe<Scalars['String']['output']>;
   userAgent?: Maybe<Scalars['String']['output']>;
-  userId: Scalars['ID']['output'];
 };
 
 export type LoginInput = {
@@ -365,6 +404,7 @@ export type Mutation = {
   confirmSessionCompletion: SessionLog;
   createCoachRating: CoachRating;
   createCoachRequest: CoachRequest;
+  createEquipment: Equipment;
   createGoal: Goal;
   createMembership: Membership;
   createProgressRating: ProgressRating;
@@ -372,7 +412,9 @@ export type Mutation = {
   createSessionFromTemplate: Session;
   createSubscriptionRequest: SubscriptionRequest;
   createUser: AuthResponse;
+  createWalkInClient: CreateWalkInClientResult;
   deleteCoachRating: Scalars['Boolean']['output'];
+  deleteEquipment: Scalars['Boolean']['output'];
   deleteGoal: Scalars['Boolean']['output'];
   deleteMembership: Scalars['Boolean']['output'];
   deleteProgressRating: Scalars['Boolean']['output'];
@@ -385,11 +427,14 @@ export type Mutation = {
   removeClient: Scalars['Boolean']['output'];
   updateCoachRating: CoachRating;
   updateCoachRequest: CoachRequest;
+  updateEquipment: Equipment;
   updateGoal: Goal;
   updateMembership: Membership;
   updateProgressRating: ProgressRating;
   updateSession: Session;
   updateUser?: Maybe<User>;
+  updateWalkInClient: WalkInClient;
+  walkInTimeIn: WalkInAttendanceLog;
 };
 
 
@@ -443,6 +488,11 @@ export type MutationCreateCoachRequestArgs = {
 };
 
 
+export type MutationCreateEquipmentArgs = {
+  input: CreateEquipmentInput;
+};
+
+
 export type MutationCreateGoalArgs = {
   input: CreateGoalInput;
 };
@@ -478,7 +528,18 @@ export type MutationCreateUserArgs = {
 };
 
 
+export type MutationCreateWalkInClientArgs = {
+  input: CreateWalkInClientInput;
+  timeInNow: Scalars['Boolean']['input'];
+};
+
+
 export type MutationDeleteCoachRatingArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteEquipmentArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -546,6 +607,12 @@ export type MutationUpdateCoachRequestArgs = {
 };
 
 
+export type MutationUpdateEquipmentArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateEquipmentInput;
+};
+
+
 export type MutationUpdateGoalArgs = {
   id: Scalars['ID']['input'];
   input: UpdateGoalInput;
@@ -573,6 +640,18 @@ export type MutationUpdateSessionArgs = {
 export type MutationUpdateUserArgs = {
   id: Scalars['ID']['input'];
   input: UpdateUserInput;
+};
+
+
+export type MutationUpdateWalkInClientArgs = {
+  input: UpdateWalkInClientInput;
+  walkInClientId: Scalars['ID']['input'];
+};
+
+
+export type MutationWalkInTimeInArgs = {
+  at?: InputMaybe<Scalars['String']['input']>;
+  walkInClientId: Scalars['ID']['input'];
 };
 
 export type PeriodRevenue = {
@@ -646,10 +725,11 @@ export type Query = {
   getCoachSessionLogs: Array<SessionLog>;
   getCoachSessions: Array<Session>;
   getCurrentMembership?: Maybe<MembershipTransaction>;
+  getEquipment?: Maybe<Equipment>;
+  getEquipments: Array<Equipment>;
   getFitnessGoalTypes: Array<Scalars['String']['output']>;
   getGoal?: Maybe<Goal>;
   getGoals: Array<Goal>;
-  getLoginHistory: Array<LoginHistory>;
   getMembership?: Maybe<Membership>;
   getMembershipTransaction?: Maybe<MembershipTransaction>;
   getMemberships: Array<Membership>;
@@ -669,6 +749,15 @@ export type Query = {
   getUsers?: Maybe<Array<Maybe<User>>>;
   getWeightProgress: Array<SessionLog>;
   getWeightProgressChart: Array<WeightProgress>;
+  /** Search by name/phone/email, or pass an empty query to list all walk-ins (admin, paginated). */
+  searchWalkInClients: Array<WalkInClient>;
+  /** All walk-in profiles with per-profile time-in counts (paginated, newest updated first). */
+  walkInAccountsOverview: WalkInAccountsOverview;
+  walkInAttendanceLogs: WalkInLogsConnection;
+  /** All time-in logs for one walk-in client (newest first). */
+  walkInLogsByClient: WalkInLogsConnection;
+  /** System-wide walk-in profile and time-in counts (admin). */
+  walkInStats: WalkInStats;
 };
 
 
@@ -748,6 +837,11 @@ export type QueryGetCoachSessionsArgs = {
 };
 
 
+export type QueryGetEquipmentArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type QueryGetGoalArgs = {
   id: Scalars['ID']['input'];
 };
@@ -756,11 +850,6 @@ export type QueryGetGoalArgs = {
 export type QueryGetGoalsArgs = {
   clientId: Scalars['ID']['input'];
   status?: InputMaybe<GoalStatus>;
-};
-
-
-export type QueryGetLoginHistoryArgs = {
-  userId: Scalars['ID']['input'];
 };
 
 
@@ -842,6 +931,30 @@ export type QueryGetWeightProgressArgs = {
 export type QueryGetWeightProgressChartArgs = {
   clientId: Scalars['ID']['input'];
   goalId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type QuerySearchWalkInClientsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  query?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryWalkInAccountsOverviewArgs = {
+  pagination?: InputMaybe<WalkInPagination>;
+};
+
+
+export type QueryWalkInAttendanceLogsArgs = {
+  filter: WalkInLogsFilter;
+  pagination?: InputMaybe<WalkInPagination>;
+};
+
+
+export type QueryWalkInLogsByClientArgs = {
+  pagination?: InputMaybe<WalkInPagination>;
+  walkInClientId: Scalars['ID']['input'];
 };
 
 export type RejectSubscriptionRequestInput = {
@@ -967,6 +1080,15 @@ export type UpdateCoachRequestInput = {
   status: CoachRequestStatus;
 };
 
+export type UpdateEquipmentInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  notes?: InputMaybe<Scalars['String']['input']>;
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
+  status?: InputMaybe<EquipmentStatus>;
+};
+
 export type UpdateGoalInput = {
   currentWeight?: InputMaybe<Scalars['Float']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
@@ -1023,6 +1145,16 @@ export type UpdateUserInput = {
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateWalkInClientInput = {
+  email?: InputMaybe<Scalars['String']['input']>;
+  firstName: Scalars['String']['input'];
+  gender: WalkInGender;
+  lastName: Scalars['String']['input'];
+  middleName?: InputMaybe<Scalars['String']['input']>;
+  notes?: InputMaybe<Scalars['String']['input']>;
+  phoneNumber?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type User = {
   __typename?: 'User';
   agreedToLiabilityWaiver?: Maybe<Scalars['Boolean']['output']>;
@@ -1039,11 +1171,80 @@ export type User = {
   heardFrom?: Maybe<Array<Maybe<Scalars['String']['output']>>>;
   id: Scalars['ID']['output'];
   lastName: Scalars['String']['output'];
+  loginHistory?: Maybe<Array<Maybe<LoginHistoryEntry>>>;
   membershipDetails?: Maybe<MemberDetails>;
   middleName?: Maybe<Scalars['String']['output']>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   role: RoleType;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type WalkInAccountRow = {
+  __typename?: 'WalkInAccountRow';
+  client: WalkInClient;
+  /** Total number of time-in attendance records for this walk-in profile. */
+  timeInCount: Scalars['Int']['output'];
+};
+
+export type WalkInAccountsOverview = {
+  __typename?: 'WalkInAccountsOverview';
+  rows: Array<WalkInAccountRow>;
+  /** Total time-in log rows across all walk-ins. */
+  totalTimeInRecords: Scalars['Int']['output'];
+  /** Total walk-in profiles in the system. */
+  totalWalkInAccounts: Scalars['Int']['output'];
+};
+
+export type WalkInAttendanceLog = {
+  __typename?: 'WalkInAttendanceLog';
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  localDate: Scalars['String']['output'];
+  timedInAt: Scalars['String']['output'];
+  walkInClient: WalkInClient;
+};
+
+export type WalkInClient = {
+  __typename?: 'WalkInClient';
+  createdAt: Scalars['String']['output'];
+  email?: Maybe<Scalars['String']['output']>;
+  firstName: Scalars['String']['output'];
+  gender: WalkInGender;
+  id: Scalars['ID']['output'];
+  lastName: Scalars['String']['output'];
+  middleName?: Maybe<Scalars['String']['output']>;
+  notes?: Maybe<Scalars['String']['output']>;
+  phoneNumber?: Maybe<Scalars['String']['output']>;
+  updatedAt: Scalars['String']['output'];
+};
+
+export enum WalkInGender {
+  Female = 'FEMALE',
+  Male = 'MALE',
+  NonBinary = 'NON_BINARY',
+  PreferNotToSay = 'PREFER_NOT_TO_SAY'
+}
+
+export type WalkInLogsConnection = {
+  __typename?: 'WalkInLogsConnection';
+  logs: Array<WalkInAttendanceLog>;
+  totalCount: Scalars['Int']['output'];
+};
+
+export type WalkInLogsFilter = {
+  /** YYYY-MM-DD (Asia/Manila calendar date) */
+  date: Scalars['String']['input'];
+};
+
+export type WalkInPagination = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type WalkInStats = {
+  __typename?: 'WalkInStats';
+  totalTimeInRecords: Scalars['Int']['output'];
+  totalWalkInAccounts: Scalars['Int']['output'];
 };
 
 export type WeightProgress = {
@@ -1053,6 +1254,40 @@ export type WeightProgress = {
   sessionLogId?: Maybe<Scalars['ID']['output']>;
   weight: Scalars['Float']['output'];
 };
+
+export type GetEquipmentsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetEquipmentsQuery = { __typename?: 'Query', getEquipments: Array<{ __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null }> };
+
+export type GetEquipmentQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetEquipmentQuery = { __typename?: 'Query', getEquipment?: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } | null };
+
+export type CreateEquipmentMutationVariables = Exact<{
+  input: CreateEquipmentInput;
+}>;
+
+
+export type CreateEquipmentMutation = { __typename?: 'Mutation', createEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } };
+
+export type UpdateEquipmentMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  input: UpdateEquipmentInput;
+}>;
+
+
+export type UpdateEquipmentMutation = { __typename?: 'Mutation', updateEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } };
+
+export type DeleteEquipmentMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type DeleteEquipmentMutation = { __typename?: 'Mutation', deleteEquipment: boolean };
 
 export type GetRevenueSummaryQueryVariables = Exact<{
   dateRange?: InputMaybe<DateRangeInput>;
@@ -1185,14 +1420,14 @@ export type GetUsersQueryVariables = Exact<{
 }>;
 
 
-export type GetUsersQuery = { __typename?: 'Query', getUsers?: Array<{ __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, attendanceId?: number | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, membershipTransaction?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null } | null, currentMembership?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null } | null> | null };
+export type GetUsersQuery = { __typename?: 'Query', getUsers?: Array<{ __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, attendanceId?: number | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, membershipTransaction?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null } | null, currentMembership?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null, loginHistory?: Array<{ __typename?: 'LoginHistoryEntry', ipAddress?: string | null, userAgent?: string | null, loginAt?: string | null } | null> | null } | null> | null };
 
 export type GetUserQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type GetUserQuery = { __typename?: 'Query', getUser?: { __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, attendanceId?: number | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, membershipTransaction?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null } | null, currentMembership?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null } | null };
+export type GetUserQuery = { __typename?: 'Query', getUser?: { __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, attendanceId?: number | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, membershipTransaction?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null } | null, currentMembership?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null, loginHistory?: Array<{ __typename?: 'LoginHistoryEntry', ipAddress?: string | null, userAgent?: string | null, loginAt?: string | null } | null> | null } | null };
 
 export type LoginMutationVariables = Exact<{
   input: LoginInput;
@@ -1264,11 +1499,65 @@ export type UsersUpdatedSubscriptionVariables = Exact<{
 }>;
 
 
-export type UsersUpdatedSubscription = { __typename?: 'Subscription', usersUpdated: Array<{ __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, attendanceId?: number | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, membershipTransaction?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null } | null, currentMembership?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null }> };
+export type UsersUpdatedSubscription = { __typename?: 'Subscription', usersUpdated: Array<{ __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, attendanceId?: number | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, membershipTransaction?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null } | null, currentMembership?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null, loginHistory?: Array<{ __typename?: 'LoginHistoryEntry', ipAddress?: string | null, userAgent?: string | null, loginAt?: string | null } | null> | null }> };
 
-export type GetLoginHistoryQueryVariables = Exact<{
-  userId: Scalars['ID']['input'];
+export type SearchWalkInClientsQueryVariables = Exact<{
+  query?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 
-export type GetLoginHistoryQuery = { __typename?: 'Query', getLoginHistory: Array<{ __typename?: 'LoginHistory', id: string, userId: string, ipAddress?: string | null, userAgent?: string | null, device?: string | null, location?: string | null, loginAt: string, createdAt?: string | null, updatedAt?: string | null }> };
+export type SearchWalkInClientsQuery = { __typename?: 'Query', searchWalkInClients: Array<{ __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, createdAt: string, updatedAt: string }> };
+
+export type WalkInAttendanceLogsQueryVariables = Exact<{
+  filter: WalkInLogsFilter;
+  pagination?: InputMaybe<WalkInPagination>;
+}>;
+
+
+export type WalkInAttendanceLogsQuery = { __typename?: 'Query', walkInAttendanceLogs: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null } }> } };
+
+export type WalkInStatsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type WalkInStatsQuery = { __typename?: 'Query', walkInStats: { __typename?: 'WalkInStats', totalWalkInAccounts: number, totalTimeInRecords: number } };
+
+export type WalkInAccountsOverviewQueryVariables = Exact<{
+  pagination?: InputMaybe<WalkInPagination>;
+}>;
+
+
+export type WalkInAccountsOverviewQuery = { __typename?: 'Query', walkInAccountsOverview: { __typename?: 'WalkInAccountsOverview', totalWalkInAccounts: number, totalTimeInRecords: number, rows: Array<{ __typename?: 'WalkInAccountRow', timeInCount: number, client: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, createdAt: string, updatedAt: string } }> } };
+
+export type WalkInLogsByClientQueryVariables = Exact<{
+  walkInClientId: Scalars['ID']['input'];
+  pagination?: InputMaybe<WalkInPagination>;
+}>;
+
+
+export type WalkInLogsByClientQuery = { __typename?: 'Query', walkInLogsByClient: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null } }> } };
+
+export type CreateWalkInClientMutationVariables = Exact<{
+  input: CreateWalkInClientInput;
+  timeInNow: Scalars['Boolean']['input'];
+}>;
+
+
+export type CreateWalkInClientMutation = { __typename?: 'Mutation', createWalkInClient: { __typename?: 'CreateWalkInClientResult', client: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null }, log?: { __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string } | null } };
+
+export type WalkInTimeInMutationVariables = Exact<{
+  walkInClientId: Scalars['ID']['input'];
+  at?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type WalkInTimeInMutation = { __typename?: 'Mutation', walkInTimeIn: { __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, lastName: string } } };
+
+export type UpdateWalkInClientMutationVariables = Exact<{
+  walkInClientId: Scalars['ID']['input'];
+  input: UpdateWalkInClientInput;
+}>;
+
+
+export type UpdateWalkInClientMutation = { __typename?: 'Mutation', updateWalkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, createdAt: string, updatedAt: string } };

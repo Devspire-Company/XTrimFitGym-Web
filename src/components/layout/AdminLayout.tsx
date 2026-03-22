@@ -14,6 +14,8 @@ import {
 	X,
 	Fingerprint,
 	Clock,
+	Dumbbell,
+	UserRound,
 } from 'lucide-react';
 import { SubscriptionRequestNotification } from '../SubscriptionRequestNotification';
 
@@ -40,7 +42,9 @@ export function AdminLayout() {
 		{ path: '/coaches', label: 'Coach Management', icon: UserCog },
 		{ path: '/memberships', label: 'Membership Management', icon: CreditCard },
 		{ path: '/subscription-requests', label: 'Subscription Requests', icon: Clock },
+		{ path: '/equipment', label: 'Equipment', icon: Dumbbell },
 		{ path: '/attendance', label: 'Attendance Logs', icon: Fingerprint },
+		{ path: '/walk-in-attendance', label: 'Walk-in Attendance', icon: UserRound },
 		{ path: '/reports', label: 'Reports & Analytics', icon: BarChart3 },
 	];
 

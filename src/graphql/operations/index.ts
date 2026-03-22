@@ -2,6 +2,8 @@
 
 // Queries
 export {
+	GetEquipmentsDocument as GET_EQUIPMENTS,
+	GetEquipmentDocument as GET_EQUIPMENT,
 	GetAllMembershipsDocument as GET_ALL_MEMBERSHIPS,
 	GetActiveMembershipsDocument as GET_ACTIVE_MEMBERSHIPS,
 	GetCurrentMembershipDocument as GET_CURRENT_MEMBERSHIP,
@@ -25,6 +27,9 @@ export {
 	CreateMembershipDocument as CREATE_MEMBERSHIP,
 	UpdateMembershipDocument as UPDATE_MEMBERSHIP,
 	DeleteMembershipDocument as DELETE_MEMBERSHIP,
+	CreateEquipmentDocument as CREATE_EQUIPMENT,
+	UpdateEquipmentDocument as UPDATE_EQUIPMENT,
+	DeleteEquipmentDocument as DELETE_EQUIPMENT,
 	PurchaseMembershipDocument as PURCHASE_MEMBERSHIP,
 	CancelMembershipDocument as CANCEL_MEMBERSHIP,
 	DirectSubscribeMemberDocument as DIRECT_SUBSCRIBE_MEMBER,
@@ -46,5 +51,17 @@ export {
 export {
 	GetAttendanceRecordsDocument as GET_ATTENDANCE_RECORDS,
 	GetAttendanceRecordDocument as GET_ATTENDANCE_RECORD,
+} from '../generated/graphql';
+
+// Walk-in clients (admin)
+export {
+	SearchWalkInClientsDocument as SEARCH_WALK_IN_CLIENTS,
+	WalkInAttendanceLogsDocument as WALK_IN_ATTENDANCE_LOGS,
+	WalkInStatsDocument as WALK_IN_STATS,
+	WalkInAccountsOverviewDocument as WALK_IN_ACCOUNTS_OVERVIEW,
+	WalkInLogsByClientDocument as WALK_IN_LOGS_BY_CLIENT,
+	CreateWalkInClientDocument as CREATE_WALK_IN_CLIENT,
+	UpdateWalkInClientDocument as UPDATE_WALK_IN_CLIENT,
+	WalkInTimeInDocument as WALK_IN_TIME_IN,
 } from '../generated/graphql';
 

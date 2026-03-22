@@ -10,6 +10,8 @@ import { ReportsPage } from '@/pages/Reports';
 import { SettingsPage } from '@/pages/Settings';
 import { AttendancePage } from '@/pages/Attendance';
 import { SubscriptionRequestsPage } from '@/pages/SubscriptionRequests';
+import { EquipmentPage } from '@/pages/Equipment';
+import { WalkInAttendancePage } from '@/pages/WalkInAttendance';
 
 export const router = createBrowserRouter([
 	{
@@ -58,8 +60,16 @@ export const router = createBrowserRouter([
 				element: <AttendancePage />,
 			},
 			{
+				path: 'walk-in-attendance',
+				element: <WalkInAttendancePage />,
+			},
+			{
 				path: 'subscription-requests',
 				element: <SubscriptionRequestsPage />,
+			},
+			{
+				path: 'equipment',
+				element: <EquipmentPage />,
 			},
 		],
 	},
