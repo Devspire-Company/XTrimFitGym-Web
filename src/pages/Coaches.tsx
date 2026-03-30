@@ -14,7 +14,7 @@ import {
 	Edit,
 	RefreshCw,
 	Users,
-	Calendar,
+	Calendar as CalendarIcon,
 	Activity,
 	Clock,
 	MapPin,
@@ -25,6 +25,8 @@ import { addToast } from '@/store/slices/uiSlice';
 import type { CreateUserMutation, CreateUserMutationVariables } from '@/graphql/generated/types';
 import { RoleType } from '@/graphql/generated/graphql';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Calendar } from '@/components/ui/calendar';
+import { format, startOfDay, startOfMonth } from 'date-fns';
 
 interface Coach {
 	id: string;
@@ -661,6 +663,187 @@ export function CoachesPage() {
 	);
 }
 
+function sessionLogDay(log: {
+	completedAt?: string | null;
+	session?: { date?: string | null } | null;
+}): Date | null {
+	const raw = log.completedAt || log.session?.date;
+	if (!raw) return null;
+	const d = new Date(raw);
+	return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function SessionLogsCalendarView({
+	sessionLogs,
+	formatDate,
+}: {
+	sessionLogs: any[];
+	formatDate: (dateString: string) => string;
+}) {
+	const [selectedDay, setSelectedDay] = useState<Date | undefined>();
+	const [month, setMonth] = useState(() => new Date());
+
+	const { logsByDay, datesWithLogs, fromYear, toYear } = useMemo(() => {
+		const byDay = new Map<string, any[]>();
+		const yNow = new Date().getFullYear();
+		let minY = yNow;
+		let maxY = yNow;
+		for (const log of sessionLogs) {
+			const d = sessionLogDay(log);
+			if (!d) continue;
+			minY = Math.min(minY, d.getFullYear());
+			maxY = Math.max(maxY, d.getFullYear());
+			const key = format(d, 'yyyy-MM-dd');
+			const arr = byDay.get(key);
+			if (arr) arr.push(log);
+			else byDay.set(key, [log]);
+		}
+		const datesWithLogs = [...byDay.keys()].map((k) => {
+			const [y, m, day] = k.split('-').map(Number);
+			return new Date(y, m - 1, day);
+		});
+		return {
+			logsByDay: byDay,
+			datesWithLogs,
+			fromYear: Math.min(minY, yNow - 2),
+			toYear: Math.max(maxY, yNow + 1),
+		};
+	}, [sessionLogs]);
+
+	useEffect(() => {
+		if (sessionLogs.length === 0) {
+			setSelectedDay(undefined);
+			setMonth(new Date());
+			return;
+		}
+		const dates = sessionLogs.map(sessionLogDay).filter((d): d is Date => d !== null);
+		if (dates.length === 0) {
+			setSelectedDay(undefined);
+			setMonth(new Date());
+			return;
+		}
+		const latest = dates.reduce((a, b) => (a > b ? a : b));
+		setMonth(startOfMonth(latest));
+		setSelectedDay(startOfDay(latest));
+	}, [sessionLogs]);
+
+	const selectedKey = selectedDay ? format(selectedDay, 'yyyy-MM-dd') : null;
+	const dayLogs = selectedKey ? (logsByDay.get(selectedKey) ?? []) : [];
+
+	return (
+		<div className="space-y-4">
+			<div className="flex flex-col lg:flex-row gap-6">
+				<div className="flex justify-center lg:justify-start shrink-0">
+					<Calendar
+						mode="single"
+						selected={selectedDay}
+						onSelect={setSelectedDay}
+						month={month}
+						onMonthChange={setMonth}
+						modifiers={{ hasSessionLog: datesWithLogs }}
+						modifiersClassNames={{
+							hasSessionLog:
+								'bg-[rgba(249,197,19,0.14)] text-[var(--text-primary)] [&_button]:font-semibold',
+						}}
+						captionLayout="dropdown"
+						fromYear={fromYear}
+						toYear={toYear}
+						className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-2"
+					/>
+				</div>
+				<div className="flex-1 min-w-0">
+					<p className="text-xs text-[var(--text-secondary)] mb-2">
+						Highlighted days have logs. Select a date for details.
+					</p>
+					{selectedDay ? (
+						<>
+							<p className="text-sm font-medium text-[var(--text-primary)] mb-3">
+								{format(selectedDay, 'MMMM d, yyyy')}
+								<span className="text-[var(--text-secondary)] font-normal ml-2">
+									({dayLogs.length} log{dayLogs.length !== 1 ? 's' : ''})
+								</span>
+							</p>
+							{dayLogs.length > 0 ? (
+								<div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
+									{dayLogs.map((log: any) => (
+										<div
+											key={log.id}
+											className="p-4 bg-[rgba(255,255,255,0.05)] rounded-lg border border-[rgba(255,255,255,0.08)]"
+										>
+											<div className="flex items-start justify-between mb-2">
+												<div className="flex-1">
+													{log.session && (
+														<div className="font-medium text-[var(--text-primary)] mb-1">
+															{log.session.name || 'Session Activity'}
+														</div>
+													)}
+													<div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-secondary)]">
+														{log.session?.date && (
+															<span className="flex items-center gap-1">
+																<CalendarIcon className="w-3 h-3" />
+																{formatDate(log.session.date)}
+															</span>
+														)}
+														{log.completedAt && (
+															<span className="flex items-center gap-1">
+																<Clock className="w-3 h-3" />
+																Completed: {formatDate(log.completedAt)}
+															</span>
+														)}
+													</div>
+												</div>
+												{log.session && (
+													<span
+														className={`px-2 py-1 text-xs rounded-lg font-semibold shrink-0 ${
+															log.session.status === 'completed'
+																? 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
+																: 'bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
+														}`}
+													>
+														{log.session.status}
+													</span>
+												)}
+											</div>
+											{log.client && (
+												<div className="mt-2 text-sm">
+													<span className="text-[var(--text-secondary)]">Client:</span>{' '}
+													<span className="font-medium text-[var(--text-primary)]">
+														{log.client.firstName} {log.client.lastName}
+													</span>
+												</div>
+											)}
+											{log.weight !== null && log.weight !== undefined && (
+												<div className="mt-2 text-sm">
+													<span className="text-[var(--text-secondary)]">Weight Recorded:</span>{' '}
+													<span className="font-medium text-[var(--text-primary)]">
+														{log.weight} kg
+													</span>
+												</div>
+											)}
+											{log.notes && (
+												<div className="mt-2 pt-2 border-t border-[rgba(255,255,255,0.08)]">
+													<div className="text-xs text-[var(--text-secondary)] mb-1">Notes:</div>
+													<div className="text-sm text-[var(--text-primary)]">{log.notes}</div>
+												</div>
+											)}
+										</div>
+									))}
+								</div>
+							) : (
+								<p className="text-sm text-[var(--text-secondary)] py-4">
+									No session logs on this date.
+								</p>
+							)}
+						</>
+					) : (
+						<p className="text-sm text-[var(--text-secondary)] py-4">Select a date on the calendar.</p>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void }) {
 	// Fetch coach sessions
 	const { data: sessionsData, loading: sessionsLoading } = useQuery(GET_COACH_SESSIONS, {
@@ -886,7 +1069,7 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 				{/* Sessions Section */}
 				<div className="bg-[rgba(255,255,255,0.03)] rounded-xl p-4 border border-[rgba(255,255,255,0.08)] mb-8">
 					<h3 className="font-semibold mb-4 text-[var(--text-primary)] flex items-center gap-2">
-						<Calendar className="w-4 h-4" />
+						<CalendarIcon className="w-4 h-4" />
 						Sessions ({sessions.length})
 					</h3>
 					{sessionsLoading ? (
@@ -900,12 +1083,25 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 								>
 									<div className="flex items-start justify-between mb-2">
 										<div className="flex-1">
-											<div className="font-medium text-[var(--text-primary)] mb-1">
-												{session.name || 'Session'}
+											<div className="flex flex-wrap items-center gap-2 mb-1">
+												<div className="font-medium text-[var(--text-primary)]">
+													{session.name || 'Session'}
+												</div>
+												{session.sessionKind === 'group_class' && (
+													<span className="px-2 py-0.5 text-[10px] uppercase tracking-wide rounded-md bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.35)]">
+														Group class
+													</span>
+												)}
 											</div>
+											{session.sessionKind === 'group_class' && session.maxParticipants != null && (
+												<div className="text-xs text-[var(--text-secondary)] mb-1">
+													Capacity: {(session.clients?.length ?? session.clientsIds?.length ?? 0)} /{' '}
+													{session.maxParticipants} enrolled
+												</div>
+											)}
 											<div className="flex items-center gap-4 text-xs text-[var(--text-secondary)]">
 												<span className="flex items-center gap-1">
-													<Calendar className="w-3 h-3" />
+													<CalendarIcon className="w-3 h-3" />
 													{formatDate(session.date)}
 												</span>
 												<span className="flex items-center gap-1">
@@ -935,7 +1131,11 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 									</div>
 									{session.clients && session.clients.length > 0 && (
 										<div className="mt-2 pt-2 border-t border-[rgba(255,255,255,0.08)]">
-											<div className="text-xs text-[var(--text-secondary)] mb-1">Clients:</div>
+											<div className="text-xs text-[var(--text-secondary)] mb-1">
+												{session.sessionKind === 'group_class'
+													? 'Confirmed participants:'
+													: 'Clients:'}
+											</div>
 											<div className="flex flex-wrap gap-2">
 												{session.clients.map((client: any) => (
 													<span
@@ -948,6 +1148,27 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 											</div>
 										</div>
 									)}
+									{session.sessionKind === 'group_class' &&
+										session.enrollments &&
+										session.enrollments.length > 0 && (
+											<div className="mt-2 pt-2 border-t border-[rgba(255,255,255,0.08)]">
+												<div className="text-xs text-[var(--text-secondary)] mb-2">
+													Invites & requests:
+												</div>
+												<ul className="text-xs text-[var(--text-primary)] space-y-1">
+													{session.enrollments.map((en: any) => (
+														<li key={`${en.clientId}-${en.status}`} className="flex justify-between gap-2">
+															<span>
+																{en.client
+																	? `${en.client.firstName} ${en.client.lastName}`
+																	: en.clientId?.slice(0, 8) + '…'}
+															</span>
+															<span className="text-[var(--text-secondary)] shrink-0">{en.status}</span>
+														</li>
+													))}
+												</ul>
+											</div>
+										)}
 									{session.note && (
 										<div className="mt-2 pt-2 border-t border-[rgba(255,255,255,0.08)]">
 											<div className="text-xs text-[var(--text-secondary)]">Note:</div>
@@ -971,71 +1192,11 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 					{sessionLogsLoading ? (
 						<div className="text-center py-4 text-[var(--text-secondary)]">Loading activities...</div>
 					) : sessionLogs.length > 0 ? (
-						<div className="space-y-3">
-							{sessionLogs.map((log: any) => (
-								<div
-									key={log.id}
-									className="p-4 bg-[rgba(255,255,255,0.05)] rounded-lg border border-[rgba(255,255,255,0.08)]"
-								>
-									<div className="flex items-start justify-between mb-2">
-										<div className="flex-1">
-											{log.session && (
-												<div className="font-medium text-[var(--text-primary)] mb-1">
-													{log.session.name || 'Session Activity'}
-												</div>
-											)}
-											<div className="flex items-center gap-4 text-xs text-[var(--text-secondary)]">
-												{log.session?.date && (
-													<span className="flex items-center gap-1">
-														<Calendar className="w-3 h-3" />
-														{formatDate(log.session.date)}
-													</span>
-												)}
-												{log.completedAt && (
-													<span className="flex items-center gap-1">
-														<Clock className="w-3 h-3" />
-														Completed: {formatDate(log.completedAt)}
-													</span>
-												)}
-											</div>
-										</div>
-										{log.session && (
-											<span
-												className={`px-2 py-1 text-xs rounded-lg font-semibold ${
-													log.session.status === 'completed'
-														? 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
-														: 'bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
-												}`}
-											>
-												{log.session.status}
-											</span>
-										)}
-									</div>
-									{log.client && (
-										<div className="mt-2 text-sm">
-											<span className="text-[var(--text-secondary)]">Client:</span>{' '}
-											<span className="font-medium text-[var(--text-primary)]">
-												{log.client.firstName} {log.client.lastName}
-											</span>
-										</div>
-									)}
-									{(log.weight !== null && log.weight !== undefined) && (
-										<div className="mt-2 text-sm">
-											<span className="text-[var(--text-secondary)]">Weight Recorded:</span>{' '}
-											<span className="font-medium text-[var(--text-primary)]">
-												{log.weight} kg
-											</span>
-										</div>
-									)}
-									{log.notes && (
-										<div className="mt-2 pt-2 border-t border-[rgba(255,255,255,0.08)]">
-											<div className="text-xs text-[var(--text-secondary)] mb-1">Notes:</div>
-											<div className="text-sm text-[var(--text-primary)]">{log.notes}</div>
-										</div>
-									)}
-								</div>
-							))}
-						</div>
+						<SessionLogsCalendarView
+							key={coach.id}
+							sessionLogs={sessionLogs}
+							formatDate={formatDate}
+						/>
 					) : (
 						<div className="text-center py-4 text-[var(--text-secondary)]">No session logs found</div>
 					)}

@@ -13,6 +13,12 @@ query SearchWalkInClients($query: String, $limit: Int, $offset: Int) {
 	}
 }
 
+query WalkInPaymentSettings {
+	walkInPaymentSettings {
+		defaultPaymentPesos
+	}
+}
+
 query WalkInAttendanceLogs($filter: WalkInLogsFilter!, $pagination: WalkInPagination) {
 	walkInAttendanceLogs(filter: $filter, pagination: $pagination) {
 		totalCount
@@ -20,6 +26,7 @@ query WalkInAttendanceLogs($filter: WalkInLogsFilter!, $pagination: WalkInPagina
 			id
 			timedInAt
 			localDate
+			payment
 			createdAt
 			walkInClient {
 				id
@@ -71,6 +78,7 @@ query WalkInLogsByClient($walkInClientId: ID!, $pagination: WalkInPagination) {
 			id
 			timedInAt
 			localDate
+			payment
 			createdAt
 			walkInClient {
 				id
@@ -83,6 +91,12 @@ query WalkInLogsByClient($walkInClientId: ID!, $pagination: WalkInPagination) {
 				notes
 			}
 		}
+	}
+}
+
+mutation UpdateWalkInPaymentSettings($paymentPesos: Float!) {
+	updateWalkInPaymentSettings(paymentPesos: $paymentPesos) {
+		defaultPaymentPesos
 	}
 }
 
@@ -102,6 +116,7 @@ mutation CreateWalkInClient($input: CreateWalkInClientInput!, $timeInNow: Boolea
 			id
 			timedInAt
 			localDate
+			payment
 		}
 	}
 }
@@ -111,6 +126,7 @@ mutation WalkInTimeIn($walkInClientId: ID!, $at: String) {
 		id
 		timedInAt
 		localDate
+		payment
 		walkInClient {
 			id
 			firstName

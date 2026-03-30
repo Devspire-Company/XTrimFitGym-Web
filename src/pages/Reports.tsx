@@ -179,22 +179,22 @@ export function ReportsPage() {
 
 		// If we have analytics data, use it; otherwise use placeholder
 		if (analyticsRange.length > 0) {
-			// Group by week or use daily data
-			const labels = analyticsRange
-				.map((a: any) => {
-					const date = new Date(a.date);
-					return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-				})
-				.slice(-30); // Last 30 days
-
-			const data = analyticsRange.map((a: any) => a.totalRevenue).slice(-30);
+			const slice = analyticsRange.slice(-30);
+			const labels = slice.map((a: any) => {
+				const date = new Date(a.date);
+				return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+			});
+			const membershipSeries = slice.map(
+				(a: any) => a.membershipSubscriptionRevenue ?? a.totalRevenue ?? 0,
+			);
+			const walkSeries = slice.map((a: any) => a.walkInRevenue ?? 0);
 
 			return {
 				labels,
 				datasets: [
 					{
-						label: 'Total Revenue',
-						data,
+						label: 'Membership revenue (snapshot)',
+						data: membershipSeries,
 						borderColor: '#F9C513',
 						backgroundColor: 'rgba(249, 197, 19, 0.1)',
 						fill: true,
@@ -202,6 +202,19 @@ export function ReportsPage() {
 						pointRadius: 3,
 						pointHoverRadius: 5,
 						pointBackgroundColor: '#F9C513',
+						pointBorderColor: '#fff',
+						pointBorderWidth: 2,
+					},
+					{
+						label: 'Walk-in fees (snapshot)',
+						data: walkSeries,
+						borderColor: '#10B981',
+						backgroundColor: 'rgba(16, 185, 129, 0.08)',
+						fill: true,
+						tension: 0.4,
+						pointRadius: 3,
+						pointHoverRadius: 5,
+						pointBackgroundColor: '#10B981',
 						pointBorderColor: '#fff',
 						pointBorderWidth: 2,
 					},
@@ -283,11 +296,14 @@ export function ReportsPage() {
 	const totalMembers = members.length;
 	const activeMembers = members.filter((m: any) => m.status === 'Active').length;
 	const totalRevenue = analytics?.totalRevenue || 0;
+	const membershipSubscriptionRevenue = analytics?.membershipSubscriptionRevenue ?? 0;
+	const walkInRevenueTotal = analytics?.walkInRevenue ?? 0;
 	const activeSubscriptions = analytics?.activeSubscriptions || 0;
 	const newSubscriptions = analytics?.newSubscriptions || 0;
 	const canceledSubscriptions = analytics?.canceledSubscriptions || 0;
 	const expiredSubscriptions = analytics?.expiredSubscriptions || 0;
-	const avgRevenuePerMember = activeSubscriptions > 0 ? totalRevenue / activeSubscriptions : 0;
+	const avgRevenuePerMember =
+		activeSubscriptions > 0 ? membershipSubscriptionRevenue / activeSubscriptions : 0;
 	const subscriptionRetentionRate =
 		activeSubscriptions > 0
 			? (
@@ -372,15 +388,28 @@ export function ReportsPage() {
 		const revenueByPeriod = analytics?.revenueByPeriod || [];
 
 		if (revenueByPeriod.length > 0) {
+			const subDay = revenueByPeriod.map((p: any) =>
+				Math.max(0, (p.revenue ?? 0) - (p.walkInRevenue ?? 0)),
+			);
+			const walkDay = revenueByPeriod.map((p: any) => p.walkInRevenue ?? 0);
 			return {
 				labels: revenueByPeriod.map((p: any) => p.period),
 				datasets: [
 					{
-						label: 'Revenue (₱)',
-						data: revenueByPeriod.map((p: any) => p.revenue),
-						backgroundColor: 'rgba(249, 197, 19, 0.6)',
+						label: 'Membership (new sales, day)',
+						data: subDay,
+						backgroundColor: 'rgba(249, 197, 19, 0.75)',
 						borderColor: 'rgba(249, 197, 19, 1)',
-						borderWidth: 3,
+						borderWidth: 2,
+						stack: 'rev',
+					},
+					{
+						label: 'Walk-in (day)',
+						data: walkDay,
+						backgroundColor: 'rgba(16, 185, 129, 0.75)',
+						borderColor: 'rgba(16, 185, 129, 1)',
+						borderWidth: 2,
+						stack: 'rev',
 					},
 				],
 			};
@@ -452,6 +481,11 @@ export function ReportsPage() {
 		csvContent += '=== SUMMARY STATISTICS ===\n';
 		csvContent += createRow(['Metric', 'Value']);
 		csvContent += createRow(['Total Revenue', `₱${totalRevenue.toLocaleString()}`]);
+		csvContent += createRow([
+			'Membership Subscription Revenue',
+			`₱${membershipSubscriptionRevenue.toLocaleString()}`,
+		]);
+		csvContent += createRow(['Walk-in Fees (time-in)', `₱${walkInRevenueTotal.toLocaleString()}`]);
 		csvContent += createRow(['Total Members', totalMembers]);
 		csvContent += createRow(['Active Members', activeMembers]);
 		csvContent += createRow(['Inactive Members', totalMembers - activeMembers]);
@@ -461,7 +495,7 @@ export function ReportsPage() {
 		csvContent += createRow(['Canceled Subscriptions', canceledSubscriptions]);
 		csvContent += createRow(['Expired Subscriptions', expiredSubscriptions]);
 		csvContent += createRow([
-			'Average Revenue per Member',
+			'Average Subscription Revenue per Active Member',
 			`₱${avgRevenuePerMember.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
 		]);
 		csvContent += createRow(['Subscription Retention Rate', `${subscriptionRetentionRate}%`]);
@@ -688,7 +722,15 @@ export function ReportsPage() {
 		// 6. Revenue by Period (Detailed)
 		if (analytics?.revenueByPeriod && analytics.revenueByPeriod.length > 0) {
 			csvContent += '=== REVENUE BY PERIOD (DETAILED) ===\n';
-			csvContent += createRow(['Period', 'Revenue', 'Percentage of Total', 'Growth Rate']);
+			csvContent += createRow([
+				'Period',
+				'Day total',
+				'Membership (day)',
+				'Walk-in (day)',
+				'Walk-in count',
+				'% of period total',
+				'Growth (day total)',
+			]);
 
 			const totalPeriodRevenue = analytics.revenueByPeriod.reduce(
 				(sum: number, item: any) => sum + item.revenue,
@@ -697,6 +739,8 @@ export function ReportsPage() {
 			let previousRevenue = 0;
 
 			analytics.revenueByPeriod.forEach((item: any, index: number) => {
+				const w = item.walkInRevenue ?? 0;
+				const sub = Math.max(0, (item.revenue ?? 0) - w);
 				const percentage =
 					totalPeriodRevenue > 0 ? ((item.revenue / totalPeriodRevenue) * 100).toFixed(2) : '0.00';
 				let growthRate = 'N/A';
@@ -709,6 +753,9 @@ export function ReportsPage() {
 				csvContent += createRow([
 					item.period,
 					`₱${item.revenue.toLocaleString()}`,
+					`₱${sub.toLocaleString()}`,
+					`₱${w.toLocaleString()}`,
+					item.walkInCount ?? 0,
 					`${percentage}%`,
 					growthRate,
 				]);
@@ -1403,13 +1450,26 @@ export function ReportsPage() {
 				</div>
 			)}
 
-			{/* Summary Cards */}
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 				<SummaryCard
 					icon={PhilippinePeso}
-					title="Total Revenue"
+					title="Total revenue"
 					value={`₱${totalRevenue.toLocaleString()}`}
-					change={`${activeSubscriptions > 0 ? '+' : ''}${activeSubscriptions} active`}
+					change="Membership + walk-in"
+					changeType="positive"
+				/>
+				<SummaryCard
+					icon={PhilippinePeso}
+					title="Membership revenue"
+					value={`₱${membershipSubscriptionRevenue.toLocaleString()}`}
+					change="All-time subscription sales"
+					changeType="positive"
+				/>
+				<SummaryCard
+					icon={PhilippinePeso}
+					title="Walk-in fees"
+					value={`₱${walkInRevenueTotal.toLocaleString()}`}
+					change="Sum of time-in payments"
 					changeType="positive"
 				/>
 				<SummaryCard
@@ -1421,7 +1481,7 @@ export function ReportsPage() {
 				/>
 				<SummaryCard
 					icon={TrendingUp}
-					title="Avg Revenue/Member"
+					title="Avg subscription / member"
 					value={`₱${avgRevenuePerMember.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
 					change={`${subscriptionRetentionRate}% retention`}
 					changeType="positive"
@@ -1603,18 +1663,21 @@ export function ReportsPage() {
 									responsive: true,
 									plugins: {
 										legend: {
-											display: false,
+											display: true,
+											position: 'top',
 										},
 										tooltip: {
 											callbacks: {
 												label: function (context: any) {
-													return `₱${context.parsed.y.toLocaleString()}`;
+													return `${context.dataset.label}: ₱${context.parsed.y.toLocaleString()}`;
 												},
 											},
 										},
 									},
 									scales: {
+										x: { stacked: true },
 										y: {
+											stacked: true,
 											beginAtZero: true,
 											ticks: {
 												callback: function (value: any) {

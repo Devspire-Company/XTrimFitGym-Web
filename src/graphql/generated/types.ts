@@ -22,10 +22,12 @@ export type Analytics = {
   date: Scalars['String']['output'];
   expiredSubscriptions: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
+  membershipSubscriptionRevenue: Scalars['Float']['output'];
   newSubscriptions: Scalars['Int']['output'];
   revenueByMembership: Array<MembershipRevenue>;
   totalRevenue: Scalars['Float']['output'];
   updatedAt?: Maybe<Scalars['String']['output']>;
+  walkInRevenue: Scalars['Float']['output'];
 };
 
 export type ApproveSubscriptionRequestInput = {
@@ -71,6 +73,22 @@ export type AuthResponse = {
   token: Scalars['String']['output'];
   user: User;
 };
+
+export type ClassEnrollment = {
+  __typename?: 'ClassEnrollment';
+  client?: Maybe<User>;
+  clientId: Scalars['ID']['output'];
+  createdAt?: Maybe<Scalars['String']['output']>;
+  status: ClassEnrollmentStatus;
+};
+
+export enum ClassEnrollmentStatus {
+  Accepted = 'accepted',
+  Declined = 'declined',
+  Invited = 'invited',
+  Pending = 'pending',
+  Rejected = 'rejected'
+}
 
 export type CoachDetails = {
   __typename?: 'CoachDetails';
@@ -198,14 +216,17 @@ export type CreateSessionFromTemplateInput = {
 };
 
 export type CreateSessionInput = {
-  clientsIds: Array<Scalars['ID']['input']>;
+  clientsIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   date: Scalars['String']['input'];
   endTime?: InputMaybe<Scalars['String']['input']>;
   goalId?: InputMaybe<Scalars['ID']['input']>;
   gymArea: Scalars['String']['input'];
+  invitedClientIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   isTemplate?: InputMaybe<Scalars['Boolean']['input']>;
+  maxParticipants?: InputMaybe<Scalars['Int']['input']>;
   name: Scalars['String']['input'];
   note?: InputMaybe<Scalars['String']['input']>;
+  sessionKind?: InputMaybe<SessionKind>;
   startTime: Scalars['String']['input'];
   templateId?: InputMaybe<Scalars['ID']['input']>;
   workoutType?: InputMaybe<Scalars['String']['input']>;
@@ -400,6 +421,7 @@ export type Mutation = {
   cancelMembership: Scalars['Boolean']['output'];
   cancelSession: Scalars['Boolean']['output'];
   clientConfirmWeight: SessionLog;
+  coachRespondToJoinRequest: Session;
   completeSession: SessionLog;
   confirmSessionCompletion: SessionLog;
   createCoachRating: CoachRating;
@@ -421,10 +443,13 @@ export type Mutation = {
   deleteSubscriptionRequest: Scalars['Boolean']['output'];
   deleteUser?: Maybe<Scalars['Boolean']['output']>;
   directSubscribeMember: MembershipTransaction;
+  inviteClientsToClassSession: Session;
   login: AuthResponse;
   purchaseMembership: MembershipTransaction;
   rejectSubscriptionRequest: Scalars['Boolean']['output'];
   removeClient: Scalars['Boolean']['output'];
+  requestToJoinClassSession: Session;
+  respondToClassInvitation: Session;
   updateCoachRating: CoachRating;
   updateCoachRequest: CoachRequest;
   updateEquipment: Equipment;
@@ -434,6 +459,7 @@ export type Mutation = {
   updateSession: Session;
   updateUser?: Maybe<User>;
   updateWalkInClient: WalkInClient;
+  updateWalkInPaymentSettings: WalkInPaymentSettings;
   walkInTimeIn: WalkInAttendanceLog;
 };
 
@@ -465,6 +491,13 @@ export type MutationCancelSessionArgs = {
 
 export type MutationClientConfirmWeightArgs = {
   sessionLogId: Scalars['ID']['input'];
+};
+
+
+export type MutationCoachRespondToJoinRequestArgs = {
+  accept: Scalars['Boolean']['input'];
+  clientId: Scalars['ID']['input'];
+  sessionId: Scalars['ID']['input'];
 };
 
 
@@ -574,6 +607,12 @@ export type MutationDirectSubscribeMemberArgs = {
 };
 
 
+export type MutationInviteClientsToClassSessionArgs = {
+  clientIds: Array<Scalars['ID']['input']>;
+  sessionId: Scalars['ID']['input'];
+};
+
+
 export type MutationLoginArgs = {
   input: LoginInput;
 };
@@ -591,6 +630,17 @@ export type MutationRejectSubscriptionRequestArgs = {
 
 export type MutationRemoveClientArgs = {
   clientId: Scalars['ID']['input'];
+};
+
+
+export type MutationRequestToJoinClassSessionArgs = {
+  sessionId: Scalars['ID']['input'];
+};
+
+
+export type MutationRespondToClassInvitationArgs = {
+  accept: Scalars['Boolean']['input'];
+  sessionId: Scalars['ID']['input'];
 };
 
 
@@ -649,6 +699,11 @@ export type MutationUpdateWalkInClientArgs = {
 };
 
 
+export type MutationUpdateWalkInPaymentSettingsArgs = {
+  paymentPesos: Scalars['Float']['input'];
+};
+
+
 export type MutationWalkInTimeInArgs = {
   at?: InputMaybe<Scalars['String']['input']>;
   walkInClientId: Scalars['ID']['input'];
@@ -659,6 +714,8 @@ export type PeriodRevenue = {
   count: Scalars['Int']['output'];
   period: Scalars['String']['output'];
   revenue: Scalars['Float']['output'];
+  walkInCount: Scalars['Int']['output'];
+  walkInRevenue: Scalars['Float']['output'];
 };
 
 export type ProgressImages = {
@@ -730,6 +787,7 @@ export type Query = {
   getFitnessGoalTypes: Array<Scalars['String']['output']>;
   getGoal?: Maybe<Goal>;
   getGoals: Array<Goal>;
+  getJoinableGroupClasses: Array<Session>;
   getMembership?: Maybe<Membership>;
   getMembershipTransaction?: Maybe<MembershipTransaction>;
   getMemberships: Array<Membership>;
@@ -756,6 +814,8 @@ export type Query = {
   walkInAttendanceLogs: WalkInLogsConnection;
   /** All time-in logs for one walk-in client (newest first). */
   walkInLogsByClient: WalkInLogsConnection;
+  /** Default walk-in time-in fee in PHP (admin). */
+  walkInPaymentSettings: WalkInPaymentSettings;
   /** System-wide walk-in profile and time-in counts (admin). */
   walkInStats: WalkInStats;
 };
@@ -966,10 +1026,12 @@ export type RevenueSummary = {
   activeSubscriptions: Scalars['Int']['output'];
   canceledSubscriptions: Scalars['Int']['output'];
   expiredSubscriptions: Scalars['Int']['output'];
+  membershipSubscriptionRevenue: Scalars['Float']['output'];
   newSubscriptions: Scalars['Int']['output'];
   revenueByMembership: Array<MembershipRevenue>;
   revenueByPeriod: Array<PeriodRevenue>;
   totalRevenue: Scalars['Float']['output'];
+  walkInRevenue: Scalars['Float']['output'];
 };
 
 export enum RoleType {
@@ -987,13 +1049,16 @@ export type Session = {
   createdAt?: Maybe<Scalars['String']['output']>;
   date: Scalars['String']['output'];
   endTime?: Maybe<Scalars['String']['output']>;
+  enrollments: Array<ClassEnrollment>;
   goal?: Maybe<Goal>;
   goalId?: Maybe<Scalars['ID']['output']>;
   gymArea: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   isTemplate?: Maybe<Scalars['Boolean']['output']>;
+  maxParticipants?: Maybe<Scalars['Int']['output']>;
   name: Scalars['String']['output'];
   note?: Maybe<Scalars['String']['output']>;
+  sessionKind: SessionKind;
   startTime: Scalars['String']['output'];
   status: SessionStatus;
   templateId?: Maybe<Scalars['ID']['output']>;
@@ -1001,6 +1066,11 @@ export type Session = {
   updatedAt?: Maybe<Scalars['String']['output']>;
   workoutType?: Maybe<Scalars['String']['output']>;
 };
+
+export enum SessionKind {
+  GroupClass = 'group_class',
+  Personal = 'personal'
+}
 
 export type SessionLog = {
   __typename?: 'SessionLog';
@@ -1120,6 +1190,7 @@ export type UpdateSessionInput = {
   date?: InputMaybe<Scalars['String']['input']>;
   endTime?: InputMaybe<Scalars['String']['input']>;
   gymArea?: InputMaybe<Scalars['String']['input']>;
+  maxParticipants?: InputMaybe<Scalars['Int']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   note?: InputMaybe<Scalars['String']['input']>;
   startTime?: InputMaybe<Scalars['String']['input']>;
@@ -1200,6 +1271,8 @@ export type WalkInAttendanceLog = {
   createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   localDate: Scalars['String']['output'];
+  /** Walk-in fee (PHP) recorded at time-in. */
+  payment: Scalars['Float']['output'];
   timedInAt: Scalars['String']['output'];
   walkInClient: WalkInClient;
 };
@@ -1239,6 +1312,12 @@ export type WalkInLogsFilter = {
 export type WalkInPagination = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type WalkInPaymentSettings = {
+  __typename?: 'WalkInPaymentSettings';
+  /** Default PHP amount applied to each new time-in (admin-configurable). */
+  defaultPaymentPesos: Scalars['Float']['output'];
 };
 
 export type WalkInStats = {
@@ -1294,28 +1373,28 @@ export type GetRevenueSummaryQueryVariables = Exact<{
 }>;
 
 
-export type GetRevenueSummaryQuery = { __typename?: 'Query', getRevenueSummary: { __typename?: 'RevenueSummary', totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }>, revenueByPeriod: Array<{ __typename?: 'PeriodRevenue', period: string, revenue: number, count: number }> } };
+export type GetRevenueSummaryQuery = { __typename?: 'Query', getRevenueSummary: { __typename?: 'RevenueSummary', totalRevenue: number, membershipSubscriptionRevenue: number, walkInRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }>, revenueByPeriod: Array<{ __typename?: 'PeriodRevenue', period: string, revenue: number, count: number, walkInRevenue: number, walkInCount: number }> } };
 
 export type GetAnalyticsQueryVariables = Exact<{
   date: Scalars['String']['input'];
 }>;
 
 
-export type GetAnalyticsQuery = { __typename?: 'Query', getAnalytics?: { __typename?: 'Analytics', id: string, date: string, totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, createdAt?: string | null, updatedAt?: string | null, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }> } | null };
+export type GetAnalyticsQuery = { __typename?: 'Query', getAnalytics?: { __typename?: 'Analytics', id: string, date: string, totalRevenue: number, membershipSubscriptionRevenue: number, walkInRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, createdAt?: string | null, updatedAt?: string | null, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }> } | null };
 
 export type GetAnalyticsRangeQueryVariables = Exact<{
   dateRange: DateRangeInput;
 }>;
 
 
-export type GetAnalyticsRangeQuery = { __typename?: 'Query', getAnalyticsRange: Array<{ __typename?: 'Analytics', id: string, date: string, totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, createdAt?: string | null, updatedAt?: string | null, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }> }> };
+export type GetAnalyticsRangeQuery = { __typename?: 'Query', getAnalyticsRange: Array<{ __typename?: 'Analytics', id: string, date: string, totalRevenue: number, membershipSubscriptionRevenue: number, walkInRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, createdAt?: string | null, updatedAt?: string | null, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }> }> };
 
 export type RevenueSummaryUpdatedSubscriptionVariables = Exact<{
   dateRange?: InputMaybe<DateRangeInput>;
 }>;
 
 
-export type RevenueSummaryUpdatedSubscription = { __typename?: 'Subscription', revenueSummaryUpdated: { __typename?: 'RevenueSummary', totalRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }>, revenueByPeriod: Array<{ __typename?: 'PeriodRevenue', period: string, revenue: number, count: number }> } };
+export type RevenueSummaryUpdatedSubscription = { __typename?: 'Subscription', revenueSummaryUpdated: { __typename?: 'RevenueSummary', totalRevenue: number, membershipSubscriptionRevenue: number, walkInRevenue: number, activeSubscriptions: number, newSubscriptions: number, canceledSubscriptions: number, expiredSubscriptions: number, revenueByMembership: Array<{ __typename?: 'MembershipRevenue', membershipId: string, membershipName: string, revenue: number, count: number }>, revenueByPeriod: Array<{ __typename?: 'PeriodRevenue', period: string, revenue: number, count: number, walkInRevenue: number, walkInCount: number }> } };
 
 export type GetAttendanceRecordsQueryVariables = Exact<{
   filter?: InputMaybe<AttendanceFilter>;
@@ -1375,7 +1454,7 @@ export type GetCoachSessionsQueryVariables = Exact<{
 }>;
 
 
-export type GetCoachSessionsQuery = { __typename?: 'Query', getCoachSessions: Array<{ __typename?: 'Session', id: string, coachId: string, clientsIds: Array<string>, name: string, date: string, startTime: string, endTime?: string | null, gymArea: string, status: SessionStatus, note?: string | null, createdAt?: string | null, updatedAt?: string | null, clients?: Array<{ __typename?: 'User', id: string, firstName: string, lastName: string, email: string }> | null }> };
+export type GetCoachSessionsQuery = { __typename?: 'Query', getCoachSessions: Array<{ __typename?: 'Session', id: string, coachId: string, clientsIds: Array<string>, name: string, date: string, startTime: string, endTime?: string | null, gymArea: string, status: SessionStatus, note?: string | null, sessionKind: SessionKind, maxParticipants?: number | null, createdAt?: string | null, updatedAt?: string | null, clients?: Array<{ __typename?: 'User', id: string, firstName: string, lastName: string, email: string }> | null, enrollments: Array<{ __typename?: 'ClassEnrollment', clientId: string, status: ClassEnrollmentStatus, createdAt?: string | null, client?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null }> }> };
 
 export type GetCoachSessionLogsQueryVariables = Exact<{
   coachId: Scalars['ID']['input'];
@@ -1510,13 +1589,18 @@ export type SearchWalkInClientsQueryVariables = Exact<{
 
 export type SearchWalkInClientsQuery = { __typename?: 'Query', searchWalkInClients: Array<{ __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, createdAt: string, updatedAt: string }> };
 
+export type WalkInPaymentSettingsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type WalkInPaymentSettingsQuery = { __typename?: 'Query', walkInPaymentSettings: { __typename?: 'WalkInPaymentSettings', defaultPaymentPesos: number } };
+
 export type WalkInAttendanceLogsQueryVariables = Exact<{
   filter: WalkInLogsFilter;
   pagination?: InputMaybe<WalkInPagination>;
 }>;
 
 
-export type WalkInAttendanceLogsQuery = { __typename?: 'Query', walkInAttendanceLogs: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null } }> } };
+export type WalkInAttendanceLogsQuery = { __typename?: 'Query', walkInAttendanceLogs: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null } }> } };
 
 export type WalkInStatsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1536,7 +1620,14 @@ export type WalkInLogsByClientQueryVariables = Exact<{
 }>;
 
 
-export type WalkInLogsByClientQuery = { __typename?: 'Query', walkInLogsByClient: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null } }> } };
+export type WalkInLogsByClientQuery = { __typename?: 'Query', walkInLogsByClient: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null } }> } };
+
+export type UpdateWalkInPaymentSettingsMutationVariables = Exact<{
+  paymentPesos: Scalars['Float']['input'];
+}>;
+
+
+export type UpdateWalkInPaymentSettingsMutation = { __typename?: 'Mutation', updateWalkInPaymentSettings: { __typename?: 'WalkInPaymentSettings', defaultPaymentPesos: number } };
 
 export type CreateWalkInClientMutationVariables = Exact<{
   input: CreateWalkInClientInput;
@@ -1544,7 +1635,7 @@ export type CreateWalkInClientMutationVariables = Exact<{
 }>;
 
 
-export type CreateWalkInClientMutation = { __typename?: 'Mutation', createWalkInClient: { __typename?: 'CreateWalkInClientResult', client: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null }, log?: { __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string } | null } };
+export type CreateWalkInClientMutation = { __typename?: 'Mutation', createWalkInClient: { __typename?: 'CreateWalkInClientResult', client: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null }, log?: { __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number } | null } };
 
 export type WalkInTimeInMutationVariables = Exact<{
   walkInClientId: Scalars['ID']['input'];
@@ -1552,7 +1643,7 @@ export type WalkInTimeInMutationVariables = Exact<{
 }>;
 
 
-export type WalkInTimeInMutation = { __typename?: 'Mutation', walkInTimeIn: { __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, lastName: string } } };
+export type WalkInTimeInMutation = { __typename?: 'Mutation', walkInTimeIn: { __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, lastName: string } } };
 
 export type UpdateWalkInClientMutationVariables = Exact<{
   walkInClientId: Scalars['ID']['input'];

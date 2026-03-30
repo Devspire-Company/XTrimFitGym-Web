@@ -11,6 +11,8 @@ import {
 	CREATE_WALK_IN_CLIENT,
 	UPDATE_WALK_IN_CLIENT,
 	WALK_IN_TIME_IN,
+	WALK_IN_PAYMENT_SETTINGS,
+	UPDATE_WALK_IN_PAYMENT_SETTINGS,
 } from '@/graphql/operations/index';
 import { WalkInGender } from '@/graphql/generated/graphql';
 import type { SearchWalkInClientsQuery } from '@/graphql/generated/graphql';
@@ -159,6 +161,24 @@ export function WalkInAttendancePage() {
 	const [editNotes, setEditNotes] = useState('');
 
 	const [accountsPage, setAccountsPage] = useState(0);
+	const [feeDraft, setFeeDraft] = useState('60');
+
+	const { data: paymentSettingsData, refetch: refetchPaymentSettings } = useQuery(
+		WALK_IN_PAYMENT_SETTINGS,
+		{ fetchPolicy: 'cache-and-network' },
+	);
+	const [updateWalkInFee, { loading: savingFee }] = useMutation(UPDATE_WALK_IN_PAYMENT_SETTINGS, {
+		onCompleted: () => {
+			dispatch(addToast({ type: 'success', message: 'Default walk-in fee updated.' }));
+			refetchPaymentSettings();
+		},
+		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
+	});
+
+	useEffect(() => {
+		const v = paymentSettingsData?.walkInPaymentSettings?.defaultPaymentPesos;
+		if (v != null) setFeeDraft(String(v));
+	}, [paymentSettingsData?.walkInPaymentSettings?.defaultPaymentPesos]);
 
 	const {
 		data: logsData,
@@ -450,6 +470,41 @@ export function WalkInAttendancePage() {
 				</p>
 			</div>
 
+			<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 md:p-5 flex flex-col sm:flex-row sm:items-end gap-4">
+				<div className="flex-1 min-w-0">
+					<h2 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+						Default time-in payment (₱)
+					</h2>
+					<p className="text-xs text-[var(--text-secondary)] mb-2">
+						Applied to each new time-in. Change anytime; existing log amounts stay as recorded.
+					</p>
+					<input
+						type="number"
+						min={0}
+						step={1}
+						value={feeDraft}
+						onChange={(e) => setFeeDraft(e.target.value)}
+						className="w-full max-w-[200px] bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-[var(--text-primary)] text-sm"
+					/>
+				</div>
+				<Button
+					type="button"
+					className="btn-primary shrink-0"
+					disabled={savingFee}
+					onClick={() => {
+						const n = Number(feeDraft);
+						if (!Number.isFinite(n) || n < 0) {
+							dispatch(addToast({ type: 'error', message: 'Enter a valid amount (≥ 0).' }));
+							return;
+						}
+						updateWalkInFee({ variables: { paymentPesos: n } });
+					}}
+				>
+					{savingFee ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+					Save default
+				</Button>
+			</div>
+
 			{/* Date toolbar */}
 			<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 md:p-5">
 				<div className="flex flex-wrap items-center gap-2">
@@ -535,6 +590,7 @@ export function WalkInAttendancePage() {
 						<thead>
 							<tr className="text-left text-[var(--text-secondary)] border-b border-[var(--card-border)] bg-[rgba(255,255,255,0.02)]">
 								<th className="px-4 py-3 font-medium">Time in</th>
+								<th className="px-4 py-3 font-medium">Payment</th>
 								<th className="px-4 py-3 font-medium">Name</th>
 								<th className="px-4 py-3 font-medium">Gender</th>
 								<th className="px-4 py-3 font-medium">Contact</th>
@@ -546,13 +602,13 @@ export function WalkInAttendancePage() {
 						<tbody>
 							{logsLoading ? (
 								<tr>
-									<td colSpan={7} className="px-4 py-12 text-center text-[var(--text-secondary)]">
+									<td colSpan={8} className="px-4 py-12 text-center text-[var(--text-secondary)]">
 										<Loader2 className="w-8 h-8 animate-spin mx-auto" />
 									</td>
 								</tr>
 							) : logs.length === 0 ? (
 								<tr>
-									<td colSpan={7} className="px-4 py-10 text-center text-[var(--text-secondary)]">
+									<td colSpan={8} className="px-4 py-10 text-center text-[var(--text-secondary)]">
 										No time-ins for this date.
 									</td>
 								</tr>
@@ -564,6 +620,9 @@ export function WalkInAttendancePage() {
 									>
 										<td className="px-4 py-3 text-[var(--text-primary)] whitespace-nowrap">
 											{formatTimeManila(row.timedInAt)}
+										</td>
+										<td className="px-4 py-3 text-[var(--text-primary)] whitespace-nowrap tabular-nums">
+											₱{Number(row.payment ?? 0).toLocaleString()}
 										</td>
 										<td className="px-4 py-3 font-medium text-[var(--text-primary)]">
 											{formatWalkInName(row.walkInClient)}
@@ -707,6 +766,7 @@ export function WalkInAttendancePage() {
 									<tr className="text-left text-[var(--text-secondary)] border-b border-[var(--card-border)] bg-[rgba(255,255,255,0.02)]">
 										<th className="px-4 py-3 font-medium">Date (Manila)</th>
 										<th className="px-4 py-3 font-medium">Time in</th>
+										<th className="px-4 py-3 font-medium">Payment</th>
 										<th className="px-4 py-3 font-medium">Contact</th>
 										<th className="px-4 py-3 font-medium">Email</th>
 										<th className="px-4 py-3 font-medium">Profile notes</th>
@@ -715,14 +775,14 @@ export function WalkInAttendancePage() {
 								<tbody>
 									{personHistoryLoading ? (
 										<tr>
-											<td colSpan={5} className="px-4 py-12 text-center">
+											<td colSpan={6} className="px-4 py-12 text-center">
 												<Loader2 className="w-8 h-8 animate-spin mx-auto text-[var(--text-secondary)]" />
 											</td>
 										</tr>
 									) : personHistoryLogs.length === 0 ? (
 										<tr>
 											<td
-												colSpan={5}
+												colSpan={6}
 												className="px-4 py-8 text-center text-[var(--text-secondary)]"
 											>
 												No time-in visits recorded yet for this person.
@@ -739,6 +799,9 @@ export function WalkInAttendancePage() {
 												</td>
 												<td className="px-4 py-3 text-[var(--text-primary)] whitespace-nowrap">
 													{formatTimeManila(row.timedInAt)}
+												</td>
+												<td className="px-4 py-3 text-[var(--text-primary)] whitespace-nowrap tabular-nums">
+													₱{Number(row.payment ?? 0).toLocaleString()}
 												</td>
 												<td className="px-4 py-3 text-[var(--text-secondary)]">
 													{row.walkInClient.phoneNumber ?? '—'}

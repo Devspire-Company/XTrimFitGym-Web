@@ -362,8 +362,9 @@ export function DashboardPage() {
 	const totalMembers = members.length;
 	const totalCoaches = coaches.length;
 	
-	// Calculate stats from analytics
 	const monthlyRevenue = analytics?.totalRevenue || 0;
+	const membershipRev = analytics?.membershipSubscriptionRevenue ?? 0;
+	const walkInRev = analytics?.walkInRevenue ?? 0;
 	const activeSubscriptions = analytics?.activeSubscriptions || 0;
 
 	// Recent members (last 3) - sort by join date
@@ -415,9 +416,9 @@ export function DashboardPage() {
 				/>
 				<StatCard
 					icon={DollarSign}
-					title="Monthly Revenue"
+					title="Total revenue"
 					value={`₱${monthlyRevenue.toLocaleString()}`}
-					change="+15% from last month"
+					change="Membership + walk-in fees"
 					changeType="positive"
 				/>
 				<StatCard
@@ -438,7 +439,15 @@ export function DashboardPage() {
 				{/* Revenue Chart */}
 				{analytics?.revenueByPeriod && analytics.revenueByPeriod.length > 0 ? (
 					<div className="mb-6">
-						<RevenueChart data={analytics.revenueByPeriod} />
+						<RevenueChart
+							data={analytics.revenueByPeriod as Array<{
+								period: string;
+								revenue: number;
+								count: number;
+								walkInRevenue?: number;
+								walkInCount?: number;
+							}>}
+						/>
 					</div>
 				) : (
 					<div className="mb-6 h-80 flex items-center justify-center text-[var(--text-secondary)]">
@@ -446,12 +455,23 @@ export function DashboardPage() {
 					</div>
 				)}
 
-				{/* Key Stats */}
-				<div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-[rgba(255,255,255,0.08)]">
+				<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 pt-4 border-t border-[rgba(255,255,255,0.08)]">
 					<div className="flex flex-col">
-						<span className="text-sm text-[var(--text-secondary)] mb-1">Total Revenue</span>
+						<span className="text-sm text-[var(--text-secondary)] mb-1">Total</span>
 						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
 							₱{monthlyRevenue.toLocaleString()}
+						</span>
+					</div>
+					<div className="flex flex-col">
+						<span className="text-sm text-[var(--text-secondary)] mb-1">Membership sales</span>
+						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+							₱{membershipRev.toLocaleString()}
+						</span>
+					</div>
+					<div className="flex flex-col">
+						<span className="text-sm text-[var(--text-secondary)] mb-1">Walk-in fees</span>
+						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+							₱{walkInRev.toLocaleString()}
 						</span>
 					</div>
 					<div className="flex flex-col">
@@ -467,9 +487,10 @@ export function DashboardPage() {
 						</span>
 					</div>
 					<div className="flex flex-col">
-						<span className="text-sm text-[var(--text-secondary)] mb-1">Avg. per Member</span>
+						<span className="text-sm text-[var(--text-secondary)] mb-1">Avg. sub / member</span>
 						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
-							₱{activeSubscriptions > 0 ? Math.round(monthlyRevenue / activeSubscriptions) : 0}
+							₱
+							{activeSubscriptions > 0 ? Math.round(membershipRev / activeSubscriptions) : 0}
 						</span>
 					</div>
 				</div>
@@ -755,26 +776,46 @@ function QuickActionButton({
 	);
 }
 
-function RevenueChart({ data }: { data: Array<{ period: string; revenue: number; count: number }> }) {
+function RevenueChart({
+	data,
+}: {
+	data: Array<{
+		period: string;
+		revenue: number;
+		count: number;
+		walkInRevenue?: number;
+		walkInCount?: number;
+	}>;
+}) {
+	const subDaily = data.map((item) =>
+		Math.max(0, item.revenue - (item.walkInRevenue ?? 0)),
+	);
+	const walkDaily = data.map((item) => item.walkInRevenue ?? 0);
+
 	const chartData = {
 		labels: data.map((item) => item.period),
 		datasets: [
 			{
-				label: 'Revenue',
-				data: data.map((item) => item.revenue),
+				label: 'Membership (new sales, day)',
+				data: subDaily,
 				borderColor: 'rgba(249, 197, 19, 1)',
-				backgroundColor: 'rgba(249, 197, 19, 0.1)',
-				borderWidth: 3,
+				backgroundColor: 'rgba(249, 197, 19, 0.12)',
+				borderWidth: 2,
 				fill: true,
-				tension: 0.4,
-				pointBackgroundColor: 'rgba(249, 197, 19, 1)',
-				pointBorderColor: '#fff',
-				pointBorderWidth: 2,
-				pointRadius: 5,
-				pointHoverRadius: 7,
-				pointHoverBackgroundColor: 'rgba(249, 197, 19, 1)',
-				pointHoverBorderColor: '#fff',
-				pointHoverBorderWidth: 2,
+				tension: 0.35,
+				pointRadius: 4,
+				pointHoverRadius: 6,
+			},
+			{
+				label: 'Walk-in fees (day)',
+				data: walkDaily,
+				borderColor: 'rgba(16, 185, 129, 1)',
+				backgroundColor: 'rgba(16, 185, 129, 0.08)',
+				borderWidth: 2,
+				fill: true,
+				tension: 0.35,
+				pointRadius: 4,
+				pointHoverRadius: 6,
 			},
 		],
 	};
@@ -784,7 +825,9 @@ function RevenueChart({ data }: { data: Array<{ period: string; revenue: number;
 		maintainAspectRatio: false,
 		plugins: {
 			legend: {
-				display: false,
+				display: true,
+				position: 'top' as const,
+				labels: { color: 'rgba(184, 188, 200, 0.95)', boxWidth: 12 },
 			},
 			tooltip: {
 				backgroundColor: 'rgba(19, 22, 31, 0.95)',
@@ -804,8 +847,14 @@ function RevenueChart({ data }: { data: Array<{ period: string; revenue: number;
 					family: "'Inter', sans-serif",
 				},
 				callbacks: {
+					afterBody: function (items: any[]) {
+						const i = items[0]?.dataIndex;
+						if (i == null) return '';
+						const total = (subDaily[i] ?? 0) + (walkDaily[i] ?? 0);
+						return `Day total: ₱${total.toLocaleString()}`;
+					},
 					label: function (context: any) {
-						return `₱${context.parsed.y.toLocaleString()}`;
+						return `${context.dataset.label}: ₱${context.parsed.y.toLocaleString()}`;
 					},
 				},
 			},

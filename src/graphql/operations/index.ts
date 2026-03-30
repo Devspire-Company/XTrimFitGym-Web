@@ -63,5 +63,7 @@ export {
 	CreateWalkInClientDocument as CREATE_WALK_IN_CLIENT,
 	UpdateWalkInClientDocument as UPDATE_WALK_IN_CLIENT,
 	WalkInTimeInDocument as WALK_IN_TIME_IN,
+	WalkInPaymentSettingsDocument as WALK_IN_PAYMENT_SETTINGS,
+	UpdateWalkInPaymentSettingsDocument as UPDATE_WALK_IN_PAYMENT_SETTINGS,
 } from '../generated/graphql';
 

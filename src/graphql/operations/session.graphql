@@ -16,6 +16,19 @@ query GetCoachSessions($coachId: ID!, $status: SessionStatus) {
 		gymArea
 		status
 		note
+		sessionKind
+		maxParticipants
+		enrollments {
+			clientId
+			status
+			createdAt
+			client {
+				id
+				firstName
+				lastName
+				email
+			}
+		}
 		createdAt
 		updatedAt
 	}

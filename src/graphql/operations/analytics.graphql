@@ -2,6 +2,8 @@
 query GetRevenueSummary($dateRange: DateRangeInput) {
 	getRevenueSummary(dateRange: $dateRange) {
 		totalRevenue
+		membershipSubscriptionRevenue
+		walkInRevenue
 		activeSubscriptions
 		newSubscriptions
 		canceledSubscriptions
@@ -16,6 +18,8 @@ query GetRevenueSummary($dateRange: DateRangeInput) {
 			period
 			revenue
 			count
+			walkInRevenue
+			walkInCount
 		}
 	}
 }
@@ -25,6 +29,8 @@ query GetAnalytics($date: String!) {
 		id
 		date
 		totalRevenue
+		membershipSubscriptionRevenue
+		walkInRevenue
 		activeSubscriptions
 		newSubscriptions
 		canceledSubscriptions
@@ -45,6 +51,8 @@ query GetAnalyticsRange($dateRange: DateRangeInput!) {
 		id
 		date
 		totalRevenue
+		membershipSubscriptionRevenue
+		walkInRevenue
 		activeSubscriptions
 		newSubscriptions
 		canceledSubscriptions
@@ -64,6 +72,8 @@ query GetAnalyticsRange($dateRange: DateRangeInput!) {
 subscription RevenueSummaryUpdated($dateRange: DateRangeInput) {
 	revenueSummaryUpdated(dateRange: $dateRange) {
 		totalRevenue
+		membershipSubscriptionRevenue
+		walkInRevenue
 		activeSubscriptions
 		newSubscriptions
 		canceledSubscriptions
@@ -78,7 +88,8 @@ subscription RevenueSummaryUpdated($dateRange: DateRangeInput) {
 			period
 			revenue
 			count
+			walkInRevenue
+			walkInCount
 		}
 	}
 }
-
