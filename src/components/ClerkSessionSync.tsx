@@ -1,5 +1,6 @@
 import { useAuth, useClerk } from '@clerk/clerk-react';
 import { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router';
 import { useApolloClient } from '@apollo/client';
 import { useAppDispatch } from '@/store/hooks';
 import { setCredentials, logout } from '@/store/slices/authSlice';
@@ -22,7 +23,19 @@ function mapMeToUser(u: NonNullable<import('@/graphql/generated/graphql').MeQuer
 	};
 }
 
+/** Don't sync Mongo admin / signOut during Clerk email/OAuth steps — avoids extra verification emails & broken sign-up. */
+function isClerkAuthRoute(pathname: string) {
+	return (
+		pathname === '/login' ||
+		pathname.startsWith('/login/') ||
+		pathname === '/sign-up' ||
+		pathname.startsWith('/sign-up/')
+	);
+}
+
 export function ClerkSessionSync() {
+	const location = useLocation();
+	const onAuthPage = isClerkAuthRoute(location.pathname);
 	const { isLoaded, isSignedIn, getToken, sessionId } = useAuth();
 	const { signOut } = useClerk();
 	const client = useApolloClient();
@@ -38,6 +51,11 @@ export function ClerkSessionSync() {
 
 		if (!isSignedIn) {
 			dispatch(logout());
+			return;
+		}
+
+		// Let Clerk finish sign-in/sign-up + email verification without calling our API or signOut()
+		if (onAuthPage) {
 			return;
 		}
 
@@ -105,7 +123,7 @@ export function ClerkSessionSync() {
 		};
 
 		void run();
-	}, [isLoaded, isSignedIn, sessionId, getToken, client, dispatch, signOut]);
+	}, [isLoaded, isSignedIn, sessionId, onAuthPage, getToken, client, dispatch, signOut]);
 
 	return null;
 }
