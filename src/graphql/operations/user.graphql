@@ -1,3 +1,17 @@
+query Me {
+	me {
+		id
+		firstName
+		middleName
+		lastName
+		email
+		role
+		phoneNumber
+		dateOfBirth
+		gender
+	}
+}
+
 query GetUsers($role: RoleType) {
 	getUsers(role: $role) {
 		id

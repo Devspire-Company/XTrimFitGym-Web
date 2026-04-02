@@ -2,6 +2,7 @@
 
 // Queries
 export {
+	MeDocument as GET_ME,
 	GetEquipmentsDocument as GET_EQUIPMENTS,
 	GetEquipmentDocument as GET_EQUIPMENT,
 	GetAllMembershipsDocument as GET_ALL_MEMBERSHIPS,

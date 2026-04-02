@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAppSelector } from '@/store/hooks';
 import type { ReactNode } from 'react';
 
@@ -7,22 +8,34 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
+	const { isLoaded, isSignedIn } = useClerkAuth();
 	const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
 	const user = useAppSelector((state) => state.auth.user);
 	const location = useLocation();
 
-	// Check if user is authenticated
-	if (!isAuthenticated) {
-		// Redirect to login but save the location they were trying to go to
+	if (!isLoaded) {
+		return (
+			<div className="min-h-screen flex items-center justify-center bg-[var(--bg-darker)]">
+				<div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--primary-yellow)]" />
+			</div>
+		);
+	}
+
+	if (!isSignedIn) {
 		return <Navigate to="/login" state={{ from: location }} replace />;
 	}
 
-	// Check if user is an admin - only admins can access the web app
-	if (user?.role !== 'admin') {
-		// Logout non-admin users and redirect to login
+	if (!isAuthenticated || !user) {
+		return (
+			<div className="min-h-screen flex items-center justify-center bg-[var(--bg-darker)]">
+				<div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--primary-yellow)]" />
+			</div>
+		);
+	}
+
+	if (user.role !== 'admin') {
 		return <Navigate to="/login" replace />;
 	}
 
 	return <>{children}</>;
 }
-

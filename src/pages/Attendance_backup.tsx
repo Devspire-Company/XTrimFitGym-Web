@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useAppSelector } from '@/store/hooks';
-import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 
@@ -13,7 +12,8 @@ export function LoginPage() {
 
 	const navigate = useNavigate();
 	const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-	const { login, loginLoading } = useAuth();
+	const loginLoading = false;
+	const login = async (_email: string, _password: string) => {};
 
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');

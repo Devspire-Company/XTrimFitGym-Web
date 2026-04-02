@@ -4,6 +4,7 @@ import { onError } from '@apollo/client/link/error';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
+import { getAuthBearerToken } from '@/lib/clerkTokenBridge';
 
 const getGraphQLUrl = (): string => {
 	// In production (e.g. Vercel), you MUST set VITE_GRAPHQL_URL to your deployed API URL + /graphql.
@@ -51,8 +52,8 @@ const wsLink = new GraphQLWsLink(
 		lazy: false,
 		// Keep the socket alive so proxies don't close it; reduces reconnects and missed messages
 		keepAlive: 15_000,
-		connectionParams: () => {
-			const token = localStorage.getItem('authToken');
+		connectionParams: async () => {
+			const token = await getAuthBearerToken();
 			return {
 				authorization: token ? `Bearer ${token}` : '',
 			};
@@ -81,9 +82,8 @@ const wsLink = new GraphQLWsLink(
 	})
 );
 
-const authLink = setContext((_, { headers }) => {
-	// Get the authentication token from localStorage or Redux store
-	const token = localStorage.getItem('authToken');
+const authLink = setContext(async (_, { headers }) => {
+	const token = await getAuthBearerToken();
 	return {
 		headers: {
 			...headers,

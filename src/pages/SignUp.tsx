@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
-import { SignIn, useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { SignUp, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router';
 import { useAppSelector } from '@/store/hooks';
 import { clerkAuthAppearance } from '@/lib/clerkAppearance';
 
-export function LoginPage() {
+export function SignUpPage() {
 	useEffect(() => {
-		document.title = 'Login - X-TRIM FIT GYM';
+		document.title = 'Sign up - X-TRIM FIT GYM';
 	}, []);
 
 	const navigate = useNavigate();
@@ -34,15 +34,14 @@ export function LoginPage() {
 			<div className="w-full max-w-md">
 				<div className="text-center mb-8">
 					<img src="/logo.png" alt="X-TRIM FIT GYM" className="h-16 w-auto mx-auto mb-4" />
-					<h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">Welcome Back</h1>
-					<p className="text-[var(--text-secondary)]">Sign in to access your admin dashboard</p>
+					<h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">Create account</h1>
+					<p className="text-[var(--text-secondary)]">Sign up for admin access (Clerk + gym role required)</p>
 				</div>
 
 				<div className="flex justify-center clerk-auth-host">
-					<SignIn
+					<SignUp
 						routing="path"
-						path="/login"
-						signUpUrl="/sign-up"
+						path="/sign-up"
 						signInUrl="/login"
 						forceRedirectUrl="/dashboard"
 						fallbackRedirectUrl="/dashboard"

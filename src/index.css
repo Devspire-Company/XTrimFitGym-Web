@@ -2007,3 +2007,17 @@ select option[selected] {
 	color: var(--primary-yellow) !important;
 	font-weight: 600 !important;
 }
+
+/* Clerk SignIn/SignUp: OAuth buttons readable on dark admin shell */
+.clerk-auth-host .cl-socialButtonsBlockButton,
+.clerk-auth-host .cl-socialButtonsIconButton {
+	background-color: #ffffff !important;
+	color: #18181b !important;
+	border: 1px solid #d4d4d8 !important;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+	min-height: 2.75rem;
+}
+.clerk-auth-host .cl-socialButtonsBlockButton:hover,
+.clerk-auth-host .cl-socialButtonsIconButton:hover {
+	background-color: #f4f4f5 !important;
+}

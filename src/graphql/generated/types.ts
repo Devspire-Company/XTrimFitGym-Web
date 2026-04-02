@@ -807,6 +807,8 @@ export type Query = {
   getUsers?: Maybe<Array<Maybe<User>>>;
   getWeightProgress: Array<SessionLog>;
   getWeightProgressChart: Array<WeightProgress>;
+  /** Current user from Authorization (JWT or Clerk session token). */
+  me?: Maybe<User>;
   /** Search by name/phone/email, or pass an empty query to list all walk-ins (admin, paginated). */
   searchWalkInClients: Array<WalkInClient>;
   /** All walk-in profiles with per-profile time-in counts (paginated, newest updated first). */
@@ -1493,6 +1495,11 @@ export type DeleteSubscriptionRequestMutationVariables = Exact<{
 
 
 export type DeleteSubscriptionRequestMutation = { __typename?: 'Mutation', deleteSubscriptionRequest: boolean };
+
+export type MeQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string } | null };
 
 export type GetUsersQueryVariables = Exact<{
   role?: InputMaybe<RoleType>;

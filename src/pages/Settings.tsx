@@ -14,6 +14,7 @@ import {
 	Eye,
 	EyeOff,
 } from 'lucide-react';
+import { useClerk } from '@clerk/clerk-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { logout, updateUser } from '@/store/slices/authSlice';
 import { addToast } from '@/store/slices/uiSlice';
@@ -27,12 +28,14 @@ export function SettingsPage() {
 	}, []);
 	const navigate = useNavigate();
 	const dispatch = useAppDispatch();
+	const { signOut } = useClerk();
 	const { user } = useAppSelector((state) => state.auth);
 	const [activeSection, setActiveSection] = useState('account');
 	const [editMode, setEditMode] = useState<Record<string, boolean>>({});
 	const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
-	const handleLogout = () => {
+	const handleLogout = async () => {
+		await signOut();
 		dispatch(logout());
 		setLogoutModalOpen(false);
 		navigate('/login');

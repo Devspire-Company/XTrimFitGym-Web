@@ -1,4 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router';
+import { useClerk } from '@clerk/clerk-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
 import { useState, useRef, useEffect } from 'react';
@@ -29,8 +30,10 @@ export function AdminLayout() {
 	const [expandedSidebarWidth, setExpandedSidebarWidth] = useState(280); // Default width
 	const sidebarRef = useRef<HTMLElement>(null);
 	const navigate = useNavigate();
+	const { signOut } = useClerk();
 
-	const handleLogout = () => {
+	const handleLogout = async () => {
+		await signOut();
 		dispatch(logout());
 		setLogoutModalOpen(false);
 		navigate('/login');
