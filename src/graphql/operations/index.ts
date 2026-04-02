@@ -2,6 +2,7 @@
 
 // Queries
 export {
+	RequestCreateAdminVerificationCodeDocument as REQUEST_CREATE_ADMIN_VERIFICATION_CODE,
 	MeDocument as GET_ME,
 	GetEquipmentsDocument as GET_EQUIPMENTS,
 	GetEquipmentDocument as GET_EQUIPMENT,

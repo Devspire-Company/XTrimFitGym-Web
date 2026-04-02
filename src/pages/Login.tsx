@@ -42,11 +42,16 @@ export function LoginPage() {
 					<SignIn
 						routing="path"
 						path="/login"
-						signUpUrl="/sign-up"
 						signInUrl="/login"
 						forceRedirectUrl="/dashboard"
 						fallbackRedirectUrl="/dashboard"
-						appearance={clerkAuthAppearance}
+						appearance={{
+							...clerkAuthAppearance,
+							elements: {
+								...clerkAuthAppearance.elements,
+								footerAction: 'hidden',
+							},
+						}}
 					/>
 				</div>
 

@@ -19,7 +19,13 @@ import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { logout, updateUser } from '@/store/slices/authSlice';
 import { addToast } from '@/store/slices/uiSlice';
 import { useMutation, useQuery } from '@apollo/client';
-import { UPDATE_USER, CREATE_USER, GET_USERS, GET_USER } from '@/graphql/operations';
+import {
+	UPDATE_USER,
+	CREATE_USER,
+	GET_USERS,
+	GET_USER,
+	REQUEST_CREATE_ADMIN_VERIFICATION_CODE,
+} from '@/graphql/operations';
 import { RoleType } from '@/graphql/generated/graphql';
 
 export function SettingsPage() {
@@ -804,13 +810,15 @@ function AdminAccountsSection() {
 		email: '',
 		password: '',
 		confirmPassword: '',
-		currentPassword: '',
 	});
+	const [verificationCode, setVerificationCode] = useState('');
 	const [showPasswords, setShowPasswords] = useState({
-		current: false,
 		password: false,
 		confirm: false,
 	});
+	const [requestCodeMutation, { loading: requestingCode }] = useMutation(
+		REQUEST_CREATE_ADMIN_VERIFICATION_CODE
+	);
 	const [createUserMutation] = useMutation(CREATE_USER);
 	const { data: adminsData, refetch } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Admin },
@@ -821,11 +829,28 @@ function AdminAccountsSection() {
 		setFormData((prev) => ({ ...prev, [name]: value }));
 	};
 
+	const handleSendVerificationCode = async () => {
+		try {
+			await requestCodeMutation();
+			dispatch(
+				addToast({
+					type: 'success',
+					message: `Verification code sent to ${user?.email || 'your email'}. Check your inbox.`,
+				})
+			);
+		} catch (error: unknown) {
+			const message =
+				error instanceof Error ? error.message : 'Could not send verification code';
+			dispatch(addToast({ type: 'error', message }));
+		}
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 
-		if (!formData.currentPassword) {
-			dispatch(addToast({ type: 'error', message: 'Current password is required' }));
+		const code = verificationCode.trim().replace(/\s/g, '');
+		if (!code) {
+			dispatch(addToast({ type: 'error', message: 'Enter the email verification code' }));
 			return;
 		}
 
@@ -851,9 +876,8 @@ function AdminAccountsSection() {
 						email: formData.email,
 						password: formData.password,
 						role: RoleType.Admin,
-						// gender is optional, so we omit it instead of sending empty string
-						currentPassword: formData.currentPassword,
-					} as any,
+						adminVerificationCode: code,
+					},
 				},
 			});
 
@@ -865,8 +889,8 @@ function AdminAccountsSection() {
 					email: '',
 					password: '',
 					confirmPassword: '',
-					currentPassword: '',
 				});
+				setVerificationCode('');
 				setIsModalOpen(false);
 				refetch();
 			}
@@ -894,7 +918,8 @@ function AdminAccountsSection() {
 			</div>
 			<div className="section-content flex flex-col gap-6">
 				<p className="text-[var(--text-secondary)] text-sm mb-4">
-					Manage administrator accounts for the system. Only existing admins can create new admin accounts.
+					Create admins only from here. New staff need a MongoDB user first (this form); they sign in with Clerk
+					using the same email. Public sign-up is disabled.
 				</p>
 				{admins.length > 0 && (
 					<div className="admin-list">
@@ -949,31 +974,29 @@ function AdminAccountsSection() {
 						<form onSubmit={handleSubmit} className="flex flex-col gap-4">
 							<div className="form-group flex flex-col gap-2">
 								<label className="text-sm font-medium text-[var(--text-secondary)]">
-									Your Current Password *
+									Email verification *
 								</label>
-								<div className="input-wrapper relative">
+								<div className="flex flex-col sm:flex-row gap-2">
 									<input
-										type={showPasswords.current ? 'text' : 'password'}
-										name="currentPassword"
-										value={formData.currentPassword}
-										onChange={handleInputChange}
-										required
-										className="w-full px-4 py-3 pr-12 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+										type="text"
+										inputMode="numeric"
+										autoComplete="one-time-code"
+										placeholder="6-digit code"
+										value={verificationCode}
+										onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+										className="flex-1 min-w-0 px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] tracking-widest transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
 									/>
 									<button
 										type="button"
-										onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-										className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+										onClick={() => void handleSendVerificationCode()}
+										disabled={requestingCode}
+										className="px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.08)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm font-medium hover:bg-[rgba(255,255,255,0.12)] disabled:opacity-50 whitespace-nowrap"
 									>
-										{showPasswords.current ? (
-											<EyeOff className="w-5 h-5" />
-										) : (
-											<Eye className="w-5 h-5" />
-										)}
+										{requestingCode ? 'Sending…' : 'Send code to my email'}
 									</button>
 								</div>
 								<p className="text-xs text-[var(--text-secondary)] mt-1">
-									Confirm your password to create a new admin account
+									We email a one-time code to your admin address ({user?.email}). Code expires in 15 minutes.
 								</p>
 							</div>
 							<div className="form-group flex flex-col gap-2">

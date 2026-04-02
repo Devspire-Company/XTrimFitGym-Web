@@ -85,7 +85,7 @@ export function ClerkSessionSync() {
 						addToast({
 							type: 'error',
 							message:
-								'No gym account found for this sign-in. Use the email registered in X-TRIM FIT GYM.',
+								'No MongoDB user for this email. An admin must create your account in Settings first; public sign-up is disabled.',
 						})
 					);
 					return;
