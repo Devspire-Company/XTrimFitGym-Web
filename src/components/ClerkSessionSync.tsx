@@ -97,7 +97,8 @@ export function ClerkSessionSync() {
 					dispatch(
 						addToast({
 							type: 'error',
-							message: 'Access denied. Only administrators can access this application.',
+							message:
+								'Admins only. Update this user’s role to admin in MongoDB, or set Clerk publicMetadata.role / CLERK_ADMIN_EMAILS before first sign-in.',
 						})
 					);
 					return;
