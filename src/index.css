@@ -2021,3 +2021,8 @@ select option[selected] {
 .clerk-auth-host .cl-socialButtonsIconButton:hover {
 	background-color: #f4f4f5 !important;
 }
+
+/* Sign-in only: no public sign-up (admins are created in Settings). */
+.clerk-auth-host .cl-footerAction {
+	display: none !important;
+}

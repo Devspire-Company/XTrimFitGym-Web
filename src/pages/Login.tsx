@@ -45,11 +45,13 @@ export function LoginPage() {
 						signInUrl="/login"
 						forceRedirectUrl="/dashboard"
 						fallbackRedirectUrl="/dashboard"
+						transferable={false}
 						appearance={{
 							...clerkAuthAppearance,
 							elements: {
 								...clerkAuthAppearance.elements,
-								footerAction: 'hidden',
+								footerAction: { display: 'none' },
+								footerActionLink: { display: 'none' },
 							},
 						}}
 					/>

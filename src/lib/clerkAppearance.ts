@@ -1,4 +1,4 @@
-/** Shared SignIn / SignUp styling: readable Google button + visible footer links. */
+/** Shared Clerk auth styling (SignIn). */
 export const clerkAuthAppearance = {
 	variables: {
 		colorPrimary: '#f9c513',
