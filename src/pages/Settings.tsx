@@ -808,14 +808,8 @@ function AdminAccountsSection() {
 		firstName: '',
 		lastName: '',
 		email: '',
-		password: '',
-		confirmPassword: '',
 	});
 	const [verificationCode, setVerificationCode] = useState('');
-	const [showPasswords, setShowPasswords] = useState({
-		password: false,
-		confirm: false,
-	});
 	const [requestCodeMutation, { loading: requestingCode }] = useMutation(
 		REQUEST_CREATE_ADMIN_VERIFICATION_CODE
 	);
@@ -854,19 +848,9 @@ function AdminAccountsSection() {
 			return;
 		}
 
-		if (formData.password !== formData.confirmPassword) {
-			dispatch(addToast({ type: 'error', message: 'Passwords do not match' }));
-			return;
-		}
-
-		if (formData.password.length < 6) {
-			dispatch(addToast({ type: 'error', message: 'Password must be at least 6 characters long' }));
-			return;
-		}
-
 		if (!user?.id) return;
 
-		// Create admin account (password verification is done in backend)
+		// Create admin account (authorized with email verification code in backend)
 		try {
 			const result = await createUserMutation({
 				variables: {
@@ -874,7 +858,6 @@ function AdminAccountsSection() {
 						firstName: formData.firstName,
 						lastName: formData.lastName,
 						email: formData.email,
-						password: formData.password,
 						role: RoleType.Admin,
 						adminVerificationCode: code,
 					},
@@ -887,8 +870,6 @@ function AdminAccountsSection() {
 					firstName: '',
 					lastName: '',
 					email: '',
-					password: '',
-					confirmPassword: '',
 				});
 				setVerificationCode('');
 				setIsModalOpen(false);
@@ -974,33 +955,6 @@ function AdminAccountsSection() {
 						<form onSubmit={handleSubmit} className="flex flex-col gap-4">
 							<div className="form-group flex flex-col gap-2">
 								<label className="text-sm font-medium text-[var(--text-secondary)]">
-									Email verification *
-								</label>
-								<div className="flex flex-col sm:flex-row gap-2">
-									<input
-										type="text"
-										inputMode="numeric"
-										autoComplete="one-time-code"
-										placeholder="6-digit code"
-										value={verificationCode}
-										onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-										className="flex-1 min-w-0 px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] tracking-widest transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
-									/>
-									<button
-										type="button"
-										onClick={() => void handleSendVerificationCode()}
-										disabled={requestingCode}
-										className="px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.08)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm font-medium hover:bg-[rgba(255,255,255,0.12)] disabled:opacity-50 whitespace-nowrap"
-									>
-										{requestingCode ? 'Sending…' : 'Send code to my email'}
-									</button>
-								</div>
-								<p className="text-xs text-[var(--text-secondary)] mt-1">
-									We email a one-time code to your admin address ({user?.email}). Code expires in 15 minutes.
-								</p>
-							</div>
-							<div className="form-group flex flex-col gap-2">
-								<label className="text-sm font-medium text-[var(--text-secondary)]">
 									First Name *
 								</label>
 								<input
@@ -1040,57 +994,30 @@ function AdminAccountsSection() {
 							</div>
 							<div className="form-group flex flex-col gap-2">
 								<label className="text-sm font-medium text-[var(--text-secondary)]">
-									Password *
+									Email verification *
 								</label>
-								<div className="input-wrapper relative">
+								<div className="flex flex-col sm:flex-row gap-2">
 									<input
-										type={showPasswords.password ? 'text' : 'password'}
-										name="password"
-										value={formData.password}
-										onChange={handleInputChange}
-										required
-										minLength={6}
-										className="w-full px-4 py-3 pr-12 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+										type="text"
+										inputMode="numeric"
+										autoComplete="one-time-code"
+										placeholder="6-digit code"
+										value={verificationCode}
+										onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+										className="flex-1 min-w-0 px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] tracking-widest transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
 									/>
 									<button
 										type="button"
-										onClick={() => setShowPasswords({ ...showPasswords, password: !showPasswords.password })}
-										className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+										onClick={() => void handleSendVerificationCode()}
+										disabled={requestingCode}
+										className="px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.08)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm font-medium hover:bg-[rgba(255,255,255,0.12)] disabled:opacity-50 whitespace-nowrap"
 									>
-										{showPasswords.password ? (
-											<EyeOff className="w-5 h-5" />
-										) : (
-											<Eye className="w-5 h-5" />
-										)}
+										{requestingCode ? 'Sending…' : 'Send code to my email'}
 									</button>
 								</div>
-							</div>
-							<div className="form-group flex flex-col gap-2">
-								<label className="text-sm font-medium text-[var(--text-secondary)]">
-									Confirm Password *
-								</label>
-								<div className="input-wrapper relative">
-									<input
-										type={showPasswords.confirm ? 'text' : 'password'}
-										name="confirmPassword"
-										value={formData.confirmPassword}
-										onChange={handleInputChange}
-										required
-										minLength={6}
-										className="w-full px-4 py-3 pr-12 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
-									/>
-									<button
-										type="button"
-										onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-										className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
-									>
-										{showPasswords.confirm ? (
-											<EyeOff className="w-5 h-5" />
-										) : (
-											<Eye className="w-5 h-5" />
-										)}
-									</button>
-								</div>
+								<p className="text-xs text-[var(--text-secondary)] mt-1">
+									We email a one-time code to your admin address ({user?.email}). Code expires in 15 minutes.
+								</p>
 							</div>
 							<div className="flex gap-4 justify-end mt-4 pt-4 border-t border-[var(--card-border)]">
 								<button
