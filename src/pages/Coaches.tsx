@@ -10,7 +10,6 @@ import {
 	X,
 	Copy,
 	Save,
-	EyeOff,
 	Edit,
 	RefreshCw,
 	Users,
@@ -623,7 +622,6 @@ export function CoachesPage() {
 										middleName: formData.middleName || undefined,
 										lastName: formData.lastName,
 										email: formData.email,
-										password: formData.password,
 										role: RoleType.Coach,
 										phoneNumber: formData.phone || undefined,
 										gender: formData.gender || undefined,
@@ -1290,7 +1288,6 @@ function AddCoachModal({
 		middleName?: string;
 		lastName: string;
 		email: string;
-		password: string;
 		phone?: string;
 		specializations: string[];
 		yearsExperience?: string;
@@ -1327,7 +1324,6 @@ function AddCoachModal({
 		middleName: '',
 		lastName: '',
 		email: '',
-		password: '',
 		phone: '',
 		specializations: [] as string[],
 		yearsExperience: '',
@@ -1343,7 +1339,6 @@ function AddCoachModal({
 		clientLimit: '',
 	});
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [showPassword, setShowPassword] = useState(false);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -1417,7 +1412,6 @@ function AddCoachModal({
 				middleName: '',
 				lastName: '',
 				email: '',
-				password: '',
 				phone: '',
 				specializations: [],
 				yearsExperience: '',
@@ -1432,7 +1426,6 @@ function AddCoachModal({
 				teachingTimeEndPeriod: 'PM',
 				clientLimit: '',
 			});
-			setShowPassword(false);
 			onClose();
 		}
 	};
@@ -1465,7 +1458,6 @@ function AddCoachModal({
 				style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
 			>
 				<div className="modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-					{/* Warning about copying credentials */}
 					<div
 						style={{
 							marginBottom: '1.5rem',
@@ -1490,7 +1482,7 @@ function AddCoachModal({
 										margin: '0 0 0.5rem 0',
 									}}
 								>
-									⚠️ IMPORTANT: Copy Credentials Before Saving
+									Clerk sign-in
 								</h4>
 								<p
 									style={{
@@ -1500,9 +1492,8 @@ function AddCoachModal({
 										lineHeight: '1.5',
 									}}
 								>
-									Please copy the email and password below before clicking "Create Coach Account".
-									These credentials should be sent to the designated coach for them to log in to the
-									app.
+									The coach is created in Clerk with this email. They sign in at the login page with
+									that address (same as admins). No password is stored in Clerk from this form.
 								</p>
 							</div>
 						</div>
@@ -1580,62 +1571,6 @@ function AddCoachModal({
 									title="Copy email"
 								>
 									<Copy className="w-4 h-4" />
-								</button>
-							</div>
-						</div>
-						<div className="form-group">
-							<label htmlFor="password">
-								Password <span className="required">*</span>
-							</label>
-							<div style={{ display: 'flex', gap: '0.5rem' }}>
-								<input
-									type={showPassword ? 'text' : 'password'}
-									id="password"
-									name="password"
-									required
-									value={formData.password}
-									onChange={handleChange}
-									style={{ flex: 1 }}
-								/>
-								<button
-									type="button"
-									onClick={() => handleCopyToClipboard(formData.password)}
-									disabled={!formData.password}
-									style={{
-										padding: '0.9rem 1rem',
-										background: 'var(--primary-yellow)',
-										color: '#1a1a1a',
-										borderRadius: '12px',
-										fontWeight: '600',
-										cursor: formData.password ? 'pointer' : 'not-allowed',
-										display: 'flex',
-										alignItems: 'center',
-										gap: '0.5rem',
-										border: 'none',
-										transition: 'all 0.3s ease',
-										opacity: formData.password ? 1 : 0.5,
-									}}
-									title="Copy password"
-								>
-									<Copy className="w-4 h-4" />
-								</button>
-								<button
-									type="button"
-									onClick={() => setShowPassword(!showPassword)}
-									style={{
-										padding: '0.9rem 1rem',
-										background: 'rgba(255, 255, 255, 0.05)',
-										color: 'var(--text-secondary)',
-										borderRadius: '12px',
-										border: '1px solid rgba(255, 255, 255, 0.1)',
-										cursor: 'pointer',
-										display: 'flex',
-										alignItems: 'center',
-										transition: 'all 0.3s ease',
-									}}
-									title={showPassword ? 'Hide password' : 'Show password'}
-								>
-									{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
 								</button>
 							</div>
 						</div>
