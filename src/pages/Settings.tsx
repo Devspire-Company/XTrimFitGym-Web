@@ -24,7 +24,6 @@ import {
 	CREATE_USER,
 	GET_USERS,
 	GET_USER,
-	REQUEST_CREATE_ADMIN_VERIFICATION_CODE,
 } from '@/graphql/operations';
 import { RoleType } from '@/graphql/generated/graphql';
 
@@ -809,10 +808,6 @@ function AdminAccountsSection() {
 		lastName: '',
 		email: '',
 	});
-	const [verificationCode, setVerificationCode] = useState('');
-	const [requestCodeMutation, { loading: requestingCode }] = useMutation(
-		REQUEST_CREATE_ADMIN_VERIFICATION_CODE
-	);
 	const [createUserMutation] = useMutation(CREATE_USER);
 	const { data: adminsData, refetch } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Admin },
@@ -823,34 +818,11 @@ function AdminAccountsSection() {
 		setFormData((prev) => ({ ...prev, [name]: value }));
 	};
 
-	const handleSendVerificationCode = async () => {
-		try {
-			await requestCodeMutation();
-			dispatch(
-				addToast({
-					type: 'success',
-					message: `Verification code sent to ${user?.email || 'your email'}. Check your inbox.`,
-				})
-			);
-		} catch (error: unknown) {
-			const message =
-				error instanceof Error ? error.message : 'Could not send verification code';
-			dispatch(addToast({ type: 'error', message }));
-		}
-	};
-
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 
-		const code = verificationCode.trim().replace(/\s/g, '');
-		if (!code) {
-			dispatch(addToast({ type: 'error', message: 'Enter the email verification code' }));
-			return;
-		}
-
 		if (!user?.id) return;
 
-		// Create admin account (authorized with email verification code in backend)
 		try {
 			const result = await createUserMutation({
 				variables: {
@@ -859,7 +831,6 @@ function AdminAccountsSection() {
 						lastName: formData.lastName,
 						email: formData.email,
 						role: RoleType.Admin,
-						adminVerificationCode: code,
 					},
 				},
 			});
@@ -871,7 +842,6 @@ function AdminAccountsSection() {
 					lastName: '',
 					email: '',
 				});
-				setVerificationCode('');
 				setIsModalOpen(false);
 				refetch();
 			}
@@ -991,33 +961,6 @@ function AdminAccountsSection() {
 									required
 									className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
 								/>
-							</div>
-							<div className="form-group flex flex-col gap-2">
-								<label className="text-sm font-medium text-[var(--text-secondary)]">
-									Email verification *
-								</label>
-								<div className="flex flex-col sm:flex-row gap-2">
-									<input
-										type="text"
-										inputMode="numeric"
-										autoComplete="one-time-code"
-										placeholder="6-digit code"
-										value={verificationCode}
-										onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-										className="flex-1 min-w-0 px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] tracking-widest transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
-									/>
-									<button
-										type="button"
-										onClick={() => void handleSendVerificationCode()}
-										disabled={requestingCode}
-										className="px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.08)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm font-medium hover:bg-[rgba(255,255,255,0.12)] disabled:opacity-50 whitespace-nowrap"
-									>
-										{requestingCode ? 'Sending…' : 'Send code to my email'}
-									</button>
-								</div>
-								<p className="text-xs text-[var(--text-secondary)] mt-1">
-									We email a one-time code to your admin address ({user?.email}). Code expires in 15 minutes.
-								</p>
 							</div>
 							<div className="flex gap-4 justify-end mt-4 pt-4 border-t border-[var(--card-border)]">
 								<button

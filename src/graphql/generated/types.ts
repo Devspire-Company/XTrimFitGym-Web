@@ -244,8 +244,6 @@ export type CreateSubscriptionRequestInput = {
 };
 
 export type CreateUserInput = {
-  /** Required when role is admin: code from requestCreateAdminVerificationCode (sent to your email). */
-  adminVerificationCode?: InputMaybe<Scalars['String']['input']>;
   agreedToLiabilityWaiver?: InputMaybe<Scalars['Boolean']['input']>;
   agreedToPrivacyPolicy?: InputMaybe<Scalars['Boolean']['input']>;
   agreedToTermsAndConditions?: InputMaybe<Scalars['Boolean']['input']>;
@@ -454,8 +452,6 @@ export type Mutation = {
   purchaseMembership: MembershipTransaction;
   rejectSubscriptionRequest: Scalars['Boolean']['output'];
   removeClient: Scalars['Boolean']['output'];
-  /** Sends a one-time code to the signed-in admin's email to authorize createUser(role: admin). */
-  requestCreateAdminVerificationCode: Scalars['Boolean']['output'];
   requestToJoinClassSession: Session;
   respondToClassInvitation: Session;
   updateCoachRating: CoachRating;
@@ -1522,11 +1518,6 @@ export type GetUserQueryVariables = Exact<{
 
 
 export type GetUserQuery = { __typename?: 'Query', getUser?: { __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, attendanceId?: number | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, membershipTransaction?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null } | null, currentMembership?: { __typename?: 'MembershipTransaction', id: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, status: TransactionStatus, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType } | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null, loginHistory?: Array<{ __typename?: 'LoginHistoryEntry', ipAddress?: string | null, userAgent?: string | null, loginAt?: string | null } | null> | null } | null };
-
-export type RequestCreateAdminVerificationCodeMutationVariables = Exact<{ [key: string]: never; }>;
-
-
-export type RequestCreateAdminVerificationCodeMutation = { __typename?: 'Mutation', requestCreateAdminVerificationCode: boolean };
 
 export type LoginMutationVariables = Exact<{
   input: LoginInput;

@@ -164,10 +164,6 @@ query GetUser($id: ID!) {
 	}
 }
 
-mutation RequestCreateAdminVerificationCode {
-	requestCreateAdminVerificationCode
-}
-
 mutation Login($input: LoginInput!) {
 	login(input: $input) {
 		user {
