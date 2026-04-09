@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { X, Check, Calendar, CreditCard, Loader2 } from 'lucide-react';
 import { GET_ACTIVE_MEMBERSHIPS, DIRECT_SUBSCRIBE_MEMBER, GET_USERS } from '@/graphql/operations/index';
@@ -21,11 +21,30 @@ export function DirectSubscribeModal({
 	onSuccess,
 }: DirectSubscribeModalProps) {
 	const [selectedMembershipId, setSelectedMembershipId] = useState<string>('');
+	/** Empty = use plan default on submit */
+	const [customMonthDuration, setCustomMonthDuration] = useState('');
+	/** YYYY-MM-DD; empty = start now */
+	const [subscriptionStartDate, setSubscriptionStartDate] = useState('');
 	const dispatch = useAppDispatch();
 
 	const { data: membershipsData, loading: membershipsLoading } = useQuery(GET_ACTIVE_MEMBERSHIPS, {
 		skip: !isOpen,
 	});
+
+	const selectedPlan = useMemo(
+		() => (membershipsData?.getMemberships || []).find((m: { id: string }) => m.id === selectedMembershipId),
+		[membershipsData, selectedMembershipId]
+	);
+
+	useEffect(() => {
+		if (!selectedMembershipId) return;
+		if (selectedPlan && typeof selectedPlan.monthDuration === 'number') {
+			setCustomMonthDuration(String(selectedPlan.monthDuration));
+		} else {
+			setCustomMonthDuration('1');
+		}
+		setSubscriptionStartDate('');
+	}, [selectedMembershipId, selectedPlan]);
 
 	const [directSubscribe, { loading: subscribing }] = useMutation(DIRECT_SUBSCRIBE_MEMBER, {
 		refetchQueries: [
@@ -44,6 +63,8 @@ export function DirectSubscribeModal({
 			onSuccess?.();
 			onClose();
 			setSelectedMembershipId('');
+			setCustomMonthDuration('');
+			setSubscriptionStartDate('');
 		},
 		onError: (error) => {
 			console.error('❌ Subscription mutation error:', error);
@@ -85,32 +106,59 @@ export function DirectSubscribeModal({
 			return;
 		}
 
-		console.log('📤 Sending subscription request...', {
+		const input: {
+			memberId: string;
+			membershipId: string;
+			monthDuration?: number;
+			startedAt?: string;
+		} = {
 			memberId,
 			membershipId: selectedMembershipId,
-		});
+		};
+
+		if (customMonthDuration.trim()) {
+			const n = parseInt(customMonthDuration, 10);
+			if (Number.isFinite(n) && n >= 1) {
+				input.monthDuration = n;
+			}
+		}
+
+		if (subscriptionStartDate.trim()) {
+			const d = new Date(`${subscriptionStartDate}T12:00:00`);
+			if (!Number.isNaN(d.getTime())) {
+				input.startedAt = d.toISOString();
+			}
+		}
+
+		console.log('📤 Sending subscription request...', input);
 
 		directSubscribe({
-			variables: {
-				input: {
-					memberId,
-					membershipId: selectedMembershipId,
-				},
-			},
+			variables: { input },
 		}).catch((error) => {
 			console.error('❌ Subscription error:', error);
 		});
 	};
 
-	const calculateEndDate = (durationType: string) => {
-		const today = new Date();
+	const previewExpiryLabel = () => {
+		const plan = (membershipsData?.getMemberships || []).find(
+			(m: { id: string }) => m.id === selectedMembershipId
+		) as { monthDuration?: number; durationType?: string } | undefined;
 		let months = 1;
+		if (customMonthDuration.trim()) {
+			const n = parseInt(customMonthDuration, 10);
+			if (Number.isFinite(n) && n >= 1) months = n;
+		} else if (plan?.monthDuration && plan.monthDuration >= 1) {
+			months = plan.monthDuration;
+		} else if (plan?.durationType === 'QUARTERLY') months = 3;
+		else if (plan?.durationType === 'YEARLY') months = 12;
 
-		if (durationType === 'QUARTERLY') months = 3;
-		else if (durationType === 'YEARLY') months = 12;
-
-		const endDate = new Date(today.setMonth(today.getMonth() + months));
-		return endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+		const start = subscriptionStartDate
+			? new Date(`${subscriptionStartDate}T12:00:00`)
+			: new Date();
+		if (Number.isNaN(start.getTime())) return null;
+		const end = new Date(start.getTime());
+		end.setMonth(end.getMonth() + months);
+		return end.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 	};
 
 	console.log('🔍 DirectSubscribeModal render:', {
@@ -188,7 +236,7 @@ export function DirectSubscribeModal({
 											</span>
 											<span className="text-[var(--text-secondary)]">
 												<Calendar size={14} className="inline mr-1" />
-												Valid until: {calculateEndDate(membership.durationType)}
+												Plan default: {membership.monthDuration ?? 1} mo
 											</span>
 										</div>
 										<span className="text-lg font-bold" style={{ color: 'var(--primary-yellow)' }}>
@@ -218,6 +266,45 @@ export function DirectSubscribeModal({
 									)}
 								</button>
 							))}
+						</div>
+					)}
+
+					{selectedMembershipId && (
+						<div className="space-y-3 mb-4 p-4 rounded-lg border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+							<p className="text-sm text-[var(--text-secondary)]">
+								Optional: override length or start date for walk-ins / legacy members.
+							</p>
+							<div>
+								<label className="text-xs text-[var(--text-secondary)] block mb-1" htmlFor="custom-months">
+									Duration (months)
+								</label>
+								<input
+									id="custom-months"
+									type="number"
+									min={1}
+									value={customMonthDuration}
+									onChange={(e) => setCustomMonthDuration(e.target.value)}
+									className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] text-[var(--text-primary)] text-sm"
+								/>
+							</div>
+							<div>
+								<label className="text-xs text-[var(--text-secondary)] block mb-1" htmlFor="sub-start">
+									Subscription start date
+								</label>
+								<input
+									id="sub-start"
+									type="date"
+									value={subscriptionStartDate}
+									onChange={(e) => setSubscriptionStartDate(e.target.value)}
+									className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] text-[var(--text-primary)] text-sm"
+								/>
+							</div>
+							{previewExpiryLabel() && (
+								<p className="text-xs text-[var(--text-secondary)]">
+									Preview expiry (before any renewal credit):{' '}
+									<strong className="text-[var(--text-primary)]">{previewExpiryLabel()}</strong>
+								</p>
+							)}
 						</div>
 					)}
 

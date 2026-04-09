@@ -46,6 +46,7 @@ query GetCurrentMembership {
 		priceAtPurchase
 		startedAt
 		expiresAt
+		monthDuration
 		status
 		createdAt
 		updatedAt
@@ -65,8 +66,29 @@ mutation DirectSubscribeMember($input: DirectSubscribeInput!) {
 		priceAtPurchase
 		startedAt
 		expiresAt
+		monthDuration
 		status
 		createdAt
+	}
+}
+
+mutation UpdateMembershipTransactionDuration($input: UpdateMembershipTransactionDurationInput!) {
+	updateMembershipTransactionDuration(input: $input) {
+		id
+		clientId
+		membershipId
+		membership {
+			id
+			name
+			monthlyPrice
+		}
+		priceAtPurchase
+		startedAt
+		expiresAt
+		monthDuration
+		status
+		createdAt
+		updatedAt
 	}
 }
 

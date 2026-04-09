@@ -24,6 +24,7 @@ import { RoleType } from '@/graphql/generated/graphql';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
+import { AdjustSubscriptionDurationModal } from '@/components/modals/AdjustSubscriptionDurationModal';
 
 interface Member {
 	id: string;
@@ -54,6 +55,7 @@ interface Member {
 	endDate?: string; // Subscription expiration date
 	expiresAt?: string; // Subscription expiration date (ISO format)
 	createdAt?: string; // Account creation date (ISO format) for filtering
+	subscriptionMonthDuration?: number;
 }
 
 export function MembersPage() {
@@ -84,6 +86,13 @@ export function MembersPage() {
 		name: string;
 		membershipId: string;
 		membershipName: string;
+	} | null>(null);
+	const [isAdjustDurationOpen, setIsAdjustDurationOpen] = useState(false);
+	const [memberToAdjustDuration, setMemberToAdjustDuration] = useState<{
+		id: string;
+		name: string;
+		transactionId: string;
+		monthDuration: number;
 	} | null>(null);
 	const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 	const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(
@@ -374,6 +383,10 @@ export function MembersPage() {
 			endDate: expirationDate, // Formatted expiration date for display
 			expiresAt: expiresAt, // Raw expiration date (ISO format) for calculations
 			createdAt: m.createdAt, // Raw creation date for filtering
+			subscriptionMonthDuration:
+				typeof membershipTransaction?.monthDuration === 'number'
+					? membershipTransaction.monthDuration
+					: membershipTransaction?.membership?.monthDuration,
 		};
 	});
 
@@ -400,6 +413,21 @@ export function MembersPage() {
 	const handleDelete = (member: Member) => {
 		setSelectedMember(member);
 		setIsDeleteModalOpen(true);
+	};
+
+	const handleAdjustDuration = (member: Member) => {
+		if (!member.transactionId) return;
+		const months =
+			member.subscriptionMonthDuration && member.subscriptionMonthDuration >= 1
+				? member.subscriptionMonthDuration
+				: 1;
+		setMemberToAdjustDuration({
+			id: member.id,
+			name: member.name,
+			transactionId: member.transactionId,
+			monthDuration: months,
+		});
+		setIsAdjustDurationOpen(true);
 	};
 
 	const handleSubscribe = (member: Member) => {
@@ -851,6 +879,21 @@ export function MembersPage() {
 													<RotateCw className="w-4 h-4 text-[var(--primary-yellow)]" />
 													Renew
 												</button>
+												<button
+													type="button"
+													onClick={(e) => {
+														e.preventDefault();
+														e.stopPropagation();
+														handleAdjustDuration(member);
+														setOpenDropdownId(null);
+														setDropdownPosition(null);
+													}}
+													onMouseDown={(e) => e.stopPropagation()}
+													className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(59,130,246,0.1)] flex items-center gap-2 cursor-pointer"
+												>
+													<Calendar className="w-4 h-4 text-[#3B82F6]" />
+													Edit subscription length
+												</button>
 											<button
 												type="button"
 												onClick={(e) => {
@@ -946,6 +989,20 @@ export function MembersPage() {
 					/>
 				)}
 			</div>
+
+			{memberToAdjustDuration && (
+				<AdjustSubscriptionDurationModal
+					isOpen={isAdjustDurationOpen}
+					onClose={() => {
+						setIsAdjustDurationOpen(false);
+						setMemberToAdjustDuration(null);
+					}}
+					transactionId={memberToAdjustDuration.transactionId}
+					memberName={memberToAdjustDuration.name}
+					currentMonthDuration={memberToAdjustDuration.monthDuration}
+					onSuccess={() => {}}
+				/>
+			)}
 
 			{/* Direct Subscribe Modal */}
 			{memberToSubscribe && (
@@ -1282,6 +1339,22 @@ function MemberViewModal({ member, onClose }: { member: Member; onClose: () => v
 									</span>
 								</div>
 							)}
+							{(member.subscriptionMonthDuration != null && member.subscriptionMonthDuration >= 1) ||
+							(memberDetails?.currentMembership?.monthDuration != null &&
+								memberDetails.currentMembership.monthDuration >= 1) ? (
+								<div>
+									<span className="text-[var(--text-secondary)]">Subscription length:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{memberDetails?.currentMembership?.monthDuration ??
+											member.subscriptionMonthDuration}{' '}
+										month
+										{(memberDetails?.currentMembership?.monthDuration ??
+											member.subscriptionMonthDuration) !== 1
+											? 's'
+											: ''}
+									</span>
+								</div>
+							) : null}
 							{member.startDate && (
 								<div>
 									<span className="text-[var(--text-secondary)]">Start Date:</span>{' '}

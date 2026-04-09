@@ -34,6 +34,7 @@ export {
 	PurchaseMembershipDocument as PURCHASE_MEMBERSHIP,
 	CancelMembershipDocument as CANCEL_MEMBERSHIP,
 	DirectSubscribeMemberDocument as DIRECT_SUBSCRIBE_MEMBER,
+	UpdateMembershipTransactionDurationDocument as UPDATE_MEMBERSHIP_TRANSACTION_DURATION,
 	ApproveSubscriptionRequestDocument as APPROVE_SUBSCRIPTION_REQUEST,
 	RejectSubscriptionRequestDocument as REJECT_SUBSCRIPTION_REQUEST,
 	DeleteSubscriptionRequestDocument as DELETE_SUBSCRIPTION_REQUEST,

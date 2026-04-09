@@ -43,10 +43,12 @@ query GetUsers($role: RoleType) {
 					features
 					status
 					durationType
+					monthDuration
 				}
 				priceAtPurchase
 				startedAt
 				expiresAt
+				monthDuration
 				status
 			}
 		}
@@ -61,10 +63,12 @@ query GetUsers($role: RoleType) {
 				features
 				status
 				durationType
+				monthDuration
 			}
 			priceAtPurchase
 			startedAt
 			expiresAt
+			monthDuration
 			status
 		}
 		coachDetails {
@@ -119,10 +123,12 @@ query GetUser($id: ID!) {
 					features
 					status
 					durationType
+					monthDuration
 				}
 				priceAtPurchase
 				startedAt
 				expiresAt
+				monthDuration
 				status
 			}
 		}
@@ -137,10 +143,12 @@ query GetUser($id: ID!) {
 				features
 				status
 				durationType
+				monthDuration
 			}
 			priceAtPurchase
 			startedAt
 			expiresAt
+			monthDuration
 			status
 		}
 		coachDetails {
@@ -269,7 +277,7 @@ mutation DeleteMembership($id: ID!) {
 }
 
 mutation PurchaseMembership($input: PurchaseMembershipInput!) {
-	purchaseMembership(input: $input) {
+		purchaseMembership(input: $input) {
 		id
 		clientId
 		membershipId
@@ -283,6 +291,7 @@ mutation PurchaseMembership($input: PurchaseMembershipInput!) {
 		priceAtPurchase
 		startedAt
 		expiresAt
+		monthDuration
 		status
 		createdAt
 		updatedAt
@@ -325,10 +334,12 @@ subscription UsersUpdated($role: RoleType) {
 					features
 					status
 					durationType
+					monthDuration
 				}
 				priceAtPurchase
 				startedAt
 				expiresAt
+				monthDuration
 				status
 			}
 		}
@@ -343,10 +354,12 @@ subscription UsersUpdated($role: RoleType) {
 				features
 				status
 				durationType
+				monthDuration
 			}
 			priceAtPurchase
 			startedAt
 			expiresAt
+			monthDuration
 			status
 		}
 		coachDetails {
