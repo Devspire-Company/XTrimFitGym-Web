@@ -2,7 +2,7 @@ import { Navigate, useLocation } from 'react-router';
 import { useAuth as useClerkAuth, useClerk } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { logout } from '@/store/slices/authSlice';
+import { logout, type User } from '@/store/slices/authSlice';
 import { RoleType } from '@/graphql/generated/graphql';
 import { setAdminPortalAuthNotice } from '@/lib/adminPortalAuthNotice';
 import type { ReactNode } from 'react';
@@ -11,15 +11,17 @@ interface ProtectedRouteProps {
 	children: ReactNode;
 }
 
+type NonAdminRole = Exclude<User['role'], 'admin'>;
+
 /** Clears Clerk + app state when a non-admin session reaches a protected route (defensive). */
-function WrongRoleRedirect({ role }: { role: RoleType }) {
+function WrongRoleRedirect({ role }: { role: NonAdminRole }) {
 	const { signOut } = useClerk();
 	const dispatch = useAppDispatch();
 	const [done, setDone] = useState(false);
 
 	useEffect(() => {
 		setAdminPortalAuthNotice({
-			code: role === RoleType.Coach ? 'WRONG_ROLE_COACH' : 'WRONG_ROLE_MEMBER',
+			code: role === 'coach' ? 'WRONG_ROLE_COACH' : 'WRONG_ROLE_MEMBER',
 		});
 		dispatch(logout());
 		void signOut().finally(() => setDone(true));
