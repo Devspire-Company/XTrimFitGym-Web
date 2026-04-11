@@ -28,6 +28,7 @@ export function MembershipViewModal({
 		MONTHLY: 'Monthly',
 		QUARTERLY: 'Quarterly',
 		YEARLY: 'Yearly',
+		DAILY: 'Daily (fixed days)',
 	};
 
 	const displayStatus = statusMap[membership.status] || membership.status;
@@ -63,6 +64,15 @@ export function MembershipViewModal({
 								<div className="detail-item">
 									<label>Duration</label>
 									<p>{displayDuration}</p>
+								</div>
+								<div className="detail-item">
+									<label>{membership.durationType === 'DAILY' ? 'Length (days)' : 'Length (months)'}</label>
+									<p>
+										{membership.monthDuration}{' '}
+										{membership.durationType === 'DAILY'
+											? `day${membership.monthDuration === 1 ? '' : 's'}`
+											: `month${membership.monthDuration === 1 ? '' : 's'}`}
+									</p>
 								</div>
 								<div className="detail-item">
 									<label>Status</label>

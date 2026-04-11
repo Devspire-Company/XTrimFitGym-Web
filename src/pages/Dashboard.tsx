@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useSubscription } from '@apollo/client';
 import { Link } from 'react-router';
-import { Users, UserCog, DollarSign, CreditCard, BarChart3, Clock, LogIn, LogOut } from 'lucide-react';
+import {
+	Users,
+	UserCog,
+	DollarSign,
+	CreditCard,
+	BarChart3,
+	Clock,
+	LogIn,
+	LogOut,
+	Calendar,
+	PieChart,
+} from 'lucide-react';
 import { GET_USERS, GET_REVENUE_SUMMARY, REVENUE_SUMMARY_UPDATED, USERS_UPDATED, GET_ATTENDANCE_RECORDS, ATTENDANCE_RECORD_ADDED, ATTENDANCE_UPDATED } from '@/graphql/operations/index';
 import { RoleType } from '@/graphql/generated/graphql';
 import type { AttendanceRecord } from '@/graphql/generated/types';
@@ -433,7 +444,8 @@ export function DashboardPage() {
 			{/* Revenue Overview Chart - Full Width */}
 			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 				<h2 className="text-xl font-semibold mb-6 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
-					<span className="text-[var(--primary-yellow)]">📈</span> Revenue Overview
+					<BarChart3 className="inline w-5 h-5 text-[var(--primary-yellow)] mr-1.5 align-[-0.125em]" aria-hidden />
+					Revenue Overview
 				</h2>
 				
 				{/* Revenue Chart */}
@@ -566,7 +578,8 @@ export function DashboardPage() {
 											{record.authTime}
 										</span>
 										<span className="flex items-center gap-1">
-											📅 {record.authDate}
+											<Calendar className="inline w-3.5 h-3.5 mr-1 align-[-0.125em] text-[var(--primary-yellow)]" aria-hidden />
+											{record.authDate}
 										</span>
 										{record.deviceName && (
 											<span className="text-xs opacity-75">• {record.deviceName}</span>
@@ -674,7 +687,8 @@ export function DashboardPage() {
 			{/* Membership Distribution - Full Width */}
 			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 				<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
-					<span className="text-[var(--primary-yellow)]">📊</span> Membership Distribution
+					<PieChart className="inline w-5 h-5 text-[var(--primary-yellow)] mr-1.5 align-[-0.125em]" aria-hidden />
+					Membership Distribution
 				</h2>
 				<div className="membership-distribution space-y-3">
 					{Object.entries(membershipDistribution).map(([name, count]) => {

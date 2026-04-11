@@ -21,12 +21,18 @@ export function SubscribeModal({
 
 	const calculateEndDate = () => {
 		const today = new Date();
-		let months = 1;
-		
+		if (membership.durationType === DurationType.Daily) {
+			const days = membership.monthDuration >= 1 ? membership.monthDuration : 1;
+			const endDate = new Date(today);
+			endDate.setDate(endDate.getDate() + days);
+			return endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+		}
+		let months = membership.monthDuration >= 1 ? membership.monthDuration : 1;
 		if (membership.durationType === DurationType.Quarterly) months = 3;
 		else if (membership.durationType === DurationType.Yearly) months = 12;
 
-		const endDate = new Date(today.setMonth(today.getMonth() + months));
+		const endDate = new Date(today);
+		endDate.setMonth(endDate.getMonth() + months);
 		return endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 	};
 

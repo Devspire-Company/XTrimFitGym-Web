@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Plus, Eye, Edit, Trash2, CreditCard, Crown } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, CreditCard, Crown, Check } from 'lucide-react';
 import { MembershipFormModal, type MembershipFormData } from '@/components/modals/MembershipFormModal';
 import { MembershipViewModal } from '@/components/modals/MembershipViewModal';
 import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
@@ -117,6 +117,7 @@ export function MembershipsPage() {
 			'Monthly': DurationType.Monthly,
 			'Quarterly': DurationType.Quarterly,
 			'Yearly': DurationType.Yearly,
+			'Daily': DurationType.Daily,
 		};
 
 		const status = statusMap[formData.status] ?? MembershipStatus.Active;
@@ -237,6 +238,7 @@ export function MembershipsPage() {
 						MONTHLY: 'month',
 						QUARTERLY: 'quarter',
 						YEARLY: 'year',
+						DAILY: 'day pass',
 					};
 
 					return (
@@ -287,9 +289,7 @@ export function MembershipsPage() {
 										key={idx}
 										className="flex items-center gap-3 text-sm text-[var(--text-secondary)] py-3 border-b border-[rgba(255,255,255,0.05)] last:border-0"
 									>
-										<span className="text-[var(--primary-yellow)] text-xs w-5 flex-shrink-0">
-											✓
-										</span>
+										<Check className="text-[var(--primary-yellow)] w-4 h-4 flex-shrink-0" aria-hidden strokeWidth={3} />
 										<span>{feature}</span>
 									</li>
 								))}

@@ -16,7 +16,7 @@ export interface MembershipFormData {
 	description: string;
 	features: string[];
 	status: 'Active' | 'Inactive' | 'Coming Soon';
-	durationType: 'Monthly' | 'Quarterly' | 'Yearly';
+	durationType: 'Monthly' | 'Quarterly' | 'Yearly' | 'Daily';
 	monthDuration: number;
 }
 
@@ -64,6 +64,7 @@ export function MembershipFormModal({
 		MONTHLY: 'Monthly',
 		QUARTERLY: 'Quarterly',
 		YEARLY: 'Yearly',
+		DAILY: 'Daily',
 	};
 
 	const defaultStatus = membership?.status ? statusMap[membership.status] || 'Active' : 'Active';
@@ -132,11 +133,14 @@ export function MembershipFormModal({
 									<option value="Monthly">Monthly</option>
 									<option value="Quarterly">Quarterly</option>
 									<option value="Yearly">Yearly</option>
+									<option value="Daily">Daily (fixed days / promos)</option>
 								</select>
 							</div>
 
 							<div className="form-group">
-								<label htmlFor="monthDuration">Month Duration *</label>
+								<label htmlFor="monthDuration" id="monthDurationLabel">
+									Plan length *
+								</label>
 								<input
 									type="number"
 									id="monthDuration"
@@ -145,12 +149,13 @@ export function MembershipFormModal({
 									required
 									min="1"
 									step="1"
-									placeholder="e.g., 3 for 3 months"
+									placeholder="e.g., 3 for 3 months, or 15 for 15-day promo"
 								/>
 								<small
+									id="monthDurationHint"
 									style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'block' }}
 								>
-									Number of months the plan lasts (e.g., 1, 3, 6, 12)
+									For Monthly / Quarterly / Yearly: length in months. For Daily: length in calendar days.
 								</small>
 							</div>
 

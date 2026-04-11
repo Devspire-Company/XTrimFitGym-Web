@@ -49,6 +49,7 @@ query GetUsers($role: RoleType) {
 				startedAt
 				expiresAt
 				monthDuration
+				dayDuration
 				status
 			}
 		}
@@ -69,6 +70,7 @@ query GetUsers($role: RoleType) {
 			startedAt
 			expiresAt
 			monthDuration
+			dayDuration
 			status
 		}
 		coachDetails {
@@ -129,6 +131,7 @@ query GetUser($id: ID!) {
 				startedAt
 				expiresAt
 				monthDuration
+				dayDuration
 				status
 			}
 		}
@@ -149,6 +152,7 @@ query GetUser($id: ID!) {
 			startedAt
 			expiresAt
 			monthDuration
+			dayDuration
 			status
 		}
 		coachDetails {
@@ -292,6 +296,7 @@ mutation PurchaseMembership($input: PurchaseMembershipInput!) {
 		startedAt
 		expiresAt
 		monthDuration
+		dayDuration
 		status
 		createdAt
 		updatedAt
@@ -340,6 +345,7 @@ subscription UsersUpdated($role: RoleType) {
 				startedAt
 				expiresAt
 				monthDuration
+				dayDuration
 				status
 			}
 		}
@@ -360,6 +366,7 @@ subscription UsersUpdated($role: RoleType) {
 			startedAt
 			expiresAt
 			monthDuration
+			dayDuration
 			status
 		}
 		coachDetails {

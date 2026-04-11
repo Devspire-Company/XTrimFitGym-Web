@@ -6,6 +6,7 @@ import {
 	Calendar,
 	Clock,
 	User,
+	UserCog,
 	LogIn,
 	LogOut,
 	RefreshCw,
@@ -15,7 +16,9 @@ import {
 	GET_ATTENDANCE_RECORDS,
 	ATTENDANCE_RECORD_ADDED,
 	ATTENDANCE_UPDATED,
+	GET_USERS,
 } from '@/graphql/operations/index';
+import { RoleType } from '@/graphql/generated/graphql';
 import type { AttendanceRecord } from '@/graphql/generated/types';
 
 export function AttendancePage() {
@@ -81,6 +84,15 @@ export function AttendancePage() {
 		},
 		fetchPolicy: 'cache-and-network',
 		pollInterval: pollIntervalMs,
+	});
+
+	const { data: coachesUsersData } = useQuery(GET_USERS, {
+		variables: { role: RoleType.Coach },
+		fetchPolicy: 'cache-first',
+	});
+	const { data: membersUsersData } = useQuery(GET_USERS, {
+		variables: { role: RoleType.Member },
+		fetchPolicy: 'cache-first',
 	});
 
 	// Initial data fetch; poll so list updates automatically without pressing Refresh
@@ -268,6 +280,49 @@ export function AttendancePage() {
 		return filtered;
 	}, [sortedRecords, searchTerm, directionFilter]);
 
+	const coachAttendanceIds = useMemo(() => {
+		const s = new Set<string>();
+		const list = coachesUsersData?.getUsers;
+		if (!list) return s;
+		for (const u of list) {
+			if (u?.attendanceId != null && String(u.attendanceId).trim() !== '') {
+				s.add(String(u.attendanceId).trim());
+			}
+		}
+		return s;
+	}, [coachesUsersData]);
+
+	const memberAttendanceIds = useMemo(() => {
+		const s = new Set<string>();
+		const list = membersUsersData?.getUsers;
+		if (!list) return s;
+		for (const u of list) {
+			if (u?.attendanceId != null && String(u.attendanceId).trim() !== '') {
+				s.add(String(u.attendanceId).trim());
+			}
+		}
+		return s;
+	}, [membersUsersData]);
+
+	const { coachRecords, clientRecords } = useMemo(() => {
+		const categorize = (record: AttendanceRecord): 'coach' | 'client' | 'other' => {
+			const c =
+				record.cardNo != null && String(record.cardNo).trim() !== ''
+					? String(record.cardNo).trim()
+					: '';
+			if (c && coachAttendanceIds.has(c)) return 'coach';
+			if (c && memberAttendanceIds.has(c)) return 'client';
+			return 'other';
+		};
+		const coach: AttendanceRecord[] = [];
+		const client: AttendanceRecord[] = [];
+		for (const r of filteredRecords) {
+			if (categorize(r) === 'coach') coach.push(r);
+			else client.push(r);
+		}
+		return { coachRecords: coach, clientRecords: client };
+	}, [filteredRecords, coachAttendanceIds, memberAttendanceIds]);
+
 	// Today's records count: always current day from API, not affected by list date filter
 	const todaysRecordsCount = dataToday?.getAttendanceRecords?.totalCount ?? 0;
 
@@ -402,96 +457,211 @@ export function AttendancePage() {
 				</div>
 			</div>
 
-			{/* Records Table */}
-			<div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden">
-				<div className="overflow-x-auto">
-					<table className="w-full">
-						<thead className="bg-[var(--bg-primary)] border-b border-[var(--border-color)]">
-							<tr>
-								<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-									Person
-								</th>
-								<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-									Date & Time
-								</th>
-								<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-									Direction
-								</th>
-								<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-									Device
-								</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-[var(--border-color)]">
-							{filteredRecords.length === 0 ? (
+			{/* Records: coaches vs clients (same filters; split by linked attendance ID) */}
+			<div className="space-y-6">
+				<div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden">
+					<div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center gap-2 bg-[var(--bg-primary)]">
+						<UserCog className="w-5 h-5 text-[var(--primary-yellow)] shrink-0" aria-hidden />
+						<h2 className="text-base font-semibold text-[var(--text-primary)]">Coaches</h2>
+						<span className="text-sm text-[var(--text-secondary)]">
+							({coachRecords.length} on this page)
+						</span>
+					</div>
+					<div className="overflow-x-auto">
+						<table className="w-full">
+							<thead className="bg-[var(--bg-primary)] border-b border-[var(--border-color)]">
 								<tr>
-									<td colSpan={4} className="px-6 py-12 text-center">
-										<p className="text-[var(--text-secondary)]">No attendance records found</p>
-									</td>
+									<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+										Person
+									</th>
+									<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+										Date & Time
+									</th>
+									<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+										Direction
+									</th>
+									<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+										Device
+									</th>
 								</tr>
-							) : (
-								filteredRecords.map((record, index) => (
-									<tr
-										key={`${record.id}-${record.authDateTime}-${index}`}
-										className="hover:bg-[var(--bg-primary)] transition-colors"
-									>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<div className="flex items-center gap-2">
-												<User className="w-4 h-4 text-[var(--text-secondary)]" />
-												<span className="text-sm font-medium text-[var(--text-primary)]">
-													{record.personName || 'Unknown'}
-												</span>
-											</div>
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<div className="flex items-center gap-2">
-												<Clock className="w-4 h-4 text-[var(--text-secondary)]" />
-												<div>
-													<div className="text-sm text-[var(--text-primary)]">
-														{formatDateTime(record.authDateTime)}
-													</div>
-													<div className="text-xs text-[var(--text-secondary)]">
-														{formatAuthDate(record.authDate)}
-													</div>
-												</div>
-											</div>
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<div
-												className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-													record.direction === 'IN'
-														? 'bg-green-100 text-green-800'
-														: record.direction === 'OUT'
-															? 'bg-red-100 text-red-800'
-															: 'bg-gray-100 text-gray-700'
-												}`}
-											>
-												{record.direction === 'IN' ? (
-													<LogIn className="w-3 h-3" />
-												) : record.direction === 'OUT' ? (
-													<LogOut className="w-3 h-3" />
-												) : null}
-												{record.direction || '—'}
-											</div>
-										</td>
-										<td className="px-6 py-4">
-											<div className="text-sm text-[var(--text-primary)]">
-												{record.deviceName || 'N/A'}
-											</div>
-											<div className="text-xs text-[var(--text-secondary)]">
-												{record.deviceSerNum || ''}
-											</div>
+							</thead>
+							<tbody className="divide-y divide-[var(--border-color)]">
+								{filteredRecords.length === 0 ? (
+									<tr>
+										<td colSpan={4} className="px-6 py-12 text-center">
+											<p className="text-[var(--text-secondary)]">No attendance records found</p>
 										</td>
 									</tr>
-								))
-							)}
-						</tbody>
-					</table>
+								) : coachRecords.length === 0 ? (
+									<tr>
+										<td colSpan={4} className="px-6 py-8 text-center">
+											<p className="text-[var(--text-secondary)]">No coach records on this page</p>
+										</td>
+									</tr>
+								) : (
+									coachRecords.map((record, index) => (
+										<tr
+											key={`coach-${record.id}-${record.authDateTime}-${index}`}
+											className="hover:bg-[var(--bg-primary)] transition-colors"
+										>
+											<td className="px-6 py-4 whitespace-nowrap">
+												<div className="flex items-center gap-2">
+													<UserCog className="w-4 h-4 text-[var(--text-secondary)]" />
+													<span className="text-sm font-medium text-[var(--text-primary)]">
+														{record.personName || 'Unknown'}
+													</span>
+												</div>
+											</td>
+											<td className="px-6 py-4 whitespace-nowrap">
+												<div className="flex items-center gap-2">
+													<Clock className="w-4 h-4 text-[var(--text-secondary)]" />
+													<div>
+														<div className="text-sm text-[var(--text-primary)]">
+															{formatDateTime(record.authDateTime)}
+														</div>
+														<div className="text-xs text-[var(--text-secondary)]">
+															{formatAuthDate(record.authDate)}
+														</div>
+													</div>
+												</div>
+											</td>
+											<td className="px-6 py-4 whitespace-nowrap">
+												<div
+													className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+														record.direction === 'IN'
+															? 'bg-green-100 text-green-800'
+															: record.direction === 'OUT'
+																? 'bg-red-100 text-red-800'
+																: 'bg-gray-100 text-gray-700'
+													}`}
+												>
+													{record.direction === 'IN' ? (
+														<LogIn className="w-3 h-3" />
+													) : record.direction === 'OUT' ? (
+														<LogOut className="w-3 h-3" />
+													) : null}
+													{record.direction || '—'}
+												</div>
+											</td>
+											<td className="px-6 py-4">
+												<div className="text-sm text-[var(--text-primary)]">
+													{record.deviceName || 'N/A'}
+												</div>
+												<div className="text-xs text-[var(--text-secondary)]">
+													{record.deviceSerNum || ''}
+												</div>
+											</td>
+										</tr>
+									))
+								)}
+							</tbody>
+						</table>
+					</div>
+				</div>
+
+				<div className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden">
+					<div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center gap-2 bg-[var(--bg-primary)]">
+						<User className="w-5 h-5 text-[var(--primary-yellow)] shrink-0" aria-hidden />
+						<h2 className="text-base font-semibold text-[var(--text-primary)]">Clients</h2>
+						<span className="text-sm text-[var(--text-secondary)]">
+							({clientRecords.length} on this page)
+						</span>
+					</div>
+					<div className="overflow-x-auto">
+						<table className="w-full">
+							<thead className="bg-[var(--bg-primary)] border-b border-[var(--border-color)]">
+								<tr>
+									<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+										Person
+									</th>
+									<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+										Date & Time
+									</th>
+									<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+										Direction
+									</th>
+									<th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+										Device
+									</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y divide-[var(--border-color)]">
+								{filteredRecords.length === 0 ? (
+									<tr>
+										<td colSpan={4} className="px-6 py-12 text-center">
+											<p className="text-[var(--text-secondary)]">No attendance records found</p>
+										</td>
+									</tr>
+								) : clientRecords.length === 0 ? (
+									<tr>
+										<td colSpan={4} className="px-6 py-8 text-center">
+											<p className="text-[var(--text-secondary)]">No client records on this page</p>
+										</td>
+									</tr>
+								) : (
+									clientRecords.map((record, index) => (
+										<tr
+											key={`client-${record.id}-${record.authDateTime}-${index}`}
+											className="hover:bg-[var(--bg-primary)] transition-colors"
+										>
+											<td className="px-6 py-4 whitespace-nowrap">
+												<div className="flex items-center gap-2">
+													<User className="w-4 h-4 text-[var(--text-secondary)]" />
+													<span className="text-sm font-medium text-[var(--text-primary)]">
+														{record.personName || 'Unknown'}
+													</span>
+												</div>
+											</td>
+											<td className="px-6 py-4 whitespace-nowrap">
+												<div className="flex items-center gap-2">
+													<Clock className="w-4 h-4 text-[var(--text-secondary)]" />
+													<div>
+														<div className="text-sm text-[var(--text-primary)]">
+															{formatDateTime(record.authDateTime)}
+														</div>
+														<div className="text-xs text-[var(--text-secondary)]">
+															{formatAuthDate(record.authDate)}
+														</div>
+													</div>
+												</div>
+											</td>
+											<td className="px-6 py-4 whitespace-nowrap">
+												<div
+													className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+														record.direction === 'IN'
+															? 'bg-green-100 text-green-800'
+															: record.direction === 'OUT'
+																? 'bg-red-100 text-red-800'
+																: 'bg-gray-100 text-gray-700'
+													}`}
+												>
+													{record.direction === 'IN' ? (
+														<LogIn className="w-3 h-3" />
+													) : record.direction === 'OUT' ? (
+														<LogOut className="w-3 h-3" />
+													) : null}
+													{record.direction || '—'}
+												</div>
+											</td>
+											<td className="px-6 py-4">
+												<div className="text-sm text-[var(--text-primary)]">
+													{record.deviceName || 'N/A'}
+												</div>
+												<div className="text-xs text-[var(--text-secondary)]">
+													{record.deviceSerNum || ''}
+												</div>
+											</td>
+										</tr>
+									))
+								)}
+							</tbody>
+						</table>
+					</div>
 				</div>
 
 				{/* Pagination */}
 				{totalPages > 1 && (
-					<div className="px-6 py-4 border-t border-[var(--border-color)] flex items-center justify-between">
+					<div className="bg-[var(--bg-secondary)] rounded-lg px-6 py-4 border border-[var(--border-color)] flex items-center justify-between">
 						<div className="text-sm text-[var(--text-secondary)]">
 							Showing {((currentPage - 1) * recordsPerPage) + 1} to{' '}
 							{Math.min(currentPage * recordsPerPage, totalCount)} of {totalCount} records

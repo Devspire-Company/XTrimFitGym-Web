@@ -50,12 +50,15 @@ interface Member {
 	};
 	transactionId?: string; // ID of the active membership transaction
 	membershipId?: string; // ID of the current membership plan (for renewal)
-	durationType?: string; // MONTHLY, QUARTERLY, YEARLY
+	durationType?: string; // MONTHLY, QUARTERLY, YEARLY, DAILY
 	startDate?: string; // Subscription start date
 	endDate?: string; // Subscription expiration date
 	expiresAt?: string; // Subscription expiration date (ISO format)
 	createdAt?: string; // Account creation date (ISO format) for filtering
 	subscriptionMonthDuration?: number;
+	/** True when subscription is tracked in calendar days (daily / promo). */
+	subscriptionUsesDays?: boolean;
+	subscriptionDayDuration?: number | null;
 }
 
 export function MembersPage() {
@@ -93,6 +96,8 @@ export function MembersPage() {
 		name: string;
 		transactionId: string;
 		monthDuration: number;
+		dayDuration: number;
+		usesDays: boolean;
 	} | null>(null);
 	const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 	const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(
@@ -290,6 +295,28 @@ export function MembersPage() {
 		};
 		
 		const expirationDate = formatExpirationDate(expiresAt);
+
+		const txDayDur = membershipTransaction?.dayDuration as number | undefined | null;
+		const planDurType = membershipTransaction?.membership?.durationType as string | undefined;
+		const subscriptionUsesDays =
+			(typeof txDayDur === 'number' && txDayDur >= 1) || planDurType === 'DAILY';
+		let subscriptionDayDuration: number | null = null;
+		if (typeof txDayDur === 'number' && txDayDur >= 1) {
+			subscriptionDayDuration = txDayDur;
+		} else if (planDurType === 'DAILY') {
+			const md = membershipTransaction?.membership?.monthDuration;
+			subscriptionDayDuration = typeof md === 'number' && md >= 1 ? md : 1;
+		} else if (expiresAt && startDate) {
+			try {
+				const s = new Date(startDate as string).getTime();
+				const e = new Date(expiresAt as string).getTime();
+				if (Number.isFinite(s) && Number.isFinite(e) && e > s) {
+					subscriptionDayDuration = Math.max(1, Math.round((e - s) / 86400000));
+				}
+			} catch {
+				/* ignore */
+			}
+		}
 		
 		// Calculate days until expiration for color coding
 		const getDaysUntilExpiration = (dateString: string | undefined): number | null => {
@@ -387,6 +414,8 @@ export function MembersPage() {
 				typeof membershipTransaction?.monthDuration === 'number'
 					? membershipTransaction.monthDuration
 					: membershipTransaction?.membership?.monthDuration,
+			subscriptionUsesDays,
+			subscriptionDayDuration,
 		};
 	});
 
@@ -417,15 +446,22 @@ export function MembersPage() {
 
 	const handleAdjustDuration = (member: Member) => {
 		if (!member.transactionId) return;
+		const usesDays = !!member.subscriptionUsesDays;
 		const months =
-			member.subscriptionMonthDuration && member.subscriptionMonthDuration >= 1
+			member.subscriptionMonthDuration != null && member.subscriptionMonthDuration >= 1
 				? member.subscriptionMonthDuration
+				: 1;
+		const dayDur =
+			member.subscriptionDayDuration != null && member.subscriptionDayDuration >= 1
+				? member.subscriptionDayDuration
 				: 1;
 		setMemberToAdjustDuration({
 			id: member.id,
 			name: member.name,
 			transactionId: member.transactionId,
-			monthDuration: months,
+			monthDuration: usesDays ? 1 : months,
+			dayDuration: usesDays ? dayDur : 1,
+			usesDays,
 		});
 		setIsAdjustDurationOpen(true);
 	};
@@ -999,7 +1035,9 @@ export function MembersPage() {
 					}}
 					transactionId={memberToAdjustDuration.transactionId}
 					memberName={memberToAdjustDuration.name}
+					usesDays={memberToAdjustDuration.usesDays}
 					currentMonthDuration={memberToAdjustDuration.monthDuration}
+					currentDayDuration={memberToAdjustDuration.dayDuration}
 					onSuccess={() => {}}
 				/>
 			)}
@@ -1339,9 +1377,24 @@ function MemberViewModal({ member, onClose }: { member: Member; onClose: () => v
 									</span>
 								</div>
 							)}
-							{(member.subscriptionMonthDuration != null && member.subscriptionMonthDuration >= 1) ||
-							(memberDetails?.currentMembership?.monthDuration != null &&
-								memberDetails.currentMembership.monthDuration >= 1) ? (
+							{member.subscriptionUsesDays ||
+							memberDetails?.currentMembership?.dayDuration != null ||
+							memberDetails?.currentMembership?.membership?.durationType === 'DAILY' ? (
+								<div>
+									<span className="text-[var(--text-secondary)]">Subscription length:</span>{' '}
+									<span className="font-medium text-[var(--text-primary)]">
+										{(() => {
+											const d =
+												memberDetails?.currentMembership?.dayDuration ??
+												member.subscriptionDayDuration ??
+												1;
+											return `${d} day${d === 1 ? '' : 's'}`;
+										})()}
+									</span>
+								</div>
+							) : (member.subscriptionMonthDuration != null && member.subscriptionMonthDuration >= 1) ||
+							  (memberDetails?.currentMembership?.monthDuration != null &&
+									memberDetails.currentMembership.monthDuration >= 1) ? (
 								<div>
 									<span className="text-[var(--text-secondary)]">Subscription length:</span>{' '}
 									<span className="font-medium text-[var(--text-primary)]">

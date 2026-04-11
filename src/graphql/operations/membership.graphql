@@ -67,6 +67,7 @@ mutation DirectSubscribeMember($input: DirectSubscribeInput!) {
 		startedAt
 		expiresAt
 		monthDuration
+		dayDuration
 		status
 		createdAt
 	}
@@ -86,6 +87,7 @@ mutation UpdateMembershipTransactionDuration($input: UpdateMembershipTransaction
 		startedAt
 		expiresAt
 		monthDuration
+		dayDuration
 		status
 		createdAt
 		updatedAt

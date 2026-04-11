@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { X, Check, Calendar, CreditCard, Loader2 } from 'lucide-react';
 import { GET_ACTIVE_MEMBERSHIPS, DIRECT_SUBSCRIBE_MEMBER, GET_USERS } from '@/graphql/operations/index';
+import { DurationType } from '@/graphql/generated/graphql';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 
@@ -52,7 +53,6 @@ export function DirectSubscribeModal({
 			{ query: GET_USERS, variables: { role: 'coach' } },
 		],
 		onCompleted: (data) => {
-			console.log('✅ Subscription successful:', data);
 			const membershipName = data.directSubscribeMember.membership?.name || 'the selected plan';
 			dispatch(
 				addToast({
@@ -79,13 +79,9 @@ export function DirectSubscribeModal({
 
 	const memberships = membershipsData?.getMemberships || [];
 
-	const handleSubscribe = () => {
-		console.log('🔔 Subscribe button clicked', {
-			selectedMembershipId,
-			memberId,
-			memberName,
-		});
+	const selectedPlanIsDaily = selectedPlan?.durationType === DurationType.Daily;
 
+	const handleSubscribe = () => {
 		if (!selectedMembershipId) {
 			dispatch(
 				addToast({
@@ -130,8 +126,6 @@ export function DirectSubscribeModal({
 			}
 		}
 
-		console.log('📤 Sending subscription request...', input);
-
 		directSubscribe({
 			variables: { input },
 		}).catch((error) => {
@@ -143,6 +137,24 @@ export function DirectSubscribeModal({
 		const plan = (membershipsData?.getMemberships || []).find(
 			(m: { id: string }) => m.id === selectedMembershipId
 		) as { monthDuration?: number; durationType?: string } | undefined;
+		const start = subscriptionStartDate
+			? new Date(`${subscriptionStartDate}T12:00:00`)
+			: new Date();
+		if (Number.isNaN(start.getTime())) return null;
+
+		if (plan?.durationType === DurationType.Daily) {
+			let days = 1;
+			if (customMonthDuration.trim()) {
+				const n = parseInt(customMonthDuration, 10);
+				if (Number.isFinite(n) && n >= 1) days = n;
+			} else if (plan?.monthDuration && plan.monthDuration >= 1) {
+				days = plan.monthDuration;
+			}
+			const end = new Date(start.getTime());
+			end.setDate(end.getDate() + days);
+			return end.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+		}
+
 		let months = 1;
 		if (customMonthDuration.trim()) {
 			const n = parseInt(customMonthDuration, 10);
@@ -152,23 +164,12 @@ export function DirectSubscribeModal({
 		} else if (plan?.durationType === 'QUARTERLY') months = 3;
 		else if (plan?.durationType === 'YEARLY') months = 12;
 
-		const start = subscriptionStartDate
-			? new Date(`${subscriptionStartDate}T12:00:00`)
-			: new Date();
-		if (Number.isNaN(start.getTime())) return null;
 		const end = new Date(start.getTime());
 		end.setMonth(end.getMonth() + months);
 		return end.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 	};
 
-	console.log('🔍 DirectSubscribeModal render:', {
-		isOpen,
-		memberId,
-		memberName,
-	});
-
 	if (!isOpen) {
-		console.log('⚠️ Modal is not open, returning null');
 		return null;
 	}
 
@@ -236,7 +237,8 @@ export function DirectSubscribeModal({
 											</span>
 											<span className="text-[var(--text-secondary)]">
 												<Calendar size={14} className="inline mr-1" />
-												Plan default: {membership.monthDuration ?? 1} mo
+												Plan default: {membership.monthDuration ?? 1}{' '}
+												{membership.durationType === DurationType.Daily ? 'days' : 'mo'}
 											</span>
 										</div>
 										<span className="text-lg font-bold" style={{ color: 'var(--primary-yellow)' }}>
@@ -276,7 +278,7 @@ export function DirectSubscribeModal({
 							</p>
 							<div>
 								<label className="text-xs text-[var(--text-secondary)] block mb-1" htmlFor="custom-months">
-									Duration (months)
+									{selectedPlanIsDaily ? 'Duration (calendar days)' : 'Duration (months)'}
 								</label>
 								<input
 									id="custom-months"

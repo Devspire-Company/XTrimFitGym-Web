@@ -11,7 +11,11 @@ interface AdjustSubscriptionDurationModalProps {
 	onClose: () => void;
 	transactionId: string;
 	memberName: string;
+	/** When true, edit length in calendar days; otherwise in months. */
+	usesDays: boolean;
 	currentMonthDuration: number;
+	/** Current day length when `usesDays` (from transaction or plan). */
+	currentDayDuration: number;
 	onSuccess?: () => void;
 }
 
@@ -20,17 +24,21 @@ export function AdjustSubscriptionDurationModal({
 	onClose,
 	transactionId,
 	memberName,
+	usesDays,
 	currentMonthDuration,
+	currentDayDuration,
 	onSuccess,
 }: AdjustSubscriptionDurationModalProps) {
 	const [months, setMonths] = useState(String(currentMonthDuration));
+	const [days, setDays] = useState(String(currentDayDuration));
 	const dispatch = useAppDispatch();
 
 	useEffect(() => {
 		if (isOpen) {
 			setMonths(String(currentMonthDuration));
+			setDays(String(currentDayDuration));
 		}
-	}, [isOpen, currentMonthDuration]);
+	}, [isOpen, currentMonthDuration, currentDayDuration]);
 
 	const [updateDuration, { loading }] = useMutation(UPDATE_MEMBERSHIP_TRANSACTION_DURATION, {
 		refetchQueries: [{ query: GET_USERS, variables: { role: RoleType.Member } }],
@@ -39,10 +47,14 @@ export function AdjustSubscriptionDurationModal({
 			const expStr = exp
 				? new Date(exp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 				: '';
+			const d = data.updateMembershipTransactionDuration.dayDuration;
+			const m = data.updateMembershipTransactionDuration.monthDuration;
+			const lenStr =
+				d != null && d >= 1 ? `${d} day${d === 1 ? '' : 's'}` : `${m} month${m === 1 ? '' : 's'}`;
 			dispatch(
 				addToast({
 					type: 'success',
-					message: `Updated ${memberName}'s subscription (${data.updateMembershipTransactionDuration.monthDuration} mo${expStr ? `, expires ${expStr}` : ''})`,
+					message: `Updated ${memberName}'s subscription (${lenStr}${expStr ? `, expires ${expStr}` : ''})`,
 				})
 			);
 			onSuccess?.();
@@ -59,6 +71,28 @@ export function AdjustSubscriptionDurationModal({
 	});
 
 	const handleSubmit = () => {
+		if (usesDays) {
+			const n = parseInt(days, 10);
+			if (!Number.isFinite(n) || n < 1) {
+				dispatch(
+					addToast({
+						type: 'error',
+						message: 'Enter a valid number of days (at least 1)',
+					})
+				);
+				return;
+			}
+			updateDuration({
+				variables: {
+					input: {
+						transactionId,
+						dayDuration: n,
+					},
+				},
+			}).catch(() => {});
+			return;
+		}
+
 		const n = parseInt(months, 10);
 		if (!Number.isFinite(n) || n < 1) {
 			dispatch(
@@ -101,21 +135,39 @@ export function AdjustSubscriptionDurationModal({
 					</h2>
 
 					<p className="modal-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-						Set total months from the subscription start date for <strong>{memberName}</strong>. Expiry
-						will be recalculated from their original start date.
+						Set total {usesDays ? 'calendar days' : 'months'} from the subscription start date for{' '}
+						<strong>{memberName}</strong>. Expiry will be recalculated from their original start date.
 					</p>
 
-					<label className="block text-sm text-[var(--text-secondary)] mb-2" htmlFor="sub-months">
-						Total duration (months)
-					</label>
-					<input
-						id="sub-months"
-						type="number"
-						min={1}
-						value={months}
-						onChange={(e) => setMonths(e.target.value)}
-						className="w-full px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] text-[var(--text-primary)] mb-6"
-					/>
+					{usesDays ? (
+						<>
+							<label className="block text-sm text-[var(--text-secondary)] mb-2" htmlFor="sub-days">
+								Total duration (days)
+							</label>
+							<input
+								id="sub-days"
+								type="number"
+								min={1}
+								value={days}
+								onChange={(e) => setDays(e.target.value)}
+								className="w-full px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] text-[var(--text-primary)] mb-6"
+							/>
+						</>
+					) : (
+						<>
+							<label className="block text-sm text-[var(--text-secondary)] mb-2" htmlFor="sub-months">
+								Total duration (months)
+							</label>
+							<input
+								id="sub-months"
+								type="number"
+								min={1}
+								value={months}
+								onChange={(e) => setMonths(e.target.value)}
+								className="w-full px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] text-[var(--text-primary)] mb-6"
+							/>
+						</>
+					)}
 
 					<div className="modal-actions" style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
 						<button
