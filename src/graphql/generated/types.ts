@@ -1219,6 +1219,8 @@ export type UpdateMembershipTransactionDurationInput = {
   dayDuration?: InputMaybe<Scalars['Int']['input']>;
   /** New total months from the transaction's startedAt (recalculates expiresAt). Omit when using dayDuration. */
   monthDuration?: InputMaybe<Scalars['Int']['input']>;
+  /** Optional ISO 8601 start datetime. When set, replaces the transaction startedAt and recalculates expiresAt from it (walk-ins / legacy corrections). Omit to keep the existing start date. */
+  startedAt?: InputMaybe<Scalars['String']['input']>;
   transactionId: Scalars['ID']['input'];
 };
 

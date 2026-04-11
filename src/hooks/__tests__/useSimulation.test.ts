@@ -86,7 +86,8 @@ describe('useSimulation', () => {
 
 	describe('filterMembers', () => {
 		it('should filter by search term', () => {
-			const filtered = filterMembers(mockMembers, 'john', 'all', 'all');
+			// "john" alone matches both "John Doe" and "Bob Johnson"
+			const filtered = filterMembers(mockMembers, 'john@', 'all', 'all');
 			expect(filtered).toHaveLength(1);
 			expect(filtered[0].name).toBe('John Doe');
 		});

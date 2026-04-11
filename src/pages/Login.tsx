@@ -1,12 +1,24 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { SignIn, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router';
 import { useAppSelector } from '@/store/hooks';
 import { clerkAuthAppearance } from '@/lib/clerkAppearance';
+import {
+	consumeAdminPortalAuthNotice,
+	messageForAdminPortalAuthNotice,
+	type AdminPortalAuthNotice,
+} from '@/lib/adminPortalAuthNotice';
 
 export function LoginPage() {
+	const [portalNotice, setPortalNotice] = useState<AdminPortalAuthNotice | null>(null);
+
 	useEffect(() => {
 		document.title = 'Login - X-TRIM FIT GYM';
+	}, []);
+
+	useEffect(() => {
+		const n = consumeAdminPortalAuthNotice();
+		if (n) setPortalNotice(n);
 	}, []);
 
 	const navigate = useNavigate();
@@ -38,11 +50,21 @@ export function LoginPage() {
 					<p className="text-[var(--text-secondary)]">Sign in to access your admin dashboard</p>
 				</div>
 
+				{portalNotice && (
+					<div
+						className="mb-4 rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-100"
+						role="alert"
+					>
+						{messageForAdminPortalAuthNotice(portalNotice)}
+					</div>
+				)}
+
 				<div className="flex justify-center clerk-auth-host">
 					<SignIn
 						routing="path"
 						path="/login"
 						signInUrl="/login"
+						signUpUrl="/login"
 						forceRedirectUrl="/dashboard"
 						fallbackRedirectUrl="/dashboard"
 						transferable={false}

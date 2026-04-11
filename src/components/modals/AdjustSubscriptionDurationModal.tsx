@@ -6,6 +6,16 @@ import { RoleType } from '@/graphql/generated/graphql';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 
+function isoOrDateToDateInput(iso: string | undefined): string {
+	if (!iso) return '';
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return '';
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
 interface AdjustSubscriptionDurationModalProps {
 	isOpen: boolean;
 	onClose: () => void;
@@ -16,6 +26,8 @@ interface AdjustSubscriptionDurationModalProps {
 	currentMonthDuration: number;
 	/** Current day length when `usesDays` (from transaction or plan). */
 	currentDayDuration: number;
+	/** Current subscription start (ISO); used to prefill the optional override field. */
+	currentStartedAtIso?: string;
 	onSuccess?: () => void;
 }
 
@@ -27,18 +39,22 @@ export function AdjustSubscriptionDurationModal({
 	usesDays,
 	currentMonthDuration,
 	currentDayDuration,
+	currentStartedAtIso,
 	onSuccess,
 }: AdjustSubscriptionDurationModalProps) {
 	const [months, setMonths] = useState(String(currentMonthDuration));
 	const [days, setDays] = useState(String(currentDayDuration));
+	/** YYYY-MM-DD; empty = keep existing startedAt on save */
+	const [subscriptionStartDate, setSubscriptionStartDate] = useState('');
 	const dispatch = useAppDispatch();
 
 	useEffect(() => {
 		if (isOpen) {
 			setMonths(String(currentMonthDuration));
 			setDays(String(currentDayDuration));
+			setSubscriptionStartDate(isoOrDateToDateInput(currentStartedAtIso));
 		}
-	}, [isOpen, currentMonthDuration, currentDayDuration]);
+	}, [isOpen, currentMonthDuration, currentDayDuration, currentStartedAtIso]);
 
 	const [updateDuration, { loading }] = useMutation(UPDATE_MEMBERSHIP_TRANSACTION_DURATION, {
 		refetchQueries: [{ query: GET_USERS, variables: { role: RoleType.Member } }],
@@ -70,7 +86,22 @@ export function AdjustSubscriptionDurationModal({
 		},
 	});
 
+	const buildInput = (): { transactionId: string; monthDuration?: number; dayDuration?: number; startedAt?: string } => {
+		const base: { transactionId: string; monthDuration?: number; dayDuration?: number; startedAt?: string } = {
+			transactionId,
+		};
+		if (subscriptionStartDate.trim()) {
+			const d = new Date(`${subscriptionStartDate.trim()}T12:00:00`);
+			if (!Number.isNaN(d.getTime())) {
+				base.startedAt = d.toISOString();
+			}
+		}
+		return base;
+	};
+
 	const handleSubmit = () => {
+		const input = buildInput();
+
 		if (usesDays) {
 			const n = parseInt(days, 10);
 			if (!Number.isFinite(n) || n < 1) {
@@ -85,7 +116,7 @@ export function AdjustSubscriptionDurationModal({
 			updateDuration({
 				variables: {
 					input: {
-						transactionId,
+						...input,
 						dayDuration: n,
 					},
 				},
@@ -106,7 +137,7 @@ export function AdjustSubscriptionDurationModal({
 		updateDuration({
 			variables: {
 				input: {
-					transactionId,
+					...input,
 					monthDuration: n,
 				},
 			},
@@ -136,7 +167,23 @@ export function AdjustSubscriptionDurationModal({
 
 					<p className="modal-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
 						Set total {usesDays ? 'calendar days' : 'months'} from the subscription start date for{' '}
-						<strong>{memberName}</strong>. Expiry will be recalculated from their original start date.
+						<strong>{memberName}</strong>. You can optionally override the start date (for walk-ins or legacy
+						records); expiry is recalculated from that start and the length below.
+					</p>
+
+					<label className="block text-sm text-[var(--text-secondary)] mb-2" htmlFor="sub-start-override">
+						Subscription start date (optional)
+					</label>
+					<input
+						id="sub-start-override"
+						type="date"
+						value={subscriptionStartDate}
+						onChange={(e) => setSubscriptionStartDate(e.target.value)}
+						className="w-full px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] text-[var(--text-primary)] mb-4"
+					/>
+					<p className="text-xs text-[var(--text-secondary)] mb-4 -mt-2">
+						Leave as shown to keep the current start; change it to align walk-in or backdated subscriptions with
+						manual subscribe behavior.
 					</p>
 
 					{usesDays ? (

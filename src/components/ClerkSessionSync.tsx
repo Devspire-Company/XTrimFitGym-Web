@@ -1,13 +1,14 @@
 import { useAuth, useClerk } from '@clerk/clerk-react';
 import { useEffect, useRef } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useApolloClient } from '@apollo/client';
 import { useAppDispatch } from '@/store/hooks';
 import { setCredentials, logout } from '@/store/slices/authSlice';
 import { addToast } from '@/store/slices/uiSlice';
 import type { User } from '@/store/slices/authSlice';
-import { MeDocument } from '@/graphql/generated/graphql';
+import { MeDocument, RoleType } from '@/graphql/generated/graphql';
 import { registerClerkTokenGetter } from '@/lib/clerkTokenBridge';
+import { setAdminPortalAuthNotice } from '@/lib/adminPortalAuthNotice';
 
 function mapMeToUser(u: NonNullable<import('@/graphql/generated/graphql').MeQuery['me']>): User {
 	return {
@@ -35,6 +36,7 @@ function isClerkAuthRoute(pathname: string) {
 
 export function ClerkSessionSync() {
 	const location = useLocation();
+	const navigate = useNavigate();
 	const onAuthPage = isClerkAuthRoute(location.pathname);
 	const { isLoaded, isSignedIn, getToken, sessionId } = useAuth();
 	const { signOut } = useClerk();
@@ -79,28 +81,36 @@ export function ClerkSessionSync() {
 
 				const me = data?.me;
 				if (!me) {
+					setAdminPortalAuthNotice({ code: 'NO_STAFF_ACCOUNT' });
 					await signOut();
 					dispatch(logout());
 					dispatch(
 						addToast({
 							type: 'error',
 							message:
-								'No MongoDB user for this email. An admin must create your account in Settings first; public sign-up is disabled.',
+								'No administrator account for this email. Self sign-up is disabled; an admin must create your account in Settings.',
 						})
 					);
+					navigate('/login', { replace: true });
 					return;
 				}
 
-				if (me.role !== 'admin') {
+				if (me.role !== RoleType.Admin) {
+					setAdminPortalAuthNotice({
+						code: me.role === RoleType.Coach ? 'WRONG_ROLE_COACH' : 'WRONG_ROLE_MEMBER',
+					});
 					await signOut();
 					dispatch(logout());
 					dispatch(
 						addToast({
 							type: 'error',
 							message:
-								'Admins only. Update this user’s role to admin in MongoDB, or set Clerk publicMetadata.role / CLERK_ADMIN_EMAILS before first sign-in.',
+								me.role === RoleType.Coach
+									? 'Coach accounts cannot use the admin web app. Use the coach mobile app.'
+									: 'Member accounts cannot use the admin web app. Use the member mobile app.',
 						})
 					);
+					navigate('/login', { replace: true });
 					return;
 				}
 
@@ -112,6 +122,7 @@ export function ClerkSessionSync() {
 				);
 			} catch {
 				if (id !== syncRunId.current) return;
+				setAdminPortalAuthNotice({ code: 'SESSION_ERROR' });
 				await signOut();
 				dispatch(logout());
 				dispatch(
@@ -120,11 +131,12 @@ export function ClerkSessionSync() {
 						message: 'Could not verify your session with the server.',
 					})
 				);
+				navigate('/login', { replace: true });
 			}
 		};
 
 		void run();
-	}, [isLoaded, isSignedIn, sessionId, onAuthPage, getToken, client, dispatch, signOut]);
+	}, [isLoaded, isSignedIn, sessionId, onAuthPage, getToken, client, dispatch, signOut, navigate]);
 
 	return null;
 }

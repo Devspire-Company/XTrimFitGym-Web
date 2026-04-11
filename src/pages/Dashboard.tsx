@@ -12,6 +12,7 @@ import {
 	LogOut,
 	Calendar,
 	PieChart,
+	Zap,
 } from 'lucide-react';
 import { GET_USERS, GET_REVENUE_SUMMARY, REVENUE_SUMMARY_UPDATED, USERS_UPDATED, GET_ATTENDANCE_RECORDS, ATTENDANCE_RECORD_ADDED, ATTENDANCE_UPDATED } from '@/graphql/operations/index';
 import { RoleType } from '@/graphql/generated/graphql';
@@ -511,7 +512,8 @@ export function DashboardPage() {
 			{/* Quick Actions */}
 			<div className="section-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[18px] p-7 backdrop-blur-md">
 				<h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)] font-['Poppins']">
-					<span className="text-[var(--primary-yellow)]">⚡</span> Quick Actions
+					<Zap className="w-5 h-5 text-[var(--primary-yellow)]" aria-hidden />
+					Quick Actions
 				</h2>
 				<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 					<QuickActionButton href="/members" icon={Users} label="Add Member" />

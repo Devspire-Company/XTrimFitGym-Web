@@ -59,6 +59,8 @@ interface Member {
 	/** True when subscription is tracked in calendar days (daily / promo). */
 	subscriptionUsesDays?: boolean;
 	subscriptionDayDuration?: number | null;
+	/** Active transaction `startedAt` (ISO) for admin duration/start overrides. */
+	subscriptionStartedAt?: string;
 }
 
 export function MembersPage() {
@@ -98,6 +100,7 @@ export function MembersPage() {
 		monthDuration: number;
 		dayDuration: number;
 		usesDays: boolean;
+		currentStartedAtIso?: string;
 	} | null>(null);
 	const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 	const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(
@@ -416,6 +419,8 @@ export function MembersPage() {
 					: membershipTransaction?.membership?.monthDuration,
 			subscriptionUsesDays,
 			subscriptionDayDuration,
+			subscriptionStartedAt:
+				typeof membershipTransaction?.startedAt === 'string' ? membershipTransaction.startedAt : undefined,
 		};
 	});
 
@@ -462,6 +467,7 @@ export function MembersPage() {
 			monthDuration: usesDays ? 1 : months,
 			dayDuration: usesDays ? dayDur : 1,
 			usesDays,
+			currentStartedAtIso: member.subscriptionStartedAt,
 		});
 		setIsAdjustDurationOpen(true);
 	};
@@ -1038,6 +1044,7 @@ export function MembersPage() {
 					usesDays={memberToAdjustDuration.usesDays}
 					currentMonthDuration={memberToAdjustDuration.monthDuration}
 					currentDayDuration={memberToAdjustDuration.dayDuration}
+					currentStartedAtIso={memberToAdjustDuration.currentStartedAtIso}
 					onSuccess={() => {}}
 				/>
 			)}
