@@ -122,7 +122,7 @@ export function SubscriptionRequestsPage() {
 
 	// Filter requests based on search term and status
 	const filteredRequests = useMemo(() => {
-		return requests.filter((request) => {
+		const filtered = requests.filter((request) => {
 			// Search filter - search in member name, email, and plan name
 			const matchesSearch =
 				!searchTerm ||
@@ -137,6 +137,14 @@ export function SubscriptionRequestsPage() {
 
 			return matchesSearch && matchesStatus;
 		});
+
+		const ts = (r: SubscriptionRequestItem) => {
+			const u = r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
+			const q = r.requestedAt ? new Date(r.requestedAt).getTime() : 0;
+			return Math.max(u, q);
+		};
+
+		return [...filtered].sort((a, b) => ts(b) - ts(a));
 	}, [requests, searchTerm, statusFilter]);
 
 	// Group filtered requests by status for statistics
@@ -222,6 +230,23 @@ export function SubscriptionRequestsPage() {
 			hour: '2-digit',
 			minute: '2-digit',
 		});
+	};
+
+	const formatRelativeSince = (dateString: string | null | undefined) => {
+		if (!dateString) return '';
+		const t = new Date(dateString).getTime();
+		if (!Number.isFinite(t)) return '';
+		const diffSec = Math.floor((Date.now() - t) / 1000);
+		if (diffSec < 0) return 'just now';
+		if (diffSec < 60) return `${diffSec}s ago`;
+		const diffMin = Math.floor(diffSec / 60);
+		if (diffMin < 60) return `${diffMin}m ago`;
+		const diffHr = Math.floor(diffMin / 60);
+		if (diffHr < 48) return `${diffHr}h ago`;
+		const diffDay = Math.floor(diffHr / 24);
+		if (diffDay < 14) return `${diffDay}d ago`;
+		const diffWk = Math.floor(diffDay / 7);
+		return `${diffWk}w ago`;
 	};
 
 	return (
@@ -327,7 +352,7 @@ export function SubscriptionRequestsPage() {
 									Plan
 								</th>
 								<th className="px-6 py-4 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-									Requested
+									Requested / age
 								</th>
 								<th className="px-6 py-4 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
 									Status
@@ -352,7 +377,9 @@ export function SubscriptionRequestsPage() {
 									</td>
 								</tr>
 							) : (
-								filteredRequests.map((request) => (
+								filteredRequests.map((request) => {
+									const sentAgo = formatRelativeSince(request.requestedAt);
+									return (
 									<tr key={request.id} className="hover:bg-[rgba(255,255,255,0.02)]">
 										<td className="px-6 py-4 whitespace-nowrap">
 											<div>
@@ -374,6 +401,9 @@ export function SubscriptionRequestsPage() {
 										</td>
 										<td className="px-6 py-4 whitespace-nowrap">
 											<p className="text-sm text-[var(--text-primary)]">{formatDate(request.requestedAt)}</p>
+											{sentAgo ? (
+												<p className="text-xs text-[var(--text-secondary)] mt-0.5">Sent {sentAgo}</p>
+											) : null}
 										</td>
 										<td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(request.status)}</td>
 										<td className="px-6 py-4 whitespace-nowrap">
@@ -440,7 +470,8 @@ export function SubscriptionRequestsPage() {
 											)}
 										</td>
 									</tr>
-								))
+									);
+								})
 							)}
 						</tbody>
 					</table>

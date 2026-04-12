@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Bell, X, Check, XCircle, ChevronUp, ChevronDown, Clock } from 'lucide-react';
 import {
@@ -27,8 +27,34 @@ interface SubscriptionRequest {
 	};
 	status: string;
 	requestedAt: string;
-	expiresAt: string;
+	createdAt?: string | null;
+	updatedAt?: string | null;
 }
+
+/** Monotonic age in seconds from `dateIso` to now (>= 0). */
+function ageSeconds(dateIso: string | null | undefined): number {
+	if (!dateIso) return 0;
+	const t = new Date(dateIso).getTime();
+	if (!Number.isFinite(t)) return 0;
+	return Math.max(0, Math.floor((Date.now() - t) / 1000));
+}
+
+/** Human-readable "time since" for admin review. */
+function formatRelativeSince(dateIso: string | null | undefined): string {
+	const sec = ageSeconds(dateIso);
+	if (sec < 60) return `${sec}s ago`;
+	const min = Math.floor(sec / 60);
+	if (min < 60) return `${min}m ago`;
+	const hr = Math.floor(min / 60);
+	if (hr < 48) return `${hr}h ago`;
+	const day = Math.floor(hr / 24);
+	if (day < 14) return `${day}d ago`;
+	const wk = Math.floor(day / 7);
+	return `${wk}w ago`;
+}
+
+/** Highlight requests waiting longer than this (seconds). */
+const STALE_PENDING_SEC = 7 * 24 * 60 * 60;
 
 export function SubscriptionRequestNotification() {
 	const [isExpanded, setIsExpanded] = useState(false);
@@ -38,13 +64,12 @@ export function SubscriptionRequestNotification() {
 	const { data, loading, error, refetch } = useQuery<{
 		getPendingSubscriptionRequests: SubscriptionRequest[];
 	}>(GET_PENDING_SUBSCRIPTION_REQUESTS, {
-		pollInterval: 2000, // Poll every 2 seconds for real-time updates
+		pollInterval: 2000,
 		fetchPolicy: 'network-only',
-		errorPolicy: 'all', // Continue even if there are errors
-		skip: false, // Always fetch
+		errorPolicy: 'all',
+		skip: false,
 		onError: (err) => {
 			console.error('Error fetching subscription requests:', err);
-			// Don't crash the app, just log the error
 		},
 	});
 
@@ -53,9 +78,9 @@ export function SubscriptionRequestNotification() {
 			{ query: GET_USERS, variables: { role: 'member' } },
 			{ query: GET_USERS, variables: { role: 'coach' } },
 		],
-		onCompleted: (data) => {
+		onCompleted: (mutationData) => {
 			const membershipName =
-				data.approveSubscriptionRequest.membership?.name || 'the selected plan';
+				mutationData.approveSubscriptionRequest.membership?.name || 'the selected plan';
 			dispatch(
 				addToast({
 					type: 'success',
@@ -64,12 +89,12 @@ export function SubscriptionRequestNotification() {
 			);
 			refetch();
 		},
-		onError: (error) => {
-			console.error('Error approving subscription request:', error);
+		onError: (mutationError) => {
+			console.error('Error approving subscription request:', mutationError);
 			dispatch(
 				addToast({
 					type: 'error',
-					message: error.message || 'Failed to approve subscription request',
+					message: mutationError.message || 'Failed to approve subscription request',
 				})
 			);
 		},
@@ -89,31 +114,27 @@ export function SubscriptionRequestNotification() {
 			);
 			refetch();
 		},
-		onError: (error) => {
+		onError: (mutationError) => {
 			dispatch(
 				addToast({
 					type: 'error',
-					message: error.message || 'Failed to reject subscription request',
+					message: mutationError.message || 'Failed to reject subscription request',
 				})
 			);
 		},
 	});
 
-	const pendingRequests = (data?.getPendingSubscriptionRequests || []).filter(
-		(request) => request && request.member && request.membership && request.membership.id
-	);
-
-	// Calculate time remaining for each request
-	const getTimeRemaining = (expiresAt: string) => {
-		const now = new Date();
-		const expires = new Date(expiresAt);
-		const diff = expires.getTime() - now.getTime();
-
-		if (diff <= 0) return 'Expired';
-
-		const seconds = Math.floor(diff / 1000);
-		return `${seconds}s`;
-	};
+	const pendingRequests = useMemo(() => {
+		const raw = (data?.getPendingSubscriptionRequests || []).filter(
+			(request) => request && request.member && request.membership && request.membership.id
+		);
+		const rank = (r: SubscriptionRequest) => {
+			const u = r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
+			const q = r.requestedAt ? new Date(r.requestedAt).getTime() : 0;
+			return Math.max(u, q);
+		};
+		return [...raw].sort((a, b) => rank(b) - rank(a));
+	}, [data?.getPendingSubscriptionRequests]);
 
 	const handleApprove = async (requestId: string) => {
 		try {
@@ -122,7 +143,7 @@ export function SubscriptionRequestNotification() {
 					input: { requestId },
 				},
 			});
-		} catch (error) {
+		} catch {
 			// Error handled in onError
 		}
 	};
@@ -134,12 +155,11 @@ export function SubscriptionRequestNotification() {
 					input: { requestId },
 				},
 			});
-		} catch (error) {
+		} catch {
 			// Error handled in onError
 		}
 	};
 
-	// Auto-expand if there are pending requests
 	useEffect(() => {
 		if (pendingRequests.length > 0 && !isMinimized) {
 			setIsExpanded(true);
@@ -152,9 +172,9 @@ export function SubscriptionRequestNotification() {
 
 	return (
 		<div className="fixed bottom-6 right-6 z-50">
-			{/* Notification Badge/Button */}
 			{!isExpanded && (
 				<button
+					type="button"
 					onClick={() => {
 						setIsExpanded(true);
 						setIsMinimized(false);
@@ -170,10 +190,8 @@ export function SubscriptionRequestNotification() {
 				</button>
 			)}
 
-			{/* Expanded Notification Panel */}
 			{isExpanded && (
 				<div className="bg-[var(--bg-darker)] border border-[rgba(255,255,255,0.1)] rounded-xl shadow-2xl w-96 max-h-[600px] flex flex-col">
-					{/* Header */}
 					<div className="flex items-center justify-between p-4 border-b border-[rgba(255,255,255,0.1)]">
 						<div className="flex items-center gap-3">
 							<Bell className="w-5 h-5 text-[var(--primary-yellow)]" />
@@ -187,6 +205,7 @@ export function SubscriptionRequestNotification() {
 							)}
 						</div>
 						<button
+							type="button"
 							onClick={() => {
 								setIsExpanded(false);
 								setIsMinimized(true);
@@ -201,7 +220,6 @@ export function SubscriptionRequestNotification() {
 						</button>
 					</div>
 
-					{/* Content */}
 					{!isMinimized && (
 						<div className="overflow-y-auto flex-1 p-4">
 							{error && (
@@ -227,17 +245,17 @@ export function SubscriptionRequestNotification() {
 											!request.membership ||
 											!request.membership.id
 										) {
-											return null; // Skip invalid requests
+											return null;
 										}
 
-										const timeRemaining = getTimeRemaining(request.expiresAt);
-										const isExpiring = timeRemaining !== 'Expired' && parseInt(timeRemaining) < 10;
+										const ageSec = ageSeconds(request.requestedAt);
+										const isStale = ageSec >= STALE_PENDING_SEC;
 
 										return (
 											<div
 												key={request.id}
 												className={`bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] rounded-lg p-4 ${
-													isExpiring ? 'border-red-500/50 bg-red-500/10' : ''
+													isStale ? 'border-amber-500/40 bg-amber-500/5' : ''
 												}`}
 											>
 												<div className="flex items-start justify-between mb-3">
@@ -253,7 +271,7 @@ export function SubscriptionRequestNotification() {
 															<span className="font-medium text-[var(--primary-yellow)]">
 																{request.membership?.name || 'Unknown Plan'}
 															</span>
-															{request.membership?.monthlyPrice && (
+															{request.membership?.monthlyPrice != null && (
 																<>
 																	<span>•</span>
 																	<span>₱{request.membership.monthlyPrice.toLocaleString()}</span>
@@ -262,6 +280,7 @@ export function SubscriptionRequestNotification() {
 														</div>
 													</div>
 													<button
+														type="button"
 														onClick={() => {
 															setIsExpanded(false);
 															setIsMinimized(true);
@@ -272,39 +291,40 @@ export function SubscriptionRequestNotification() {
 													</button>
 												</div>
 
-												{/* Time Remaining */}
 												<div
-													className={`flex items-center gap-2 mb-3 text-xs ${
-														isExpiring ? 'text-red-400' : 'text-[var(--text-secondary)]'
+													className={`flex flex-col gap-1 mb-3 text-xs ${
+														isStale ? 'text-amber-200/90' : 'text-[var(--text-secondary)]'
 													}`}
 												>
-													<Clock className="w-3 h-3" />
-													<span>
-														{timeRemaining === 'Expired'
-															? 'Request expired'
-															: `Expires in ${timeRemaining}`}
-													</span>
+													<div className="flex items-center gap-2">
+														<Clock className="w-3 h-3 shrink-0" />
+														<span>Request sent {formatRelativeSince(request.requestedAt)}</span>
+													</div>
+													{isStale && (
+														<p className="pl-5 text-[11px] opacity-90">
+															Pending over a week — please review soon.
+														</p>
+													)}
 												</div>
 
-												{/* Actions */}
-												{timeRemaining !== 'Expired' && (
-													<div className="flex gap-2">
-														<button
-															onClick={() => handleApprove(request.id)}
-															className="flex-1 flex items-center justify-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
-														>
-															<Check className="w-4 h-4" />
-															Approve
-														</button>
-														<button
-															onClick={() => handleReject(request.id)}
-															className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
-														>
-															<XCircle className="w-4 h-4" />
-															Reject
-														</button>
-													</div>
-												)}
+												<div className="flex gap-2">
+													<button
+														type="button"
+														onClick={() => handleApprove(request.id)}
+														className="flex-1 flex items-center justify-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+													>
+														<Check className="w-4 h-4" />
+														Approve
+													</button>
+													<button
+														type="button"
+														onClick={() => handleReject(request.id)}
+														className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+													>
+														<XCircle className="w-4 h-4" />
+														Reject
+													</button>
+												</div>
 											</div>
 										);
 									})}
