@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import {
 	Users,
 	UserCog,
-	DollarSign,
+	PhilippinePeso,
 	CreditCard,
 	BarChart3,
 	Clock,
@@ -427,7 +427,7 @@ export function DashboardPage() {
 					changeType="neutral"
 				/>
 				<StatCard
-					icon={DollarSign}
+					icon={PhilippinePeso}
 					title="Total revenue"
 					value={`₱${monthlyRevenue.toLocaleString()}`}
 					change="Membership + walk-in fees"
@@ -471,19 +471,19 @@ export function DashboardPage() {
 				<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 pt-4 border-t border-[rgba(255,255,255,0.08)]">
 					<div className="flex flex-col">
 						<span className="text-sm text-[var(--text-secondary)] mb-1">Total</span>
-						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Inter',ui-sans-serif,system-ui,sans-serif] tabular-nums">
 							₱{monthlyRevenue.toLocaleString()}
 						</span>
 					</div>
 					<div className="flex flex-col">
 						<span className="text-sm text-[var(--text-secondary)] mb-1">Membership sales</span>
-						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Inter',ui-sans-serif,system-ui,sans-serif] tabular-nums">
 							₱{membershipRev.toLocaleString()}
 						</span>
 					</div>
 					<div className="flex flex-col">
 						<span className="text-sm text-[var(--text-secondary)] mb-1">Walk-in fees</span>
-						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Inter',ui-sans-serif,system-ui,sans-serif] tabular-nums">
 							₱{walkInRev.toLocaleString()}
 						</span>
 					</div>
@@ -501,7 +501,7 @@ export function DashboardPage() {
 					</div>
 					<div className="flex flex-col">
 						<span className="text-sm text-[var(--text-secondary)] mb-1">Avg. sub / member</span>
-						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Poppins']">
+						<span className="text-lg font-semibold text-[var(--text-primary)] font-['Inter',ui-sans-serif,system-ui,sans-serif] tabular-nums">
 							₱
 							{activeSubscriptions > 0 ? Math.round(membershipRev / activeSubscriptions) : 0}
 						</span>
@@ -754,7 +754,7 @@ function StatCard({
 			<h3 className="text-[0.85rem] font-medium text-[var(--text-secondary)] mb-2 uppercase">
 				{title}
 			</h3>
-			<div className="stat-value text-[2.2rem] font-bold text-[var(--text-primary)] mb-2 font-['Poppins']">
+			<div className="stat-value text-[2.2rem] font-bold tracking-tight text-[var(--text-primary)] mb-2 font-['Inter',ui-sans-serif,system-ui,sans-serif] tabular-nums">
 				{value}
 			</div>
 			<div

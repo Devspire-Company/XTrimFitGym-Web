@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Check, X as XIcon, Clock, CheckCircle2, XCircle, Trash2, Search } from 'lucide-react';
+import { Check, X as XIcon, Clock, CheckCircle2, XCircle, Search } from 'lucide-react';
 import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
 import { SuccessModal } from '@/components/modals/SuccessModal';
 import {
 	GET_ALL_SUBSCRIPTION_REQUESTS,
 	APPROVE_SUBSCRIPTION_REQUEST,
-	REJECT_SUBSCRIPTION_REQUEST,
 	DELETE_SUBSCRIPTION_REQUEST,
 } from '@/graphql/operations/index';
 import type { GetAllSubscriptionRequestsQuery } from '@/graphql/generated/types';
@@ -22,7 +21,6 @@ export function SubscriptionRequestsPage() {
 	const dispatch = useAppDispatch();
 	type SubscriptionRequestItem = GetAllSubscriptionRequestsQuery['getAllSubscriptionRequests'][number];
 	const [selectedRequest, setSelectedRequest] = useState<SubscriptionRequestItem | null>(null);
-	const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 	const [successMessage, setSuccessMessage] = useState('');
@@ -47,28 +45,14 @@ export function SubscriptionRequestsPage() {
 		},
 	});
 
-	const [rejectRequest, { loading: rejecting }] = useMutation(REJECT_SUBSCRIPTION_REQUEST, {
-		onCompleted: () => {
-			setSuccessMessage('Subscription request rejected successfully!');
-			setIsSuccessModalOpen(true);
-			setIsRejectModalOpen(false);
-			setSelectedRequest(null);
-			refetch();
-			dispatch(addToast({ type: 'success', message: 'Subscription request rejected!' }));
-		},
-		onError: (error) => {
-			dispatch(addToast({ type: 'error', message: error.message }));
-		},
-	});
-
 	const [deleteRequest, { loading: deleting }] = useMutation(DELETE_SUBSCRIPTION_REQUEST, {
 		onCompleted: () => {
-			setSuccessMessage('Subscription request deleted successfully!');
+			setSuccessMessage('Subscription request dismissed successfully!');
 			setIsSuccessModalOpen(true);
 			setIsDeleteModalOpen(false);
 			setSelectedRequest(null);
 			refetch();
-			dispatch(addToast({ type: 'success', message: 'Subscription request deleted!' }));
+			dispatch(addToast({ type: 'success', message: 'Subscription request dismissed!' }));
 		},
 		onError: (error) => {
 			dispatch(addToast({ type: 'error', message: error.message }));
@@ -83,23 +67,6 @@ export function SubscriptionRequestsPage() {
 				},
 			},
 		});
-	};
-
-	const handleReject = (request: SubscriptionRequestItem) => {
-		setSelectedRequest(request);
-		setIsRejectModalOpen(true);
-	};
-
-	const handleConfirmReject = () => {
-		if (selectedRequest) {
-			rejectRequest({
-				variables: {
-					input: {
-						requestId: selectedRequest.id,
-					},
-				},
-			});
-		}
 	};
 
 	const handleDelete = (request: SubscriptionRequestItem) => {
@@ -283,6 +250,7 @@ export function SubscriptionRequestsPage() {
 						<select
 							value={statusFilter}
 							onChange={(e) => setStatusFilter(e.target.value)}
+							aria-label="Filter subscription requests by status"
 							className="w-full px-4 py-2.5 bg-[var(--bg-darker)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-yellow)] focus:border-transparent"
 						>
 							<option value="all">All Status</option>
@@ -437,20 +405,13 @@ export function SubscriptionRequestsPage() {
 														Approve
 													</Button>
 													<Button
-														onClick={() => handleReject(request)}
-														disabled={rejecting || deleting}
-														className="btn-small btn-danger"
-													>
-														<XIcon className="w-4 h-4" />
-														Reject
-													</Button>
-													<Button
 														onClick={() => handleDelete(request)}
-														disabled={approving || rejecting || deleting}
+														disabled={approving || deleting}
 														className="btn-small btn-danger"
-														title="Delete request"
+														title="Dismiss request"
 													>
-														<Trash2 className="w-4 h-4" />
+														<XCircle className="w-4 h-4" />
+														Dismiss
 													</Button>
 												</div>
 											) : request.status === 'REJECTED' ? (
@@ -459,10 +420,10 @@ export function SubscriptionRequestsPage() {
 														onClick={() => handleDelete(request)}
 														disabled={deleting}
 														className="btn-small btn-danger"
-														title="Delete request"
+														title="Dismiss request"
 													>
-														<Trash2 className="w-4 h-4" />
-														Delete
+														<XCircle className="w-4 h-4" />
+														Dismiss
 													</Button>
 												</div>
 											) : (
@@ -480,27 +441,17 @@ export function SubscriptionRequestsPage() {
 
 			{/* Modals */}
 			<DeleteConfirmModal
-				isOpen={isRejectModalOpen}
-				onClose={() => {
-					setIsRejectModalOpen(false);
-					setSelectedRequest(null);
-				}}
-				onConfirm={handleConfirmReject}
-				title="Reject Subscription Request?"
-				message={`Are you sure you want to reject the subscription request from ${selectedRequest?.member?.firstName} ${selectedRequest?.member?.lastName} for the ${selectedRequest?.membership?.name} plan?`}
-				isDeleting={rejecting}
-			/>
-
-			<DeleteConfirmModal
 				isOpen={isDeleteModalOpen}
 				onClose={() => {
 					setIsDeleteModalOpen(false);
 					setSelectedRequest(null);
 				}}
 				onConfirm={handleConfirmDelete}
-				title="Delete Subscription Request?"
-				message={`Are you sure you want to delete the subscription request from ${selectedRequest?.member?.firstName} ${selectedRequest?.member?.lastName} for the ${selectedRequest?.membership?.name} plan? This action cannot be undone.`}
+				title="Dismiss Subscription Request?"
+				message={`Are you sure you want to dismiss the subscription request from ${selectedRequest?.member?.firstName} ${selectedRequest?.member?.lastName} for the ${selectedRequest?.membership?.name} plan?`}
 				isDeleting={deleting}
+				confirmLabel="Dismiss"
+				confirmingLabel="Dismissing..."
 			/>
 
 			<SuccessModal

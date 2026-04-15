@@ -6,6 +6,7 @@ export interface EquipmentFormData {
 	name: string;
 	description: string;
 	notes: string;
+	acquiredAt: string;
 	imageUrl: string;
 	imageFile?: File | null;
 	status: EquipmentStatus;
@@ -34,6 +35,7 @@ export function EquipmentFormModal({
 		const name = (formData.get('name') as string)?.trim() || '';
 		const description = (formData.get('description') as string)?.trim() || '';
 		const notes = (formData.get('notes') as string)?.trim() || '';
+		const acquiredAt = (formData.get('acquiredAt') as string)?.trim() || '';
 		const imageUrl = (formData.get('imageUrl') as string)?.trim() || '';
 		const imageFile = formData.get('imageFile') as File | null;
 		const statusRaw = (formData.get('status') as string) || EquipmentStatus.Available;
@@ -42,6 +44,7 @@ export function EquipmentFormModal({
 			name,
 			description,
 			notes,
+			acquiredAt,
 			imageUrl,
 			imageFile: imageFile && imageFile.size > 0 ? imageFile : null,
 			status: statusRaw as EquipmentStatus,
@@ -97,6 +100,19 @@ export function EquipmentFormModal({
 									<option value={EquipmentStatus.Damaged}>Damaged</option>
 									<option value={EquipmentStatus.Undermaintenance}>Under maintenance</option>
 								</select>
+							</div>
+							<div className="form-group">
+								<label htmlFor="acquiredAt">Acquired date</label>
+								<input
+									id="acquiredAt"
+									name="acquiredAt"
+									type="date"
+									defaultValue={
+										equipment?.acquiredAt
+											? new Date(equipment.acquiredAt).toISOString().slice(0, 10)
+											: ''
+									}
+								/>
 							</div>
 							<div className="form-group" style={{ gridColumn: '1 / -1' }}>
 								<label htmlFor="description">Description</label>

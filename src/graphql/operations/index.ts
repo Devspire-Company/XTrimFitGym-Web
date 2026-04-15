@@ -4,6 +4,7 @@
 export {
 	MeDocument as GET_ME,
 	GetEquipmentsDocument as GET_EQUIPMENTS,
+	GetEquipmentsLegacyDocument as GET_EQUIPMENTS_LEGACY,
 	GetEquipmentDocument as GET_EQUIPMENT,
 	GetAllMembershipsDocument as GET_ALL_MEMBERSHIPS,
 	GetActiveMembershipsDocument as GET_ACTIVE_MEMBERSHIPS,
@@ -17,6 +18,7 @@ export {
 	GetAnalyticsRangeDocument as GET_ANALYTICS_RANGE,
 	GetCoachSessionsDocument as GET_COACH_SESSIONS,
 	GetCoachSessionLogsDocument as GET_COACH_SESSION_LOGS,
+	GetMyNotificationsDocument as GET_MY_NOTIFICATIONS,
 } from '../generated/graphql';
 
 // Mutations
@@ -25,12 +27,18 @@ export {
 	CreateUserDocument as CREATE_USER,
 	UpdateUserDocument as UPDATE_USER,
 	DeleteUserDocument as DELETE_USER,
+	DisableUserDocument as DISABLE_USER,
+	EnableUserDocument as ENABLE_USER,
 	CreateMembershipDocument as CREATE_MEMBERSHIP,
 	UpdateMembershipDocument as UPDATE_MEMBERSHIP,
 	DeleteMembershipDocument as DELETE_MEMBERSHIP,
 	CreateEquipmentDocument as CREATE_EQUIPMENT,
+	CreateEquipmentLegacyDocument as CREATE_EQUIPMENT_LEGACY,
 	UpdateEquipmentDocument as UPDATE_EQUIPMENT,
+	UpdateEquipmentLegacyDocument as UPDATE_EQUIPMENT_LEGACY,
 	DeleteEquipmentDocument as DELETE_EQUIPMENT,
+	ArchiveEquipmentDocument as ARCHIVE_EQUIPMENT,
+	UnarchiveEquipmentDocument as UNARCHIVE_EQUIPMENT,
 	PurchaseMembershipDocument as PURCHASE_MEMBERSHIP,
 	CancelMembershipDocument as CANCEL_MEMBERSHIP,
 	DirectSubscribeMemberDocument as DIRECT_SUBSCRIBE_MEMBER,
@@ -38,6 +46,9 @@ export {
 	ApproveSubscriptionRequestDocument as APPROVE_SUBSCRIPTION_REQUEST,
 	RejectSubscriptionRequestDocument as REJECT_SUBSCRIPTION_REQUEST,
 	DeleteSubscriptionRequestDocument as DELETE_SUBSCRIPTION_REQUEST,
+	LogReportDownloadDocument as LOG_REPORT_DOWNLOAD,
+	MarkNotificationReadDocument as MARK_NOTIFICATION_READ,
+	MarkAllMyNotificationsReadDocument as MARK_ALL_MY_NOTIFICATIONS_READ,
 } from '../generated/graphql';
 
 // Subscriptions
@@ -67,5 +78,6 @@ export {
 	WalkInTimeInDocument as WALK_IN_TIME_IN,
 	WalkInPaymentSettingsDocument as WALK_IN_PAYMENT_SETTINGS,
 	UpdateWalkInPaymentSettingsDocument as UPDATE_WALK_IN_PAYMENT_SETTINGS,
+	GetReportDownloadLogsDocument as GET_REPORT_DOWNLOAD_LOGS,
 } from '../generated/graphql';
 

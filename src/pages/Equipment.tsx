@@ -1,21 +1,142 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, Dumbbell } from 'lucide-react';
+import { Plus, Edit, Archive, Dumbbell, Download, AlertTriangle, RotateCcw } from 'lucide-react';
 import { EquipmentFormModal, type EquipmentFormData } from '@/components/modals/EquipmentFormModal';
-import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
 import { SuccessModal } from '@/components/modals/SuccessModal';
 import {
 	GET_EQUIPMENTS,
-	CREATE_EQUIPMENT,
-	UPDATE_EQUIPMENT,
-	DELETE_EQUIPMENT,
+	GET_EQUIPMENTS_LEGACY,
+	CREATE_EQUIPMENT_LEGACY,
+	UPDATE_EQUIPMENT_LEGACY,
+	ARCHIVE_EQUIPMENT,
+	UNARCHIVE_EQUIPMENT,
+	LOG_REPORT_DOWNLOAD,
 } from '@/graphql/operations/index';
-import type { Equipment } from '@/graphql/generated/graphql';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import { uploadEquipmentImage } from '@/lib/uploadApi';
-import { EquipmentStatus } from '@/graphql/generated/graphql';
+import { EquipmentStatus, ReportType } from '@/graphql/generated/graphql';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+const LEGACY_ARCHIVE_PREFIX = '__ARCHIVED__|';
+
+function parseLegacyArchiveMeta(rawNotes: string | null | undefined) {
+	if (!rawNotes) {
+		return {
+			isArchived: false,
+			archiveReason: null as string | null,
+			archivedAt: null as string | null,
+			cleanNotes: null as string | null,
+		};
+	}
+	const lines = rawNotes.split('\n');
+	const first = lines[0] || '';
+	if (!first.startsWith(LEGACY_ARCHIVE_PREFIX)) {
+		return {
+			isArchived: false,
+			archiveReason: null as string | null,
+			archivedAt: null as string | null,
+			cleanNotes: rawNotes.trim() || null,
+		};
+	}
+	const payload = first.slice(LEGACY_ARCHIVE_PREFIX.length);
+	const [encodedReason = '', archivedAt = ''] = payload.split('|');
+	const cleanNotes = lines.slice(1).join('\n').trim() || null;
+	return {
+		isArchived: true,
+		archiveReason: decodeURIComponent(encodedReason || ''),
+		archivedAt: archivedAt || null,
+		cleanNotes,
+	};
+}
+
+function buildLegacyArchivedNotes(reason: string, cleanNotes: string | null) {
+	const marker = `${LEGACY_ARCHIVE_PREFIX}${encodeURIComponent(reason)}|${new Date().toISOString()}`;
+	return cleanNotes && cleanNotes.trim().length > 0
+		? `${marker}\n${cleanNotes.trim()}`
+		: marker;
+}
+
+function formatDateManila(dateValue: string | null | undefined) {
+	if (!dateValue) return 'N/A';
+	try {
+		return new Date(dateValue).toLocaleDateString('en-PH', {
+			timeZone: 'Asia/Manila',
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+		});
+	} catch {
+		return 'N/A';
+	}
+}
+
+async function loadImageAsDataUrl(path: string): Promise<string | null> {
+	try {
+		const response = await fetch(path);
+		if (!response.ok) return null;
+		const blob = await response.blob();
+		return await new Promise((resolve) => {
+			const reader = new FileReader();
+			reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+			reader.onerror = () => resolve(null);
+			reader.readAsDataURL(blob);
+		});
+	} catch {
+		return null;
+	}
+}
+
+async function getImageDimensions(dataUrl: string): Promise<{ width: number; height: number } | null> {
+	return await new Promise((resolve) => {
+		const img = new Image();
+		img.onload = () => {
+			if (!img.naturalWidth || !img.naturalHeight) {
+				resolve(null);
+				return;
+			}
+			resolve({ width: img.naturalWidth, height: img.naturalHeight });
+		};
+		img.onerror = () => resolve(null);
+		img.src = dataUrl;
+	});
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+	let binary = '';
+	const bytes = new Uint8Array(buffer);
+	const chunkSize = 0x8000;
+	for (let i = 0; i < bytes.length; i += chunkSize) {
+		const chunk = bytes.subarray(i, i + chunkSize);
+		binary += String.fromCharCode(...chunk);
+	}
+	return btoa(binary);
+}
+
+async function tryRegisterInterFont(doc: jsPDF): Promise<boolean> {
+	try {
+		const regularUrl =
+			'https://raw.githubusercontent.com/rsms/inter/master/docs/font-files/Inter-Regular.ttf';
+		const boldUrl =
+			'https://raw.githubusercontent.com/rsms/inter/master/docs/font-files/Inter-Bold.ttf';
+		const [regularRes, boldRes] = await Promise.all([fetch(regularUrl), fetch(boldUrl)]);
+		if (!regularRes.ok || !boldRes.ok) return false;
+		const [regularBuf, boldBuf] = await Promise.all([
+			regularRes.arrayBuffer(),
+			boldRes.arrayBuffer(),
+		]);
+		const pdf = doc as any;
+		pdf.addFileToVFS('Inter-Regular.ttf', arrayBufferToBase64(regularBuf));
+		pdf.addFont('Inter-Regular.ttf', 'Inter', 'normal');
+		pdf.addFileToVFS('Inter-Bold.ttf', arrayBufferToBase64(boldBuf));
+		pdf.addFont('Inter-Bold.ttf', 'Inter', 'bold');
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 function statusLabel(s: EquipmentStatus): string {
 	switch (s) {
@@ -39,6 +160,15 @@ function statusBadgeClass(s: EquipmentStatus): string {
 	}
 }
 
+const ARCHIVE_REASON_OPTIONS = [
+	'Damaged beyond repair',
+	'Replaced by a new unit',
+	'Safety concern',
+	'Not in use / obsolete',
+	'Sent for long-term repair',
+	'Other',
+] as const;
+
 export function EquipmentPage() {
 	useEffect(() => {
 		document.title = 'Equipment - X-TRIM FIT GYM';
@@ -46,20 +176,105 @@ export function EquipmentPage() {
 
 	const dispatch = useAppDispatch();
 	const token = useAppSelector((s) => s.auth.token);
-	const [selected, setSelected] = useState<Equipment | null>(null);
+	const currentUser = useAppSelector((s) => s.auth.user);
+	const [selected, setSelected] = useState<any | null>(null);
 	const [isFormOpen, setIsFormOpen] = useState(false);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 	const [isSuccessOpen, setIsSuccessOpen] = useState(false);
 	const [successMessage, setSuccessMessage] = useState('');
 	const [isEdit, setIsEdit] = useState(false);
 	const [uploading, setUploading] = useState(false);
+	const [viewTab, setViewTab] = useState<'CURRENT' | 'ARCHIVED'>('CURRENT');
+	const [statusFilter, setStatusFilter] = useState<'ALL' | EquipmentStatus>('ALL');
+	const [useLegacyApi, setUseLegacyApi] = useState(
+		import.meta.env.VITE_ENABLE_MODERN_ARCHIVE_API !== 'true'
+	);
+	const [archiveReasonOption, setArchiveReasonOption] = useState<(typeof ARCHIVE_REASON_OPTIONS)[number]>(
+		'Damaged beyond repair'
+	);
+	const [archiveReasonOther, setArchiveReasonOther] = useState('');
+	const appendLocalExportLog = (fileName: string) => {
+		try {
+			const key = 'xtrimfit-report-export-logs';
+			const raw = localStorage.getItem(key);
+			const prev = raw ? (JSON.parse(raw) as any[]) : [];
+			const next = {
+				id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+				reportType: String(ReportType.Equipment),
+				fileName,
+				downloadedById: currentUser?.id || 'unknown',
+				downloadedByRole: currentUser?.role || 'admin',
+				downloadedBy: {
+					firstName: currentUser?.firstName,
+					lastName: currentUser?.lastName,
+					email: currentUser?.email,
+				},
+				createdAt: new Date().toISOString(),
+			};
+			localStorage.setItem(key, JSON.stringify([next, ...prev].slice(0, 50)));
+		} catch {
+			// Non-blocking local history write
+		}
+	};
 
-	const { data, loading, error } = useQuery(GET_EQUIPMENTS, { errorPolicy: 'none' });
-	const list: Equipment[] = data?.getEquipments ?? [];
+	const modernQuery = useQuery(GET_EQUIPMENTS, {
+		variables: { includeArchived: true },
+		errorPolicy: 'none',
+		skip: useLegacyApi,
+	});
+	const legacyQuery = useQuery(GET_EQUIPMENTS_LEGACY, {
+		errorPolicy: 'none',
+		skip: !useLegacyApi,
+	});
+	useEffect(() => {
+		if (!modernQuery.error) return;
+		const msg = modernQuery.error.message || '';
+		if (
+			msg.includes('includeArchived') ||
+			msg.includes('isArchived') ||
+			msg.includes('archiveEquipment') ||
+			msg.includes('Cannot query field') ||
+			msg.includes('Unknown argument')
+		) {
+			setUseLegacyApi(true);
+		}
+	}, [modernQuery.error]);
+	const data = useLegacyApi ? legacyQuery.data : modernQuery.data;
+	const loading = useLegacyApi ? legacyQuery.loading : modernQuery.loading;
+	const error = useLegacyApi ? legacyQuery.error : modernQuery.error;
+	const list = (data?.getEquipments ?? []) as any[];
+	const normalizedList = useLegacyApi
+		? list.map((item) => {
+				const legacyMeta = parseLegacyArchiveMeta(item.notes);
+				return {
+					...item,
+					isArchived: legacyMeta.isArchived,
+					archiveReason: legacyMeta.archiveReason,
+					archivedAt: legacyMeta.archivedAt,
+					notes: legacyMeta.cleanNotes,
+					legacyRawNotes: item.notes ?? null,
+				};
+			})
+		: list;
+	const refreshEquipmentList = async () => {
+		if (useLegacyApi) {
+			await legacyQuery.refetch();
+			return;
+		}
+		await modernQuery.refetch({ includeArchived: true });
+	};
+	const archiveFiltered =
+		viewTab === 'ARCHIVED'
+			? normalizedList.filter((item) => item.isArchived === true)
+			: normalizedList.filter((item) => item.isArchived !== true);
+	const visibleList =
+		statusFilter === 'ALL'
+			? archiveFiltered
+			: archiveFiltered.filter((item) => item.status === statusFilter);
 
-	const [createEquipment, { loading: creating }] = useMutation(CREATE_EQUIPMENT, {
-		refetchQueries: [{ query: GET_EQUIPMENTS }],
+	const [createEquipment, { loading: creating }] = useMutation(CREATE_EQUIPMENT_LEGACY, {
 		onCompleted: () => {
+			refreshEquipmentList().catch(() => {});
 			setSuccessMessage('Equipment created.');
 			setIsSuccessOpen(true);
 			setIsFormOpen(false);
@@ -68,9 +283,9 @@ export function EquipmentPage() {
 		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
 	});
 
-	const [updateEquipment, { loading: updating }] = useMutation(UPDATE_EQUIPMENT, {
-		refetchQueries: [{ query: GET_EQUIPMENTS }],
+	const [updateEquipment, { loading: updating }] = useMutation(UPDATE_EQUIPMENT_LEGACY, {
 		onCompleted: () => {
+			refreshEquipmentList().catch(() => {});
 			setSuccessMessage('Equipment updated.');
 			setIsSuccessOpen(true);
 			setIsFormOpen(false);
@@ -79,18 +294,36 @@ export function EquipmentPage() {
 		},
 		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
 	});
-
-	const [deleteEquipment, { loading: deleting }] = useMutation(DELETE_EQUIPMENT, {
-		refetchQueries: [{ query: GET_EQUIPMENTS }],
+	const [archiveEquipment, { loading: archiving }] = useMutation(ARCHIVE_EQUIPMENT, {
+		refetchQueries: [{ query: GET_EQUIPMENTS, variables: { includeArchived: true } }],
 		onCompleted: () => {
-			setSuccessMessage('Equipment deleted.');
+			setSuccessMessage('Equipment archived.');
 			setIsSuccessOpen(true);
 			setIsDeleteOpen(false);
 			setSelected(null);
-			dispatch(addToast({ type: 'success', message: 'Equipment deleted.' }));
+			dispatch(addToast({ type: 'success', message: 'Equipment archived.' }));
 		},
 		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
 	});
+	const [updateEquipmentLegacyMeta, { loading: updatingLegacyMeta }] = useMutation(
+		UPDATE_EQUIPMENT_LEGACY,
+		{
+			onCompleted: () => {
+				refreshEquipmentList().catch(() => {});
+			},
+			onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
+		}
+	);
+	const [unarchiveEquipment, { loading: restoring }] = useMutation(UNARCHIVE_EQUIPMENT, {
+		refetchQueries: [{ query: GET_EQUIPMENTS, variables: { includeArchived: true } }],
+		onCompleted: () => {
+			setSuccessMessage('Equipment restored to current list.');
+			setIsSuccessOpen(true);
+			dispatch(addToast({ type: 'success', message: 'Equipment restored.' }));
+		},
+		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
+	});
+	const [logReportDownload] = useMutation(LOG_REPORT_DOWNLOAD);
 
 	const handleCreate = () => {
 		setIsEdit(false);
@@ -98,15 +331,34 @@ export function EquipmentPage() {
 		setIsFormOpen(true);
 	};
 
-	const handleEdit = (item: Equipment) => {
+	const handleEdit = (item: any) => {
 		setIsEdit(true);
 		setSelected(item);
 		setIsFormOpen(true);
 	};
 
-	const handleDelete = (item: Equipment) => {
+	const handleDelete = (item: any) => {
 		setSelected(item);
+		setArchiveReasonOption('Damaged beyond repair');
+		setArchiveReasonOther('');
 		setIsDeleteOpen(true);
+	};
+
+	const handleRestore = async (item: any) => {
+		if (useLegacyApi) {
+			const legacyMeta = parseLegacyArchiveMeta(item.legacyRawNotes ?? item.notes);
+			await updateEquipmentLegacyMeta({
+				variables: {
+					id: item.id,
+					input: { notes: legacyMeta.cleanNotes ?? '' },
+				},
+			});
+			setSuccessMessage('Equipment restored to current list.');
+			setIsSuccessOpen(true);
+			dispatch(addToast({ type: 'success', message: 'Equipment restored.' }));
+			return;
+		}
+		await unarchiveEquipment({ variables: { id: item.id } });
 	};
 
 	const handleFormSubmit = async (formData: EquipmentFormData) => {
@@ -154,10 +406,149 @@ export function EquipmentPage() {
 		}
 	};
 
-	const handleConfirmDelete = () => {
-		if (selected) {
-			deleteEquipment({ variables: { id: selected.id } });
+	const handleConfirmDelete = async () => {
+		if (!selected) return;
+		const finalReason =
+			archiveReasonOption === 'Other' ? archiveReasonOther.trim() : archiveReasonOption;
+		if (!finalReason) {
+			dispatch(addToast({ type: 'error', message: 'Archive reason is required.' }));
+			return;
 		}
+		try {
+			if (useLegacyApi) {
+				const legacyMeta = parseLegacyArchiveMeta(selected.legacyRawNotes ?? selected.notes);
+				const archivedNotes = buildLegacyArchivedNotes(finalReason, legacyMeta.cleanNotes);
+				await updateEquipmentLegacyMeta({
+					variables: {
+						id: selected.id,
+						input: { notes: archivedNotes },
+					},
+				});
+				setSuccessMessage('Equipment archived.');
+				setIsSuccessOpen(true);
+				setIsDeleteOpen(false);
+				setSelected(null);
+				dispatch(addToast({ type: 'success', message: 'Equipment archived.' }));
+			} else {
+				await archiveEquipment({
+					variables: { id: selected.id, reason: finalReason },
+				});
+			}
+		} catch (err) {
+			console.error('Archive failed:', err);
+		}
+	};
+
+	const handleExportPdf = async () => {
+		const now = new Date();
+		const filename = `equipment-master-report-${now
+			.toISOString()
+			.replace(/[:.]/g, '-')
+			.slice(0, 19)}.pdf`;
+		const reportRows = normalizedList;
+		const totalCount = reportRows.length;
+		const currentCount = reportRows.filter((eq) => !eq.isArchived).length;
+		const archivedCount = reportRows.filter((eq) => !!eq.isArchived).length;
+		const availableCount = reportRows.filter((eq) => eq.status === EquipmentStatus.Available).length;
+		const damagedCount = reportRows.filter((eq) => eq.status === EquipmentStatus.Damaged).length;
+		const maintenanceCount = reportRows.filter(
+			(eq) => eq.status === EquipmentStatus.Undermaintenance
+		).length;
+		const exportedByLabel = [currentUser?.firstName, currentUser?.lastName]
+			.filter(Boolean)
+			.join(' ')
+			.trim() || currentUser?.email || 'System';
+
+		const doc = new jsPDF({ orientation: 'landscape' });
+		const interReady = await tryRegisterInterFont(doc);
+		doc.setFont(interReady ? 'Inter' : 'helvetica', 'normal');
+		const logoDataUrl = await loadImageAsDataUrl('/logo.png');
+		let headerTextX = 14;
+		if (logoDataUrl) {
+			const logoSize = await getImageDimensions(logoDataUrl);
+			const maxLogoWidth = 32;
+			const maxLogoHeight = 24;
+			let logoWidth = maxLogoWidth;
+			let logoHeight = maxLogoHeight;
+			if (logoSize) {
+				const ratio = logoSize.width / logoSize.height;
+				if (ratio >= 1) {
+					logoWidth = maxLogoWidth;
+					logoHeight = maxLogoWidth / ratio;
+					if (logoHeight > maxLogoHeight) {
+						logoHeight = maxLogoHeight;
+						logoWidth = maxLogoHeight * ratio;
+					}
+				} else {
+					logoHeight = maxLogoHeight;
+					logoWidth = maxLogoHeight * ratio;
+				}
+			}
+			doc.addImage(logoDataUrl, 'PNG', 14, 10, logoWidth, logoHeight);
+			headerTextX = 14 + logoWidth + 6;
+		}
+		doc.setFontSize(16);
+		doc.setFont(interReady ? 'Inter' : 'helvetica', 'bold');
+		doc.text('X-TRIM FIT GYM', headerTextX, 18);
+		doc.setFontSize(13);
+		doc.setFont(interReady ? 'Inter' : 'helvetica', 'bold');
+		doc.text('Equipment Master Report', headerTextX, 26);
+		doc.setFontSize(10);
+		doc.setFont(interReady ? 'Inter' : 'helvetica', 'normal');
+		doc.text(
+			`Generated: ${now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' })} (Asia/Manila)`,
+			14,
+			34
+		);
+		doc.text(
+			`Total: ${totalCount} | Current: ${currentCount} | Archived: ${archivedCount} | Available: ${availableCount} | Damaged: ${damagedCount} | Under maintenance: ${maintenanceCount}`,
+			14,
+			40
+		);
+		doc.text(`Exported by: ${exportedByLabel}`, 14, 46);
+
+		autoTable(doc, {
+			startY: 52,
+			head: [
+				[
+					'Name',
+					'Condition',
+					'Record State',
+					'Added Date',
+					'Archived Date',
+					'Archive Reason',
+					'Acquired Date',
+					'Notes',
+				],
+			],
+			body: reportRows.map((eq) => [
+				eq.name,
+				statusLabel(eq.status),
+				eq.isArchived ? 'Archived' : 'Current',
+				formatDateManila(eq.createdAt),
+				formatDateManila(eq.archivedAt),
+				eq.archiveReason || '-',
+				formatDateManila(eq.acquiredAt),
+				eq.notes || '-',
+			]),
+			styles: { fontSize: 8 },
+			headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
+			alternateRowStyles: { fillColor: [245, 245, 248] },
+			margin: { left: 14, right: 14 },
+		});
+		doc.save(filename);
+		appendLocalExportLog(filename);
+		await logReportDownload({
+			variables: {
+				input: {
+					reportType: ReportType.Equipment,
+					fileName: filename,
+					filterSummary: `scope:all-records;tab:${viewTab};condition:${statusFilter}`,
+				},
+			},
+		}).catch(() => {
+			// Non-blocking audit log failure; export is already completed
+		});
 	};
 
 	if (loading) {
@@ -193,17 +584,61 @@ export function EquipmentPage() {
 						Equipment
 					</h1>
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
-						Manage gym equipment shown in the app ({list.length} items)
+						Manage gym equipment shown in the app ({visibleList.length} shown)
 					</p>
 				</div>
-				<Button onClick={handleCreate}>
-					<Plus className="w-4 h-4" />
-					Add Equipment
-				</Button>
+				<div className="flex items-center gap-2">
+					<div className="inline-flex rounded-lg border border-[var(--card-border)] overflow-hidden">
+						<button
+							type="button"
+							onClick={() => setViewTab('CURRENT')}
+							className={`px-3 py-2 text-xs font-semibold ${
+								viewTab === 'CURRENT'
+									? 'bg-[var(--primary-yellow)] text-black'
+									: 'bg-[var(--card-bg)] text-[var(--text-primary)]'
+							}`}
+						>
+							Current
+						</button>
+						<button
+							type="button"
+							onClick={() => setViewTab('ARCHIVED')}
+							className={`px-3 py-2 text-xs font-semibold ${
+								viewTab === 'ARCHIVED'
+									? 'bg-[var(--primary-yellow)] text-black'
+									: 'bg-[var(--card-bg)] text-[var(--text-primary)]'
+							}`}
+						>
+							Archived
+						</button>
+					</div>
+					<select
+						aria-label="Filter equipment by condition"
+						value={statusFilter}
+						onChange={(e) => setStatusFilter(e.target.value as 'ALL' | EquipmentStatus)}
+						className="px-3 py-2 text-xs font-semibold bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary-yellow)]"
+					>
+						<option value="ALL">All Conditions</option>
+						<option value={EquipmentStatus.Available}>Available</option>
+						<option value={EquipmentStatus.Damaged}>Damaged</option>
+						<option value={EquipmentStatus.Undermaintenance}>Under maintenance</option>
+					</select>
+					<Button onClick={handleCreate}>
+						<Plus className="w-4 h-4" />
+						Add Equipment
+					</Button>
+					<Button onClick={handleExportPdf} className="btn-secondary">
+						<Download className="w-4 h-4" />
+						Export PDF
+					</Button>
+				</div>
 			</div>
+			<p className="text-xs text-[var(--text-secondary)]">
+				Current = non-archived equipment. Condition filter controls availability state.
+			</p>
 
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-				{list.map((item) => (
+				{visibleList.map((item) => (
 					<div
 						key={item.id}
 						className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] overflow-hidden backdrop-blur-md"
@@ -240,33 +675,86 @@ export function EquipmentPage() {
 									) : null}
 								</div>
 							)}
+							<div className="mb-4 text-xs text-[var(--text-secondary)] space-y-1">
+								<div>
+									Added:{' '}
+									{item.createdAt
+										? new Date(item.createdAt).toLocaleDateString('en-PH', {
+												timeZone: 'Asia/Manila',
+											})
+										: 'N/A'}
+								</div>
+								{item.isArchived ? (
+									<>
+										<div>
+											Archived:{' '}
+											{item.archivedAt
+												? new Date(item.archivedAt).toLocaleDateString('en-PH', {
+														timeZone: 'Asia/Manila',
+													})
+												: 'N/A'}
+										</div>
+										<div>Reason: {item.archiveReason || 'N/A'}</div>
+									</>
+								) : null}
+							</div>
 							<div className="flex gap-3">
-								<button
-									type="button"
-									onClick={() => handleEdit(item)}
-									className="btn-small btn-edit flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)] flex items-center justify-center gap-2"
-								>
-									<Edit className="w-4 h-4" />
-									Edit
-								</button>
-								<button
-									type="button"
-									onClick={() => handleDelete(item)}
-									className="btn-small btn-delete flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] flex items-center justify-center gap-2"
-								>
-									<Trash2 className="w-4 h-4" />
-									Delete
-								</button>
+								{item.isArchived && !useLegacyApi ? (
+									<button
+										type="button"
+										onClick={() => handleRestore(item)}
+										disabled={restoring}
+										className="btn-small flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)] flex items-center justify-center gap-2 disabled:opacity-60"
+									>
+										<RotateCcw className="w-4 h-4" />
+										{restoring ? 'Restoring...' : 'Restore'}
+									</button>
+								) : (
+									<>
+										<button
+											type="button"
+											onClick={() => handleEdit(item)}
+											className="btn-small btn-edit flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)] flex items-center justify-center gap-2"
+										>
+											<Edit className="w-4 h-4" />
+											Edit
+										</button>
+										<button
+											type="button"
+											onClick={() => handleDelete(item)}
+											className="btn-small btn-delete flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] flex items-center justify-center gap-2"
+										>
+											<Archive className="w-4 h-4" />
+											Archive
+										</button>
+									</>
+								)}
 							</div>
 						</div>
 					</div>
 				))}
 			</div>
 
-			{list.length === 0 && (
+			{viewTab === 'ARCHIVED' && (
+				<div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
+					<p className="text-sm text-[var(--text-secondary)]">
+						{useLegacyApi
+							? 'Archived records are tracked in compatibility mode for the current API.'
+							: 'Archived equipment records include archive date and reason for full audit visibility.'}
+					</p>
+				</div>
+			)}
+
+			{visibleList.length === 0 && (
 				<div className="text-center py-12 border border-dashed border-[var(--card-border)] rounded-xl">
 					<Dumbbell className="w-12 h-12 mx-auto text-[var(--text-secondary)] mb-3" />
-					<p className="text-[var(--text-secondary)]">No equipment yet.</p>
+					<p className="text-[var(--text-secondary)]">
+						{viewTab === 'ARCHIVED'
+							? 'No archived equipment.'
+							: statusFilter === 'ALL'
+								? 'No equipment yet.'
+								: 'No equipment matches the selected condition.'}
+					</p>
 					<Button onClick={handleCreate} className="mt-4">
 						<Plus className="w-4 h-4" />
 						Add Equipment
@@ -287,21 +775,89 @@ export function EquipmentPage() {
 				uploading={uploading}
 			/>
 
-			<DeleteConfirmModal
-				isOpen={isDeleteOpen}
-				onClose={() => {
-					setIsDeleteOpen(false);
-					setSelected(null);
-				}}
-				onConfirm={handleConfirmDelete}
-				title="Delete equipment?"
-				message={
-					selected
-						? `Delete "${selected.name}"? This cannot be undone.`
-						: ''
-				}
-				isDeleting={deleting}
-			/>
+			{isDeleteOpen && (
+				<div
+					className="modal-overlay active"
+					onClick={() => {
+						if (archiving || updatingLegacyMeta) return;
+						setIsDeleteOpen(false);
+						setSelected(null);
+					}}
+				>
+					<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+						<div className="modal-body">
+							<div className="modal-delete-icon">
+								<AlertTriangle size={48} />
+							</div>
+							<h2 className="modal-delete-title">Archive equipment?</h2>
+							<p className="modal-delete-text">
+								{selected
+									? `Archive "${selected.name}"? It will be hidden from current view but history is preserved.`
+									: ''}
+							</p>
+							<div className="mb-4 text-left">
+								<label className="block text-sm text-[var(--text-secondary)] mb-2">
+									Reason for archiving <span className="text-[#EF4444]">*</span>
+								</label>
+								<select
+									value={archiveReasonOption}
+									onChange={(e) =>
+										setArchiveReasonOption(
+											e.target.value as (typeof ARCHIVE_REASON_OPTIONS)[number]
+										)
+									}
+									aria-label="Select archive reason"
+									className="w-full px-3 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary-yellow)]"
+									disabled={archiving || updatingLegacyMeta}
+								>
+									{ARCHIVE_REASON_OPTIONS.map((reason) => (
+										<option key={reason} value={reason}>
+											{reason}
+										</option>
+									))}
+								</select>
+							</div>
+							{archiveReasonOption === 'Other' && (
+								<div className="mb-4 text-left">
+									<label className="block text-sm text-[var(--text-secondary)] mb-2">
+										Specify reason <span className="text-[#EF4444]">*</span>
+									</label>
+									<textarea
+										value={archiveReasonOther}
+										onChange={(e) => setArchiveReasonOther(e.target.value)}
+										placeholder="Type the specific reason here..."
+										rows={3}
+										className="w-full px-3 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary-yellow)] resize-none"
+										disabled={archiving || updatingLegacyMeta}
+									/>
+								</div>
+							)}
+							<div className="modal-delete-actions flex items-center gap-3">
+								<button
+									type="button"
+									className="btn-secondary flex-1 h-12 rounded-xl text-base font-semibold inline-flex items-center justify-center"
+									onClick={() => {
+										if (archiving || updatingLegacyMeta) return;
+										setIsDeleteOpen(false);
+										setSelected(null);
+									}}
+									disabled={archiving || updatingLegacyMeta}
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									className="btn-danger flex-1 h-12 rounded-xl text-base font-semibold inline-flex items-center justify-center"
+									onClick={handleConfirmDelete}
+									disabled={archiving || updatingLegacyMeta}
+								>
+									{archiving || updatingLegacyMeta ? 'Archiving...' : 'Archive'}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 
 			<SuccessModal
 				isOpen={isSuccessOpen}

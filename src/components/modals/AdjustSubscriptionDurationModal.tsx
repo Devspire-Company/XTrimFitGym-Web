@@ -46,6 +46,7 @@ export function AdjustSubscriptionDurationModal({
 	const [days, setDays] = useState(String(currentDayDuration));
 	/** YYYY-MM-DD; empty = keep existing startedAt on save */
 	const [subscriptionStartDate, setSubscriptionStartDate] = useState('');
+	const [adjustmentReason, setAdjustmentReason] = useState('');
 	const dispatch = useAppDispatch();
 
 	useEffect(() => {
@@ -53,6 +54,7 @@ export function AdjustSubscriptionDurationModal({
 			setMonths(String(currentMonthDuration));
 			setDays(String(currentDayDuration));
 			setSubscriptionStartDate(isoOrDateToDateInput(currentStartedAtIso));
+			setAdjustmentReason('');
 		}
 	}, [isOpen, currentMonthDuration, currentDayDuration, currentStartedAtIso]);
 
@@ -86,9 +88,10 @@ export function AdjustSubscriptionDurationModal({
 		},
 	});
 
-	const buildInput = (): { transactionId: string; monthDuration?: number; dayDuration?: number; startedAt?: string } => {
-		const base: { transactionId: string; monthDuration?: number; dayDuration?: number; startedAt?: string } = {
+	const buildInput = (): { transactionId: string; monthDuration?: number; dayDuration?: number; startedAt?: string; reason: string } => {
+		const base: { transactionId: string; monthDuration?: number; dayDuration?: number; startedAt?: string; reason: string } = {
 			transactionId,
+			reason: adjustmentReason.trim(),
 		};
 		if (subscriptionStartDate.trim()) {
 			const d = new Date(`${subscriptionStartDate.trim()}T12:00:00`);
@@ -100,6 +103,15 @@ export function AdjustSubscriptionDurationModal({
 	};
 
 	const handleSubmit = () => {
+		if (!adjustmentReason.trim()) {
+			dispatch(
+				addToast({
+					type: 'error',
+					message: 'Reason is required for audit trail',
+				})
+			);
+			return;
+		}
 		const input = buildInput();
 
 		if (usesDays) {
@@ -185,6 +197,17 @@ export function AdjustSubscriptionDurationModal({
 						Leave as shown to keep the current start; change it to align walk-in or backdated subscriptions with
 						manual subscribe behavior.
 					</p>
+					<label className="block text-sm text-[var(--text-secondary)] mb-2" htmlFor="sub-adjust-reason">
+						Reason <span className="text-red-400">*</span>
+					</label>
+					<input
+						id="sub-adjust-reason"
+						type="text"
+						value={adjustmentReason}
+						onChange={(e) => setAdjustmentReason(e.target.value)}
+						placeholder="Why is this subscription being adjusted?"
+						className="w-full px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] text-[var(--text-primary)] mb-4"
+					/>
 
 					{usesDays ? (
 						<>

@@ -8,6 +8,9 @@ query SearchWalkInClients($query: String, $limit: Int, $offset: Int) {
 		email
 		gender
 		notes
+		ageYears
+		minorWaiverGuardianName
+		minorWaiverAcceptedAt
 		createdAt
 		updatedAt
 	}
@@ -37,6 +40,11 @@ query WalkInAttendanceLogs($filter: WalkInLogsFilter!, $pagination: WalkInPagina
 				email
 				gender
 				notes
+				ageYears
+				minorWaiverGuardianName
+				minorWaiverAcceptedAt
+				createdAt
+				updatedAt
 			}
 		}
 	}
@@ -64,6 +72,9 @@ query WalkInAccountsOverview($pagination: WalkInPagination) {
 				email
 				gender
 				notes
+				ageYears
+				minorWaiverGuardianName
+				minorWaiverAcceptedAt
 				createdAt
 				updatedAt
 			}
@@ -89,6 +100,11 @@ query WalkInLogsByClient($walkInClientId: ID!, $pagination: WalkInPagination) {
 				email
 				gender
 				notes
+				ageYears
+				minorWaiverGuardianName
+				minorWaiverAcceptedAt
+				createdAt
+				updatedAt
 			}
 		}
 	}
@@ -111,6 +127,9 @@ mutation CreateWalkInClient($input: CreateWalkInClientInput!, $timeInNow: Boolea
 			email
 			gender
 			notes
+			ageYears
+			minorWaiverGuardianName
+			minorWaiverAcceptedAt
 		}
 		log {
 			id
@@ -145,6 +164,9 @@ mutation UpdateWalkInClient($walkInClientId: ID!, $input: UpdateWalkInClientInpu
 		email
 		gender
 		notes
+		ageYears
+		minorWaiverGuardianName
+		minorWaiverAcceptedAt
 		createdAt
 		updatedAt
 	}

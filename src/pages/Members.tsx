@@ -3,7 +3,7 @@ import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import {
 	Search,
 	Eye,
-	Trash2,
+	Ban,
 	Users,
 	X,
 	CreditCard,
@@ -18,8 +18,18 @@ import {
 	Dumbbell,
 	FileText,
 	RotateCw,
+	CheckCircle2,
 } from 'lucide-react';
-import { GET_USERS, GET_USER, DELETE_USER, CANCEL_MEMBERSHIP, DIRECT_SUBSCRIBE_MEMBER, USERS_UPDATED } from '@/graphql/operations/index';
+import {
+	GET_USERS,
+	GET_USER,
+	DISABLE_USER,
+	ENABLE_USER,
+	CANCEL_MEMBERSHIP,
+	DIRECT_SUBSCRIBE_MEMBER,
+	USERS_UPDATED,
+	GET_PENDING_SUBSCRIPTION_REQUESTS,
+} from '@/graphql/operations/index';
 import { RoleType } from '@/graphql/generated/graphql';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
@@ -75,11 +85,13 @@ export function MembersPage() {
 	const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+	const [disableReason, setDisableReason] = useState('');
 	const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
 	const [memberToSubscribe, setMemberToSubscribe] = useState<{ id: string; name: string } | null>(
 		null
 	);
 	const [isUnsubscribeModalOpen, setIsUnsubscribeModalOpen] = useState(false);
+	const [unsubscribeReason, setUnsubscribeReason] = useState('');
 	const [memberToUnsubscribe, setMemberToUnsubscribe] = useState<{
 		id: string;
 		name: string;
@@ -129,6 +141,9 @@ export function MembersPage() {
 		variables: { role: RoleType.Member },
 		errorPolicy: 'none',
 	});
+	const { data: pendingData } = useQuery(GET_PENDING_SUBSCRIPTION_REQUESTS, {
+		errorPolicy: 'ignore',
+	});
 
 	// Real-time subscription for member updates
 	const { data: subscriptionData } = useSubscription(USERS_UPDATED, {
@@ -139,12 +154,12 @@ export function MembersPage() {
 	// Use subscription data if available, otherwise fall back to query data
 	const membersData = subscriptionData?.usersUpdated || data?.getUsers || [];
 
-	const [deleteUserMutation] = useMutation(DELETE_USER, {
+	const [disableUserMutation] = useMutation(DISABLE_USER, {
 		onCompleted: () => {
 			dispatch(
 				addToast({
 					type: 'success',
-					message: 'Member deleted successfully',
+					message: 'Member disabled successfully',
 				})
 			);
 			// Subscription will automatically update the data
@@ -153,9 +168,17 @@ export function MembersPage() {
 			dispatch(
 				addToast({
 					type: 'error',
-					message: error.message || 'Failed to delete member',
+					message: error.message || 'Failed to disable member',
 				})
 			);
+		},
+	});
+	const [enableUserMutation] = useMutation(ENABLE_USER, {
+		onCompleted: () => {
+			dispatch(addToast({ type: 'success', message: 'Member enabled successfully' }));
+		},
+		onError: (error) => {
+			dispatch(addToast({ type: 'error', message: error.message || 'Failed to enable member' }));
 		},
 	});
 
@@ -169,6 +192,7 @@ export function MembersPage() {
 			);
 			setIsUnsubscribeModalOpen(false);
 			setMemberToUnsubscribe(null);
+			setUnsubscribeReason('');
 			// Subscription will automatically update the data
 		},
 		onError: (error) => {
@@ -266,10 +290,20 @@ export function MembersPage() {
 
 	// Transform API data
 	const apiMembers: Member[] = membersData.map((m: any) => {
+		const hasPendingRequest =
+			(pendingData?.getPendingSubscriptionRequests || []).some(
+				(req: any) => req.memberId === m.id
+			);
 		// Check both currentMembership and membershipTransaction for subscription info
 		const membershipTransaction = m.currentMembership || m.membershipDetails?.membershipTransaction;
 		const membership = membershipTransaction?.membership?.name || 'No Plan';
-		const status = membershipTransaction?.status === 'ACTIVE' ? 'Active' : 'Inactive';
+		const status = m.isDisabled
+			? 'Disabled'
+			: membershipTransaction?.status === 'ACTIVE'
+				? 'Active'
+				: hasPendingRequest
+					? 'Pending'
+					: 'Inactive';
 		const joinDate = m.createdAt
 			? new Date(m.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 			: 'N/A';
@@ -550,23 +584,35 @@ export function MembersPage() {
 
 	const confirmDelete = async () => {
 		if (selectedMember) {
+			if (!disableReason.trim()) {
+				dispatch(addToast({ type: 'error', message: 'Disable reason is required' }));
+				return;
+			}
 			try {
-				await deleteUserMutation({
-					variables: { id: selectedMember.id },
+				await disableUserMutation({
+					variables: { id: selectedMember.id, reason: disableReason.trim() },
 				});
 				setIsDeleteModalOpen(false);
 				setSelectedMember(null);
+				setDisableReason('');
 			} catch (err) {
-				console.error('Error deleting member:', err);
+				console.error('Error disabling member:', err);
 			}
 		}
 	};
 
 	const confirmUnsubscribe = async () => {
 		if (memberToUnsubscribe) {
+			if (!unsubscribeReason.trim()) {
+				dispatch(addToast({ type: 'error', message: 'Reason is required to unsubscribe' }));
+				return;
+			}
 			try {
 				await cancelMembershipMutation({
-					variables: { transactionId: memberToUnsubscribe.transactionId },
+					variables: {
+						transactionId: memberToUnsubscribe.transactionId,
+						reason: unsubscribeReason.trim(),
+					},
 				});
 			} catch (err) {
 				console.error('Error unsubscribing member:', err);
@@ -693,16 +739,19 @@ export function MembersPage() {
 					<select
 						value={statusFilter}
 						onChange={(e) => setStatusFilter(e.target.value)}
+						aria-label="Filter members by status"
 						className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
 					>
 						<option value="all">All Status</option>
 						<option value="Active">Active</option>
 						<option value="Inactive">Inactive</option>
-						<option value="Suspended">Suspended</option>
+						<option value="Pending">Pending</option>
+						<option value="Disabled">Disabled</option>
 					</select>
 					<select
 						value={membershipFilter}
 						onChange={(e) => setMembershipFilter(e.target.value)}
+						aria-label="Filter members by membership"
 						className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
 					>
 						<option value="all">All Memberships</option>
@@ -789,8 +838,10 @@ export function MembersPage() {
 												className={`status-badge px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
 													member.status === 'Active'
 														? 'active bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
-														: member.status === 'Inactive'
+															: member.status === 'Inactive'
 															? 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
+																: member.status === 'Pending'
+																	? 'bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]'
 															: 'suspended bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]'
 												}`}
 											>
@@ -904,7 +955,22 @@ export function MembersPage() {
 											<Eye className="w-4 h-4 text-[#3B82F6]" />
 											View
 										</button>
-										{member.status === 'Active' && member.transactionId ? (
+										{member.status === 'Disabled' ? (
+											<button
+												type="button"
+												onClick={async (e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													await enableUserMutation({ variables: { id: member.id } });
+													setOpenDropdownId(null);
+													setDropdownPosition(null);
+												}}
+												className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(16,185,129,0.1)] flex items-center gap-2 cursor-pointer"
+											>
+												<CheckCircle2 className="w-4 h-4 text-[#10B981]" />
+												Enable
+											</button>
+										) : member.status === 'Active' && member.transactionId ? (
 											<>
 												<button
 													type="button"
@@ -981,8 +1047,8 @@ export function MembersPage() {
 											onMouseDown={(e) => e.stopPropagation()}
 											className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(239,68,68,0.1)] flex items-center gap-2 cursor-pointer"
 										>
-											<Trash2 className="w-4 h-4 text-[#EF4444]" />
-											Delete
+											<Ban className="w-4 h-4 text-[#EF4444]" />
+											Disable
 										</button>
 									</>
 								);
@@ -1011,24 +1077,83 @@ export function MembersPage() {
 				)}
 			</div>
 
-			{/* Delete Modal */}
+			{/* Disable Member Modal */}
 			<div
 				className={`modal-overlay ${isDeleteModalOpen && selectedMember ? 'active' : ''}`}
 				onClick={() => {
 					setIsDeleteModalOpen(false);
 					setSelectedMember(null);
+					setDisableReason('');
 				}}
 			>
 				{selectedMember && (
-					<DeleteConfirmModal
-						title="Delete Member?"
-						message={`Are you sure you want to delete ${selectedMember.name}? This action cannot be undone.`}
-						onConfirm={confirmDelete}
-						onCancel={() => {
-							setIsDeleteModalOpen(false);
-							setSelectedMember(null);
-						}}
-					/>
+					<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+						<div className="modal-body">
+							<div className="modal-delete-icon">
+								<Ban className="w-10 h-10" />
+							</div>
+							<h3 className="modal-delete-title">Disable Member?</h3>
+							<p className="modal-delete-text">
+								Disable {selectedMember.name}? Account access will be blocked but all records stay intact.
+							</p>
+							<div className="mb-4">
+								<label className="block text-sm text-[var(--text-secondary)] mb-2">Reason for disabling</label>
+								<input
+									type="text"
+									value={disableReason}
+									onChange={(e) => setDisableReason(e.target.value)}
+									placeholder="Required reason for audit trail"
+									className="w-full px-3 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)]"
+								/>
+							</div>
+							<div className="modal-delete-actions">
+								<button
+									type="button"
+									className="btn-secondary"
+									onClick={() => {
+										setIsDeleteModalOpen(false);
+										setSelectedMember(null);
+										setDisableReason('');
+									}}
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										gap: '0.5rem',
+										padding: '0.75rem 1.5rem',
+										borderRadius: '0.75rem',
+										fontWeight: '600',
+										transition: 'all 0.2s',
+										cursor: 'pointer',
+									}}
+								>
+									<X className="w-4 h-4" />
+									Cancel
+								</button>
+								<button
+									type="button"
+									className="btn-danger"
+									onClick={confirmDelete}
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										gap: '0.5rem',
+										padding: '0.75rem 1.5rem',
+										borderRadius: '0.75rem',
+										fontWeight: '600',
+										transition: 'all 0.2s',
+										cursor: 'pointer',
+									}}
+								>
+									<Ban className="w-4 h-4" />
+									Disable
+								</button>
+							</div>
+						</div>
+					</div>
 				)}
 			</div>
 
@@ -1072,6 +1197,7 @@ export function MembersPage() {
 					onClick={() => {
 						setIsUnsubscribeModalOpen(false);
 						setMemberToUnsubscribe(null);
+						setUnsubscribeReason('');
 					}}
 				>
 					<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
@@ -1095,6 +1221,16 @@ export function MembersPage() {
 								Are you sure you want to unsubscribe <strong>{memberToUnsubscribe.name}</strong>?
 								This action will cancel their current membership subscription.
 							</p>
+							<div className="mb-4">
+								<label className="block text-sm text-[var(--text-secondary)] mb-2">Reason</label>
+								<input
+									type="text"
+									value={unsubscribeReason}
+									onChange={(e) => setUnsubscribeReason(e.target.value)}
+									placeholder="Required reason"
+									className="w-full px-3 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)]"
+								/>
+							</div>
 
 							<div
 								className="modal-actions"
@@ -1106,6 +1242,7 @@ export function MembersPage() {
 									onClick={() => {
 										setIsUnsubscribeModalOpen(false);
 										setMemberToUnsubscribe(null);
+										setUnsubscribeReason('');
 									}}
 									style={{
 										flex: 1,
@@ -1712,68 +1849,3 @@ function MemberViewModal({ member, onClose }: { member: Member; onClose: () => v
 	);
 }
 
-function DeleteConfirmModal({
-	title,
-	message,
-	onConfirm,
-	onCancel,
-}: {
-	title: string;
-	message: string;
-	onConfirm: () => void;
-	onCancel: () => void;
-}) {
-	return (
-		<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
-			<div className="modal-body">
-				<div className="modal-delete-icon">
-					<Trash2 className="w-10 h-10" />
-				</div>
-				<h3 className="modal-delete-title">{title}</h3>
-				<p className="modal-delete-text">{message}</p>
-				<div className="modal-delete-actions">
-					<button
-						type="button"
-						className="btn-secondary"
-						onClick={onCancel}
-						style={{
-							flex: 1,
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							gap: '0.5rem',
-							padding: '0.75rem 1.5rem',
-							borderRadius: '0.75rem',
-							fontWeight: '600',
-							transition: 'all 0.2s',
-							cursor: 'pointer',
-						}}
-					>
-						<X className="w-4 h-4" />
-						Cancel
-					</button>
-					<button
-						type="button"
-						className="btn-danger"
-						onClick={onConfirm}
-						style={{
-							flex: 1,
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							gap: '0.5rem',
-							padding: '0.75rem 1.5rem',
-							borderRadius: '0.75rem',
-							fontWeight: '600',
-							transition: 'all 0.2s',
-							cursor: 'pointer',
-						}}
-					>
-						<Trash2 className="w-4 h-4" />
-						Delete
-					</button>
-				</div>
-			</div>
-		</div>
-	);
-}

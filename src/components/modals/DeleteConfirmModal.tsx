@@ -7,6 +7,8 @@ interface DeleteConfirmModalProps {
 	title: string;
 	message: string;
 	isDeleting?: boolean;
+	confirmLabel?: string;
+	confirmingLabel?: string;
 }
 
 export function DeleteConfirmModal({
@@ -16,6 +18,8 @@ export function DeleteConfirmModal({
 	title,
 	message,
 	isDeleting = false,
+	confirmLabel = 'Confirm',
+	confirmingLabel = 'Processing...',
 }: DeleteConfirmModalProps) {
 	if (!isOpen) return null;
 
@@ -77,7 +81,7 @@ export function DeleteConfirmModal({
 							onClick={onConfirm}
 							disabled={isDeleting}
 						>
-							{isDeleting ? 'Deleting...' : 'Delete'}
+							{isDeleting ? confirmingLabel : confirmLabel}
 						</button>
 					</div>
 				</div>

@@ -247,6 +247,22 @@ mutation DeleteUser($id: ID!) {
 	deleteUser(id: $id)
 }
 
+mutation DisableUser($id: ID!, $reason: String!) {
+	disableUser(id: $id, reason: $reason) {
+		id
+		isDisabled
+		disabledAt
+		disableReason
+	}
+}
+
+mutation EnableUser($id: ID!) {
+	enableUser(id: $id) {
+		id
+		isDisabled
+	}
+}
+
 mutation CreateMembership($input: CreateMembershipInput!) {
 	createMembership(input: $input) {
 		id
@@ -303,8 +319,8 @@ mutation PurchaseMembership($input: PurchaseMembershipInput!) {
 	}
 }
 
-mutation CancelMembership($transactionId: ID!) {
-	cancelMembership(transactionId: $transactionId)
+mutation CancelMembership($transactionId: ID!, $reason: String!) {
+	cancelMembership(transactionId: $transactionId, reason: $reason)
 }
 
 # Subscriptions

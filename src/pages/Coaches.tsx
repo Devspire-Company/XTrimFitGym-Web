@@ -86,18 +86,17 @@ export function CoachesPage() {
 			dispatch(
 				addToast({
 					type: 'success',
-					message: `Successfully deleted coach ${selectedCoach?.name}`,
+					message: `Successfully removed coach ${selectedCoach?.name}`,
 				})
 			);
 			setIsDeleteModalOpen(false);
 			setSelectedCoach(null);
-			// Subscription will automatically update the data
 		},
 		onError: (error) => {
 			dispatch(
 				addToast({
 					type: 'error',
-					message: error.message || 'Failed to delete coach',
+					message: error.message || 'Failed to remove coach',
 				})
 			);
 		},
@@ -157,7 +156,7 @@ export function CoachesPage() {
 					variables: { id: selectedCoach.id },
 				});
 			} catch (err) {
-				console.error('Error deleting coach:', err);
+				console.error('Error removing coach:', err);
 			}
 		}
 	};
@@ -298,6 +297,7 @@ export function CoachesPage() {
 					<select
 						value={statusFilter}
 						onChange={(e) => setStatusFilter(e.target.value)}
+						aria-label="Filter coaches by status"
 						className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
 					>
 						<option value="all">All Status</option>
@@ -414,7 +414,7 @@ export function CoachesPage() {
 											<button
 												onClick={() => handleDelete(coach)}
 												className="btn-small btn-delete px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] hover:bg-[rgba(239,68,68,0.25)] transition-colors"
-												title="Delete Coach"
+												title="Remove Coach"
 											>
 												<Trash2 className="w-4 h-4" />
 											</button>
@@ -550,7 +550,7 @@ export function CoachesPage() {
 				)}
 			</div>
 
-			{/* Delete Modal */}
+			{/* Remove Coach Modal */}
 			<div
 				className={`modal-overlay ${isDeleteModalOpen && selectedCoach ? 'active' : ''}`}
 				onClick={() => {
@@ -559,9 +559,9 @@ export function CoachesPage() {
 				}}
 			>
 				{selectedCoach && (
-					<DeleteConfirmModal
-						title="Delete Coach?"
-						message={`Are you sure you want to delete ${selectedCoach.name}? This action cannot be undone.`}
+					<RemoveConfirmModal
+						title="Remove Coach?"
+						message={`Are you sure you want to remove ${selectedCoach.name}? This action cannot be undone.`}
 						onConfirm={confirmDelete}
 						onCancel={() => {
 							setIsDeleteModalOpen(false);
@@ -1210,7 +1210,7 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 	);
 }
 
-function DeleteConfirmModal({
+function RemoveConfirmModal({
 	title,
 	message,
 	onConfirm,
@@ -1268,7 +1268,7 @@ function DeleteConfirmModal({
 						}}
 					>
 						<Trash2 className="w-4 h-4" />
-						Delete
+						Remove
 					</button>
 				</div>
 			</div>

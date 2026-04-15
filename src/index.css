@@ -1971,16 +1971,16 @@ button:disabled,
 .members-page select option:hover,
 .members-page select option:focus,
 .members-page select option:checked {
-	background: rgba(249, 197, 19, 0.2) !important;
-	color: var(--primary-yellow) !important;
+	background: #5f4a00 !important;
+	color: #fff4c4 !important;
 	font-weight: 600 !important;
 }
 
 .search-filter-bar select option[selected],
 .coaches-page select option[selected],
 .members-page select option[selected] {
-	background: rgba(249, 197, 19, 0.25) !important;
-	color: var(--primary-yellow) !important;
+	background: #5f4a00 !important;
+	color: #fff4c4 !important;
 	font-weight: 600 !important;
 }
 
@@ -1997,14 +1997,14 @@ select option {
 select option:hover,
 select option:focus,
 select option:checked {
-	background: rgba(249, 197, 19, 0.2) !important;
-	color: var(--primary-yellow) !important;
+	background: #5f4a00 !important;
+	color: #fff4c4 !important;
 	font-weight: 600 !important;
 }
 
 select option[selected] {
-	background: rgba(249, 197, 19, 0.25) !important;
-	color: var(--primary-yellow) !important;
+	background: #5f4a00 !important;
+	color: #fff4c4 !important;
 	font-weight: 600 !important;
 }
 

@@ -167,6 +167,7 @@ export type CreateCoachRequestInput = {
 };
 
 export type CreateEquipmentInput = {
+  acquiredAt?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl: Scalars['String']['input'];
   name: Scalars['String']['input'];
@@ -267,11 +268,16 @@ export type CreateUserInput = {
 };
 
 export type CreateWalkInClientInput = {
+  ageYears: Scalars['Int']['input'];
   email?: InputMaybe<Scalars['String']['input']>;
   firstName: Scalars['String']['input'];
   gender: WalkInGender;
   lastName: Scalars['String']['input'];
   middleName?: InputMaybe<Scalars['String']['input']>;
+  /** Required when ageYears is under 18: admin confirms guardian waiver on file. */
+  minorWaiverAcknowledged?: InputMaybe<Scalars['Boolean']['input']>;
+  /** Parent/guardian full name when under 18. */
+  minorWaiverGuardianName?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
@@ -306,15 +312,29 @@ export enum DurationType {
 
 export type Equipment = {
   __typename?: 'Equipment';
+  acquiredAt?: Maybe<Scalars['String']['output']>;
+  archiveReason?: Maybe<Scalars['String']['output']>;
+  archivedAt?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   imageUrl: Scalars['String']['output'];
+  isArchived: Scalars['Boolean']['output'];
+  lifecycleLogs: Array<EquipmentLifecycleLog>;
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
   sortOrder: Scalars['Int']['output'];
   status: EquipmentStatus;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type EquipmentLifecycleLog = {
+  __typename?: 'EquipmentLifecycleLog';
+  action: Scalars['String']['output'];
+  changedAt: Scalars['String']['output'];
+  changedById?: Maybe<Scalars['ID']['output']>;
+  notes?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<EquipmentStatus>;
 };
 
 export enum EquipmentStatus {
@@ -347,6 +367,14 @@ export enum GoalStatus {
   Completed = 'completed',
   Paused = 'paused'
 }
+
+export type LogReportDownloadInput = {
+  dateRange?: InputMaybe<ReportDownloadDateRangeInput>;
+  fileName?: InputMaybe<Scalars['String']['input']>;
+  filterSummary?: InputMaybe<Scalars['String']['input']>;
+  metadataJson?: InputMaybe<Scalars['String']['input']>;
+  reportType: ReportType;
+};
 
 export type LoginHistoryEntry = {
   __typename?: 'LoginHistoryEntry';
@@ -410,6 +438,9 @@ export enum MembershipStatus {
 
 export type MembershipTransaction = {
   __typename?: 'MembershipTransaction';
+  canceledAt?: Maybe<Scalars['String']['output']>;
+  canceledById?: Maybe<Scalars['ID']['output']>;
+  canceledReason?: Maybe<Scalars['String']['output']>;
   client?: Maybe<User>;
   clientId: Scalars['ID']['output'];
   createdAt?: Maybe<Scalars['String']['output']>;
@@ -417,6 +448,9 @@ export type MembershipTransaction = {
   dayDuration?: Maybe<Scalars['Int']['output']>;
   expiresAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
+  lastAdjustedAt?: Maybe<Scalars['String']['output']>;
+  lastAdjustedById?: Maybe<Scalars['ID']['output']>;
+  lastAdjustedReason?: Maybe<Scalars['String']['output']>;
   membership?: Maybe<Membership>;
   membershipId: Scalars['ID']['output'];
   /** Total months for this subscription from startedAt (matches expiry; may differ from plan default). */
@@ -430,6 +464,7 @@ export type MembershipTransaction = {
 export type Mutation = {
   __typename?: 'Mutation';
   approveSubscriptionRequest: MembershipTransaction;
+  archiveEquipment: Equipment;
   assignCoachToGoal: Goal;
   cancelCoachRequest: Scalars['Boolean']['output'];
   cancelMembership: Scalars['Boolean']['output'];
@@ -457,15 +492,21 @@ export type Mutation = {
   deleteSubscriptionRequest: Scalars['Boolean']['output'];
   deleteUser?: Maybe<Scalars['Boolean']['output']>;
   directSubscribeMember: MembershipTransaction;
+  disableUser?: Maybe<User>;
+  enableUser?: Maybe<User>;
   inviteClientsToClassSession: Session;
   leaveClassSession: Session;
+  logReportDownload: ReportDownloadLog;
   login: AuthResponse;
+  markAllMyNotificationsRead: Scalars['Boolean']['output'];
+  markNotificationRead: Notification;
   purchaseMembership: MembershipTransaction;
   rejectSubscriptionRequest: Scalars['Boolean']['output'];
   removeClient: Scalars['Boolean']['output'];
   removeClientFromClassSession: Session;
   requestToJoinClassSession: Session;
   respondToClassInvitation: Session;
+  unarchiveEquipment: Equipment;
   updateCoachRating: CoachRating;
   updateCoachRequest: CoachRequest;
   updateEquipment: Equipment;
@@ -486,6 +527,12 @@ export type MutationApproveSubscriptionRequestArgs = {
 };
 
 
+export type MutationArchiveEquipmentArgs = {
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+};
+
+
 export type MutationAssignCoachToGoalArgs = {
   goalId: Scalars['ID']['input'];
 };
@@ -497,6 +544,7 @@ export type MutationCancelCoachRequestArgs = {
 
 
 export type MutationCancelMembershipArgs = {
+  reason: Scalars['String']['input'];
   transactionId: Scalars['ID']['input'];
 };
 
@@ -624,6 +672,17 @@ export type MutationDirectSubscribeMemberArgs = {
 };
 
 
+export type MutationDisableUserArgs = {
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+};
+
+
+export type MutationEnableUserArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationInviteClientsToClassSessionArgs = {
   clientIds: Array<Scalars['ID']['input']>;
   sessionId: Scalars['ID']['input'];
@@ -635,8 +694,18 @@ export type MutationLeaveClassSessionArgs = {
 };
 
 
+export type MutationLogReportDownloadArgs = {
+  input: LogReportDownloadInput;
+};
+
+
 export type MutationLoginArgs = {
   input: LoginInput;
+};
+
+
+export type MutationMarkNotificationReadArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -669,6 +738,11 @@ export type MutationRequestToJoinClassSessionArgs = {
 export type MutationRespondToClassInvitationArgs = {
   accept: Scalars['Boolean']['input'];
   sessionId: Scalars['ID']['input'];
+};
+
+
+export type MutationUnarchiveEquipmentArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -741,6 +815,27 @@ export type MutationWalkInTimeInArgs = {
   at?: InputMaybe<Scalars['String']['input']>;
   walkInClientId: Scalars['ID']['input'];
 };
+
+export type Notification = {
+  __typename?: 'Notification';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  dedupeKey: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  isRead: Scalars['Boolean']['output'];
+  message: Scalars['String']['output'];
+  metadataJson?: Maybe<Scalars['String']['output']>;
+  readAt?: Maybe<Scalars['String']['output']>;
+  recipientId: Scalars['ID']['output'];
+  recipientRole: RoleType;
+  title: Scalars['String']['output'];
+  type: NotificationType;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export enum NotificationType {
+  Inactivity = 'INACTIVITY',
+  MembershipExpiring = 'MEMBERSHIP_EXPIRING'
+}
 
 export type PeriodRevenue = {
   __typename?: 'PeriodRevenue';
@@ -824,10 +919,12 @@ export type Query = {
   getMembership?: Maybe<Membership>;
   getMembershipTransaction?: Maybe<MembershipTransaction>;
   getMemberships: Array<Membership>;
+  getMyNotifications: Array<Notification>;
   getMySubscriptionRequests: Array<SubscriptionRequest>;
   getPendingCoachRequests: Array<CoachRequest>;
   getPendingSubscriptionRequests: Array<SubscriptionRequest>;
   getProgressRatings: Array<ProgressRating>;
+  getReportDownloadLogs: Array<ReportDownloadLog>;
   getRevenueSummary: RevenueSummary;
   getSession?: Maybe<Session>;
   getSessionLogBySessionId?: Maybe<SessionLog>;
@@ -937,6 +1034,11 @@ export type QueryGetEquipmentArgs = {
 };
 
 
+export type QueryGetEquipmentsArgs = {
+  includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
 export type QueryGetGoalArgs = {
   id: Scalars['ID']['input'];
 };
@@ -963,9 +1065,23 @@ export type QueryGetMembershipsArgs = {
 };
 
 
+export type QueryGetMyNotificationsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  unreadOnly?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
 export type QueryGetProgressRatingsArgs = {
   clientId: Scalars['ID']['input'];
   goalId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetReportDownloadLogsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  reportType?: InputMaybe<ReportType>;
 };
 
 
@@ -1013,6 +1129,7 @@ export type QueryGetUserArgs = {
 
 
 export type QueryGetUsersArgs = {
+  includeDisabled?: InputMaybe<Scalars['Boolean']['input']>;
   role?: InputMaybe<RoleType>;
 };
 
@@ -1055,6 +1172,41 @@ export type QueryWalkInLogsByClientArgs = {
 export type RejectSubscriptionRequestInput = {
   requestId: Scalars['ID']['input'];
 };
+
+export type ReportDownloadDateRange = {
+  __typename?: 'ReportDownloadDateRange';
+  endDate?: Maybe<Scalars['String']['output']>;
+  startDate?: Maybe<Scalars['String']['output']>;
+};
+
+export type ReportDownloadDateRangeInput = {
+  endDate?: InputMaybe<Scalars['String']['input']>;
+  startDate?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ReportDownloadLog = {
+  __typename?: 'ReportDownloadLog';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  dateRange?: Maybe<ReportDownloadDateRange>;
+  downloadedBy?: Maybe<User>;
+  downloadedById: Scalars['ID']['output'];
+  downloadedByRole: RoleType;
+  fileName?: Maybe<Scalars['String']['output']>;
+  filterSummary?: Maybe<Scalars['String']['output']>;
+  format: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  metadataJson?: Maybe<Scalars['String']['output']>;
+  reportType: ReportType;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export enum ReportType {
+  Attendance = 'ATTENDANCE',
+  Equipment = 'EQUIPMENT',
+  NearEndingMemberships = 'NEAR_ENDING_MEMBERSHIPS',
+  Revenue = 'REVENUE',
+  WalkIn = 'WALK_IN'
+}
 
 export type RevenueSummary = {
   __typename?: 'RevenueSummary';
@@ -1186,6 +1338,7 @@ export type UpdateCoachRequestInput = {
 };
 
 export type UpdateEquipmentInput = {
+  acquiredAt?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
@@ -1219,6 +1372,8 @@ export type UpdateMembershipTransactionDurationInput = {
   dayDuration?: InputMaybe<Scalars['Int']['input']>;
   /** New total months from the transaction's startedAt (recalculates expiresAt). Omit when using dayDuration. */
   monthDuration?: InputMaybe<Scalars['Int']['input']>;
+  /** Required audit reason for changing length/start date. */
+  reason: Scalars['String']['input'];
   /** Optional ISO 8601 start datetime. When set, replaces the transaction startedAt and recalculates expiresAt from it (walk-ins / legacy corrections). Omit to keep the existing start date. */
   startedAt?: InputMaybe<Scalars['String']['input']>;
   transactionId: Scalars['ID']['input'];
@@ -1262,11 +1417,14 @@ export type UpdateUserInput = {
 };
 
 export type UpdateWalkInClientInput = {
+  ageYears: Scalars['Int']['input'];
   email?: InputMaybe<Scalars['String']['input']>;
   firstName: Scalars['String']['input'];
   gender: WalkInGender;
   lastName: Scalars['String']['input'];
   middleName?: InputMaybe<Scalars['String']['input']>;
+  minorWaiverAcknowledged?: InputMaybe<Scalars['Boolean']['input']>;
+  minorWaiverGuardianName?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
@@ -1281,11 +1439,14 @@ export type User = {
   createdAt?: Maybe<Scalars['String']['output']>;
   currentMembership?: Maybe<MembershipTransaction>;
   dateOfBirth?: Maybe<Scalars['String']['output']>;
+  disableReason?: Maybe<Scalars['String']['output']>;
+  disabledAt?: Maybe<Scalars['String']['output']>;
   email: Scalars['String']['output'];
   firstName: Scalars['String']['output'];
   gender: Scalars['String']['output'];
   heardFrom?: Maybe<Array<Maybe<Scalars['String']['output']>>>;
   id: Scalars['ID']['output'];
+  isDisabled: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   loginHistory?: Maybe<Array<Maybe<LoginHistoryEntry>>>;
   membershipDetails?: Maybe<MemberDetails>;
@@ -1324,6 +1485,8 @@ export type WalkInAttendanceLog = {
 
 export type WalkInClient = {
   __typename?: 'WalkInClient';
+  /** Age in whole years (admin-entered). */
+  ageYears?: Maybe<Scalars['Int']['output']>;
   createdAt: Scalars['String']['output'];
   email?: Maybe<Scalars['String']['output']>;
   firstName: Scalars['String']['output'];
@@ -1331,6 +1494,10 @@ export type WalkInClient = {
   id: Scalars['ID']['output'];
   lastName: Scalars['String']['output'];
   middleName?: Maybe<Scalars['String']['output']>;
+  /** When the guardian liability waiver was recorded (ISO). */
+  minorWaiverAcceptedAt?: Maybe<Scalars['String']['output']>;
+  /** Parent/guardian name on file when under 18 with waiver. */
+  minorWaiverGuardianName?: Maybe<Scalars['String']['output']>;
   notes?: Maybe<Scalars['String']['output']>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['String']['output'];
@@ -1379,24 +1546,38 @@ export type WeightProgress = {
   weight: Scalars['Float']['output'];
 };
 
-export type GetEquipmentsQueryVariables = Exact<{ [key: string]: never; }>;
+export type GetEquipmentsQueryVariables = Exact<{
+  includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
 
 
-export type GetEquipmentsQuery = { __typename?: 'Query', getEquipments: Array<{ __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null }> };
+export type GetEquipmentsQuery = { __typename?: 'Query', getEquipments: Array<{ __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> }> };
+
+export type GetEquipmentsLegacyQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetEquipmentsLegacyQuery = { __typename?: 'Query', getEquipments: Array<{ __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null }> };
 
 export type GetEquipmentQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type GetEquipmentQuery = { __typename?: 'Query', getEquipment?: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } | null };
+export type GetEquipmentQuery = { __typename?: 'Query', getEquipment?: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> } | null };
 
 export type CreateEquipmentMutationVariables = Exact<{
   input: CreateEquipmentInput;
 }>;
 
 
-export type CreateEquipmentMutation = { __typename?: 'Mutation', createEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } };
+export type CreateEquipmentMutation = { __typename?: 'Mutation', createEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> } };
+
+export type CreateEquipmentLegacyMutationVariables = Exact<{
+  input: CreateEquipmentInput;
+}>;
+
+
+export type CreateEquipmentLegacyMutation = { __typename?: 'Mutation', createEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } };
 
 export type UpdateEquipmentMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1404,7 +1585,30 @@ export type UpdateEquipmentMutationVariables = Exact<{
 }>;
 
 
-export type UpdateEquipmentMutation = { __typename?: 'Mutation', updateEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } };
+export type UpdateEquipmentMutation = { __typename?: 'Mutation', updateEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> } };
+
+export type UpdateEquipmentLegacyMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  input: UpdateEquipmentInput;
+}>;
+
+
+export type UpdateEquipmentLegacyMutation = { __typename?: 'Mutation', updateEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } };
+
+export type ArchiveEquipmentMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+}>;
+
+
+export type ArchiveEquipmentMutation = { __typename?: 'Mutation', archiveEquipment: { __typename?: 'Equipment', id: string, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> } };
+
+export type UnarchiveEquipmentMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type UnarchiveEquipmentMutation = { __typename?: 'Mutation', unarchiveEquipment: { __typename?: 'Equipment', id: string, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> } };
 
 export type DeleteEquipmentMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1466,6 +1670,22 @@ export type AttendanceUpdatedSubscriptionVariables = Exact<{ [key: string]: neve
 
 export type AttendanceUpdatedSubscription = { __typename?: 'Subscription', attendanceUpdated: Array<{ __typename?: 'AttendanceRecord', id: string, authDateTime: string, authDate: string, authTime: string, direction: string, deviceName: string, deviceSerNum: string, personName: string, cardNo?: string | null }> };
 
+export type GetReportDownloadLogsQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  reportType?: InputMaybe<ReportType>;
+}>;
+
+
+export type GetReportDownloadLogsQuery = { __typename?: 'Query', getReportDownloadLogs: Array<{ __typename?: 'ReportDownloadLog', id: string, reportType: ReportType, format: string, downloadedById: string, downloadedByRole: RoleType, fileName?: string | null, filterSummary?: string | null, metadataJson?: string | null, createdAt?: string | null, downloadedBy?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null, dateRange?: { __typename?: 'ReportDownloadDateRange', startDate?: string | null, endDate?: string | null } | null }> };
+
+export type LogReportDownloadMutationVariables = Exact<{
+  input: LogReportDownloadInput;
+}>;
+
+
+export type LogReportDownloadMutation = { __typename?: 'Mutation', logReportDownload: { __typename?: 'ReportDownloadLog', id: string, reportType: ReportType, format: string, downloadedById: string, createdAt?: string | null } };
+
 export type GetAllMembershipsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -1493,12 +1713,33 @@ export type UpdateMembershipTransactionDurationMutationVariables = Exact<{
 }>;
 
 
-export type UpdateMembershipTransactionDurationMutation = { __typename?: 'Mutation', updateMembershipTransactionDuration: { __typename?: 'MembershipTransaction', id: string, clientId: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, monthDuration: number, dayDuration?: number | null, status: TransactionStatus, createdAt?: string | null, updatedAt?: string | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number } | null } };
+export type UpdateMembershipTransactionDurationMutation = { __typename?: 'Mutation', updateMembershipTransactionDuration: { __typename?: 'MembershipTransaction', id: string, clientId: string, membershipId: string, priceAtPurchase: number, startedAt: string, expiresAt: string, monthDuration: number, dayDuration?: number | null, lastAdjustedReason?: string | null, lastAdjustedAt?: string | null, status: TransactionStatus, createdAt?: string | null, updatedAt?: string | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number } | null } };
 
 export type MembershipsUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
 export type MembershipsUpdatedSubscription = { __typename?: 'Subscription', membershipsUpdated: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
+
+export type GetMyNotificationsQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  unreadOnly?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+
+export type GetMyNotificationsQuery = { __typename?: 'Query', getMyNotifications: Array<{ __typename?: 'Notification', id: string, recipientId: string, recipientRole: RoleType, type: NotificationType, title: string, message: string, dedupeKey: string, metadataJson?: string | null, isRead: boolean, readAt?: string | null, createdAt?: string | null, updatedAt?: string | null }> };
+
+export type MarkNotificationReadMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type MarkNotificationReadMutation = { __typename?: 'Mutation', markNotificationRead: { __typename?: 'Notification', id: string, isRead: boolean, readAt?: string | null } };
+
+export type MarkAllMyNotificationsReadMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MarkAllMyNotificationsReadMutation = { __typename?: 'Mutation', markAllMyNotificationsRead: boolean };
 
 export type GetCoachSessionsQueryVariables = Exact<{
   coachId: Scalars['ID']['input'];
@@ -1594,6 +1835,21 @@ export type DeleteUserMutationVariables = Exact<{
 
 export type DeleteUserMutation = { __typename?: 'Mutation', deleteUser?: boolean | null };
 
+export type DisableUserMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+}>;
+
+
+export type DisableUserMutation = { __typename?: 'Mutation', disableUser?: { __typename?: 'User', id: string, isDisabled: boolean, disabledAt?: string | null, disableReason?: string | null } | null };
+
+export type EnableUserMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type EnableUserMutation = { __typename?: 'Mutation', enableUser?: { __typename?: 'User', id: string, isDisabled: boolean } | null };
+
 export type CreateMembershipMutationVariables = Exact<{
   input: CreateMembershipInput;
 }>;
@@ -1625,6 +1881,7 @@ export type PurchaseMembershipMutation = { __typename?: 'Mutation', purchaseMemb
 
 export type CancelMembershipMutationVariables = Exact<{
   transactionId: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
 }>;
 
 
@@ -1644,7 +1901,7 @@ export type SearchWalkInClientsQueryVariables = Exact<{
 }>;
 
 
-export type SearchWalkInClientsQuery = { __typename?: 'Query', searchWalkInClients: Array<{ __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, createdAt: string, updatedAt: string }> };
+export type SearchWalkInClientsQuery = { __typename?: 'Query', searchWalkInClients: Array<{ __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, ageYears?: number | null, minorWaiverGuardianName?: string | null, minorWaiverAcceptedAt?: string | null, createdAt: string, updatedAt: string }> };
 
 export type WalkInPaymentSettingsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1657,7 +1914,7 @@ export type WalkInAttendanceLogsQueryVariables = Exact<{
 }>;
 
 
-export type WalkInAttendanceLogsQuery = { __typename?: 'Query', walkInAttendanceLogs: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null } }> } };
+export type WalkInAttendanceLogsQuery = { __typename?: 'Query', walkInAttendanceLogs: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, ageYears?: number | null, minorWaiverGuardianName?: string | null, minorWaiverAcceptedAt?: string | null, createdAt: string, updatedAt: string } }> } };
 
 export type WalkInStatsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1669,7 +1926,7 @@ export type WalkInAccountsOverviewQueryVariables = Exact<{
 }>;
 
 
-export type WalkInAccountsOverviewQuery = { __typename?: 'Query', walkInAccountsOverview: { __typename?: 'WalkInAccountsOverview', totalWalkInAccounts: number, totalTimeInRecords: number, rows: Array<{ __typename?: 'WalkInAccountRow', timeInCount: number, client: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, createdAt: string, updatedAt: string } }> } };
+export type WalkInAccountsOverviewQuery = { __typename?: 'Query', walkInAccountsOverview: { __typename?: 'WalkInAccountsOverview', totalWalkInAccounts: number, totalTimeInRecords: number, rows: Array<{ __typename?: 'WalkInAccountRow', timeInCount: number, client: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, ageYears?: number | null, minorWaiverGuardianName?: string | null, minorWaiverAcceptedAt?: string | null, createdAt: string, updatedAt: string } }> } };
 
 export type WalkInLogsByClientQueryVariables = Exact<{
   walkInClientId: Scalars['ID']['input'];
@@ -1677,7 +1934,7 @@ export type WalkInLogsByClientQueryVariables = Exact<{
 }>;
 
 
-export type WalkInLogsByClientQuery = { __typename?: 'Query', walkInLogsByClient: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null } }> } };
+export type WalkInLogsByClientQuery = { __typename?: 'Query', walkInLogsByClient: { __typename?: 'WalkInLogsConnection', totalCount: number, logs: Array<{ __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number, createdAt: string, walkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, ageYears?: number | null, minorWaiverGuardianName?: string | null, minorWaiverAcceptedAt?: string | null, createdAt: string, updatedAt: string } }> } };
 
 export type UpdateWalkInPaymentSettingsMutationVariables = Exact<{
   paymentPesos: Scalars['Float']['input'];
@@ -1692,7 +1949,7 @@ export type CreateWalkInClientMutationVariables = Exact<{
 }>;
 
 
-export type CreateWalkInClientMutation = { __typename?: 'Mutation', createWalkInClient: { __typename?: 'CreateWalkInClientResult', client: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null }, log?: { __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number } | null } };
+export type CreateWalkInClientMutation = { __typename?: 'Mutation', createWalkInClient: { __typename?: 'CreateWalkInClientResult', client: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, ageYears?: number | null, minorWaiverGuardianName?: string | null, minorWaiverAcceptedAt?: string | null }, log?: { __typename?: 'WalkInAttendanceLog', id: string, timedInAt: string, localDate: string, payment: number } | null } };
 
 export type WalkInTimeInMutationVariables = Exact<{
   walkInClientId: Scalars['ID']['input'];
@@ -1708,4 +1965,4 @@ export type UpdateWalkInClientMutationVariables = Exact<{
 }>;
 
 
-export type UpdateWalkInClientMutation = { __typename?: 'Mutation', updateWalkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, createdAt: string, updatedAt: string } };
+export type UpdateWalkInClientMutation = { __typename?: 'Mutation', updateWalkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, ageYears?: number | null, minorWaiverGuardianName?: string | null, minorWaiverAcceptedAt?: string | null, createdAt: string, updatedAt: string } };

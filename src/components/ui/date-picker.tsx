@@ -121,12 +121,6 @@ export function DatePicker({
 						return false
 					}}
 					initialFocus
-					classNames={{
-						dropdown: "text-sm font-medium cursor-pointer text-[var(--text-primary)]",
-						dropdown_root: "relative has-focus:border-[var(--primary-yellow)] border border-[rgba(255,255,255,0.1)] shadow-xs has-focus:ring-[var(--primary-yellow)]/50 has-focus:ring-[3px] rounded-md bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] transition-all min-w-[110px] px-2 py-1.5",
-						dropdowns: "w-full flex items-center text-sm font-medium justify-center gap-2 mb-2",
-						month_caption: "mb-2",
-					}}
 				/>
 			</PopoverContent>
 		</Popover>

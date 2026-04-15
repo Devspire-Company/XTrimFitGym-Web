@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from 'react';
-import { useQuery, useSubscription } from '@apollo/client';
+import { useQuery, useSubscription, useMutation } from '@apollo/client';
 import {
 	Chart as ChartJS,
 	CategoryScale,
@@ -21,7 +21,7 @@ import {
 	TrendingUp,
 	Activity,
 	Download,
-	Calendar,
+	ChevronDown,
 } from 'lucide-react';
 import {
 	GET_USERS,
@@ -29,8 +29,150 @@ import {
 	GET_ANALYTICS_RANGE,
 	REVENUE_SUMMARY_UPDATED,
 	USERS_UPDATED,
+	WALK_IN_ACCOUNTS_OVERVIEW,
+	LOG_REPORT_DOWNLOAD,
+	GET_REPORT_DOWNLOAD_LOGS,
 } from '@/graphql/operations/index';
-import { RoleType } from '@/graphql/generated/graphql';
+import { RoleType, ReportType } from '@/graphql/generated/graphql';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { useAppSelector } from '@/store/hooks';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+type LocalExportLog = {
+	id: string;
+	reportType: string;
+	fileName: string;
+	downloadedById: string;
+	downloadedByRole: string;
+	downloadedBy?: {
+		firstName?: string;
+		lastName?: string;
+		email?: string;
+	};
+	createdAt: string;
+};
+
+const REPORT_EXPORT_LOCAL_STORAGE_KEY = 'xtrimfit-report-export-logs';
+
+async function loadImageAsDataUrl(path: string): Promise<string | null> {
+	try {
+		const response = await fetch(path);
+		if (!response.ok) return null;
+		const blob = await response.blob();
+		return await new Promise((resolve) => {
+			const reader = new FileReader();
+			reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+			reader.onerror = () => resolve(null);
+			reader.readAsDataURL(blob);
+		});
+	} catch {
+		return null;
+	}
+}
+
+async function getImageDimensions(dataUrl: string): Promise<{ width: number; height: number } | null> {
+	return await new Promise((resolve) => {
+		const img = new Image();
+		img.onload = () => {
+			if (!img.naturalWidth || !img.naturalHeight) {
+				resolve(null);
+				return;
+			}
+			resolve({ width: img.naturalWidth, height: img.naturalHeight });
+		};
+		img.onerror = () => resolve(null);
+		img.src = dataUrl;
+	});
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+	let binary = '';
+	const bytes = new Uint8Array(buffer);
+	const chunkSize = 0x8000;
+	for (let i = 0; i < bytes.length; i += chunkSize) {
+		const chunk = bytes.subarray(i, i + chunkSize);
+		binary += String.fromCharCode(...chunk);
+	}
+	return btoa(binary);
+}
+
+async function tryRegisterInterFont(doc: jsPDF): Promise<boolean> {
+	try {
+		const regularUrl =
+			'https://raw.githubusercontent.com/rsms/inter/master/docs/font-files/Inter-Regular.ttf';
+		const boldUrl =
+			'https://raw.githubusercontent.com/rsms/inter/master/docs/font-files/Inter-Bold.ttf';
+		const [regularRes, boldRes] = await Promise.all([fetch(regularUrl), fetch(boldUrl)]);
+		if (!regularRes.ok || !boldRes.ok) return false;
+		const [regularBuf, boldBuf] = await Promise.all([
+			regularRes.arrayBuffer(),
+			boldRes.arrayBuffer(),
+		]);
+		const pdf = doc as any;
+		pdf.addFileToVFS('Inter-Regular.ttf', arrayBufferToBase64(regularBuf));
+		pdf.addFont('Inter-Regular.ttf', 'Inter', 'normal');
+		pdf.addFileToVFS('Inter-Bold.ttf', arrayBufferToBase64(boldBuf));
+		pdf.addFont('Inter-Bold.ttf', 'Inter', 'bold');
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+async function renderBrandedPdfHeader(
+	doc: jsPDF,
+	title: string,
+	now: Date,
+	summaryLine: string,
+	exportedBy: string
+): Promise<{ interReady: boolean; startY: number }> {
+	const interReady = await tryRegisterInterFont(doc);
+	doc.setFont(interReady ? 'Inter' : 'helvetica', 'normal');
+
+	const logoDataUrl = await loadImageAsDataUrl('/logo.png');
+	let headerTextX = 14;
+	if (logoDataUrl) {
+		const logoSize = await getImageDimensions(logoDataUrl);
+		const maxLogoWidth = 32;
+		const maxLogoHeight = 24;
+		let logoWidth = maxLogoWidth;
+		let logoHeight = maxLogoHeight;
+		if (logoSize) {
+			const ratio = logoSize.width / logoSize.height;
+			if (ratio >= 1) {
+				logoWidth = maxLogoWidth;
+				logoHeight = maxLogoWidth / ratio;
+				if (logoHeight > maxLogoHeight) {
+					logoHeight = maxLogoHeight;
+					logoWidth = maxLogoHeight * ratio;
+				}
+			} else {
+				logoHeight = maxLogoHeight;
+				logoWidth = maxLogoHeight * ratio;
+			}
+		}
+		doc.addImage(logoDataUrl, 'PNG', 14, 10, logoWidth, logoHeight);
+		headerTextX = 14 + logoWidth + 6;
+	}
+
+	doc.setFontSize(16);
+	doc.setFont(interReady ? 'Inter' : 'helvetica', 'bold');
+	doc.text('X-TRIM FIT GYM', headerTextX, 18);
+	doc.setFontSize(13);
+	doc.text(title, headerTextX, 26);
+	doc.setFontSize(10);
+	doc.setFont(interReady ? 'Inter' : 'helvetica', 'normal');
+	doc.text(
+		`Generated: ${now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' })} (Asia/Manila)`,
+		14,
+		34
+	);
+	doc.text(summaryLine, 14, 40);
+	doc.text(`Exported by: ${exportedBy}`, 14, 46);
+
+	return { interReady, startY: 52 };
+}
 
 ChartJS.register(
 	CategoryScale,
@@ -45,15 +187,40 @@ ChartJS.register(
 	Filler
 );
 
+const REPORTS_CHART_FONT_FAMILY = "'Inter', ui-sans-serif, system-ui, sans-serif";
+
 export function ReportsPage() {
 	useEffect(() => {
 		document.title = 'Reports & Analytics - X-TRIM FIT GYM';
 	}, []);
 
-	// State for user export filters
-	const [userExportStartDate, setUserExportStartDate] = useState<string>('');
-	const [userExportEndDate, setUserExportEndDate] = useState<string>('');
-	const [userExportType, setUserExportType] = useState<string>('all'); // 'all', 'member', 'coach', 'admin'
+	// Inter draws ₱ and digits consistently on canvas; restore when leaving page.
+	useEffect(() => {
+		const prev = ChartJS.defaults.font.family;
+		ChartJS.defaults.font.family = REPORTS_CHART_FONT_FAMILY;
+		return () => {
+			ChartJS.defaults.font.family = prev;
+		};
+	}, []);
+	const currentUser = useAppSelector((s) => s.auth.user);
+	const exportedByLabel = [currentUser?.firstName, currentUser?.lastName]
+		.filter(Boolean)
+		.join(' ')
+		.trim() || currentUser?.email || 'System';
+	const [auditApiSupported, setAuditApiSupported] = useState(true);
+	const [downloadablesOpen, setDownloadablesOpen] = useState(false);
+	const [localExportLogs, setLocalExportLogs] = useState<LocalExportLog[]>([]);
+
+	useEffect(() => {
+		try {
+			const raw = localStorage.getItem(REPORT_EXPORT_LOCAL_STORAGE_KEY);
+			if (!raw) return;
+			const parsed = JSON.parse(raw) as LocalExportLog[];
+			if (Array.isArray(parsed)) setLocalExportLogs(parsed);
+		} catch {
+			// Ignore malformed local history
+		}
+	}, []);
 
 	// Initial data fetch with queries
 	const { data: membersData, loading: membersLoading } = useQuery(GET_USERS, {
@@ -70,7 +237,6 @@ export function ReportsPage() {
 	const { data: adminsData, loading: adminsLoading } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Admin },
 		errorPolicy: 'none',
-		skip: userExportType !== 'all' && userExportType !== 'admin', // Only fetch if needed
 	});
 
 	const { data: analyticsData, error: analyticsError } = useQuery(GET_REVENUE_SUMMARY, {
@@ -117,6 +283,34 @@ export function ReportsPage() {
 			console.warn('[Reports] Analytics range query failed, using fallback data:', error.message);
 		},
 	});
+	const { data: walkInOverviewData } = useQuery(WALK_IN_ACCOUNTS_OVERVIEW, {
+		variables: { pagination: { limit: 200, offset: 0 } },
+		errorPolicy: 'ignore',
+	});
+	const [logReportDownload] = useMutation(LOG_REPORT_DOWNLOAD);
+	const {
+		data: reportLogsData,
+		loading: reportLogsLoading,
+		refetch: refetchReportLogs,
+		error: reportLogsError,
+	} = useQuery(GET_REPORT_DOWNLOAD_LOGS, {
+		variables: { limit: 10, offset: 0 },
+		fetchPolicy: 'cache-and-network',
+		pollInterval: 15000,
+		skip: !auditApiSupported,
+	});
+	useEffect(() => {
+		if (!reportLogsError) return;
+		const message = reportLogsError.message || '';
+		if (
+			message.includes('Cannot query field "getReportDownloadLogs"') ||
+			message.includes('Cannot query field "logReportDownload"') ||
+			message.includes('Unknown type "ReportType"') ||
+			message.includes('Unknown type "LogReportDownloadInput"')
+		) {
+			setAuditApiSupported(false);
+		}
+	}, [reportLogsError]);
 
 	// Use subscription data if available, otherwise fall back to query data
 	const data = {
@@ -133,10 +327,36 @@ export function ReportsPage() {
 	const loading = membersLoading || coachesLoading;
 	const error = analyticsError || analyticsRangeError || null;
 
-	const userExportLoading =
-		((userExportType === 'all' || userExportType === 'member') && membersLoading) ||
-		((userExportType === 'all' || userExportType === 'coach') && coachesLoading) ||
-		((userExportType === 'all' || userExportType === 'admin') && adminsLoading);
+	const userExportLoading = membersLoading || coachesLoading || adminsLoading;
+	const recentReportLogs =
+		auditApiSupported && (reportLogsData?.getReportDownloadLogs?.length ?? 0) > 0
+			? reportLogsData?.getReportDownloadLogs ?? []
+			: localExportLogs;
+
+	const appendLocalExportLog = (reportType: ReportType, fileName: string) => {
+		const next: LocalExportLog = {
+			id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+			reportType: String(reportType),
+			fileName,
+			downloadedById: currentUser?.id || 'unknown',
+			downloadedByRole: currentUser?.role || 'admin',
+			downloadedBy: {
+				firstName: currentUser?.firstName,
+				lastName: currentUser?.lastName,
+				email: currentUser?.email,
+			},
+			createdAt: new Date().toISOString(),
+		};
+		setLocalExportLogs((prev) => {
+			const updated = [next, ...prev].slice(0, 50);
+			try {
+				localStorage.setItem(REPORT_EXPORT_LOCAL_STORAGE_KEY, JSON.stringify(updated));
+			} catch {
+				// Ignore storage write failures
+			}
+			return updated;
+		});
+	};
 
 	// Update analytics range data when revenue subscription updates
 	// Note: Analytics range query is still used for historical data, but we could trigger a refetch
@@ -1120,68 +1340,149 @@ export function ReportsPage() {
 		URL.revokeObjectURL(url);
 	};
 
-	// User Export Function with Date Range Filtering
+	const exportRevenuePdf = async () => {
+		const doc = new jsPDF({ orientation: 'landscape' });
+		const now = new Date();
+		const filename = `revenue-report-${now.toISOString().replace(/[:.]/g, '-').slice(0, 19)}.pdf`;
+		const summaryLine = `Total: PHP ${Number(totalRevenue).toLocaleString()} | Membership: PHP ${Number(membershipSubscriptionRevenue).toLocaleString()} | Walk-in: PHP ${Number(walkInRevenueTotal).toLocaleString()} | Active subscriptions: ${activeSubscriptions}`;
+		const { startY } = await renderBrandedPdfHeader(
+			doc,
+			'Revenue Report',
+			now,
+			summaryLine,
+			exportedByLabel
+		);
+
+		autoTable(doc, {
+			startY,
+			head: [['Metric', 'Value']],
+			body: [
+				['Total Revenue', `PHP ${Number(totalRevenue).toLocaleString()}`],
+				['Membership Revenue', `PHP ${Number(membershipSubscriptionRevenue).toLocaleString()}`],
+				['Walk-in Revenue', `PHP ${Number(walkInRevenueTotal).toLocaleString()}`],
+				['Active Subscriptions', String(activeSubscriptions)],
+			],
+			styles: { fontSize: 9 },
+			headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
+			alternateRowStyles: { fillColor: [245, 245, 248] },
+			margin: { left: 14, right: 14 },
+		});
+		doc.save(filename);
+		appendLocalExportLog(ReportType.Revenue, filename);
+		if (auditApiSupported) {
+			await logReportDownload({
+				variables: { input: { reportType: ReportType.Revenue, fileName: filename, filterSummary: 'reports-page-summary' } },
+			})
+				.then(() => refetchReportLogs())
+				.catch(() => {});
+		}
+	};
+
+	const exportNearEndingMembershipPdf = async () => {
+		const thresholdDate = new Date();
+		thresholdDate.setDate(thresholdDate.getDate() + 7);
+		const nearEnding = (data?.members || []).filter((m: any) => {
+			const exp = m.currentMembership?.expiresAt;
+			if (!exp) return false;
+			const d = new Date(exp);
+			return d >= new Date() && d <= thresholdDate;
+		});
+		const doc = new jsPDF({ orientation: 'landscape' });
+		const now = new Date();
+		const filename = `near-ending-memberships-${now.toISOString().replace(/[:.]/g, '-').slice(0, 19)}.pdf`;
+		const summaryLine = `Members near expiry (<=7 days): ${nearEnding.length} | Threshold date: ${thresholdDate.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}`;
+		const { startY } = await renderBrandedPdfHeader(
+			doc,
+			'Near-Ending Memberships Report',
+			now,
+			summaryLine,
+			exportedByLabel
+		);
+
+		autoTable(doc, {
+			startY,
+			head: [['Member', 'Plan', 'Expires At', 'Status']],
+			body: nearEnding.map((m: any) => [
+				`${m.firstName} ${m.lastName}`,
+				m.currentMembership?.membership?.name || 'N/A',
+				new Date(m.currentMembership?.expiresAt).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }),
+				m.currentMembership?.status || 'N/A',
+			]),
+			styles: { fontSize: 9 },
+			headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
+			alternateRowStyles: { fillColor: [245, 245, 248] },
+			margin: { left: 14, right: 14 },
+		});
+		doc.save(filename);
+		appendLocalExportLog(ReportType.NearEndingMemberships, filename);
+		if (auditApiSupported) {
+			await logReportDownload({
+				variables: { input: { reportType: ReportType.NearEndingMemberships, fileName: filename, filterSummary: 'threshold=7days' } },
+			})
+				.then(() => refetchReportLogs())
+				.catch(() => {});
+		}
+	};
+
+	const exportWalkInPdf = async () => {
+		const rows = walkInOverviewData?.walkInAccountsOverview?.rows || [];
+		const doc = new jsPDF({ orientation: 'landscape' });
+		const now = new Date();
+		const filename = `walk-in-report-${now.toISOString().replace(/[:.]/g, '-').slice(0, 19)}.pdf`;
+		const totalTimeIns = rows.reduce((sum: number, r: any) => sum + Number(r.timeInCount ?? 0), 0);
+		const summaryLine = `Profiles: ${rows.length} | Total time-ins (visible rows): ${totalTimeIns}`;
+		const { startY } = await renderBrandedPdfHeader(
+			doc,
+			'Walk-in Accounts Report',
+			now,
+			summaryLine,
+			exportedByLabel
+		);
+
+		autoTable(doc, {
+			startY,
+			head: [['Name', 'Phone', 'Email', 'Time-ins']],
+			body: rows.map((r: any) => [
+				`${r.client.firstName} ${r.client.lastName}`,
+				r.client.phoneNumber || '-',
+				r.client.email || '-',
+				String(r.timeInCount ?? 0),
+			]),
+			styles: { fontSize: 9 },
+			headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
+			alternateRowStyles: { fillColor: [245, 245, 248] },
+			margin: { left: 14, right: 14 },
+		});
+		doc.save(filename);
+		appendLocalExportLog(ReportType.WalkIn, filename);
+		if (auditApiSupported) {
+			await logReportDownload({
+				variables: { input: { reportType: ReportType.WalkIn, fileName: filename, filterSummary: 'accounts-overview' } },
+			})
+				.then(() => refetchReportLogs())
+				.catch(() => {});
+		}
+	};
+
+	// Export all members, coaches, and admins to CSV (no filters)
 	const exportUsersToCSV = () => {
-		const needMembers = userExportType === 'all' || userExportType === 'member';
-		const needCoaches = userExportType === 'all' || userExportType === 'coach';
-		const needAdmins = userExportType === 'all' || userExportType === 'admin';
-
-		if (needMembers && membersLoading) {
-			alert('Please wait for user data to finish loading.');
-			return;
-		}
-		if (needCoaches && coachesLoading) {
-			alert('Please wait for user data to finish loading.');
-			return;
-		}
-		if (needAdmins && adminsLoading) {
+		if (membersLoading || coachesLoading || adminsLoading) {
 			alert('Please wait for user data to finish loading.');
 			return;
 		}
 
-		// Collect all users based on filter from current query data (not stale cache)
 		const membersList = data?.members ?? [];
 		const coachesList = data?.coaches ?? [];
 		const adminsList = data?.admins ?? [];
 
-		let allUsers: any[] = [];
-		if (needMembers) {
-			allUsers = [...allUsers, ...membersList.map((u: any) => ({ ...u, role: 'member' }))];
-		}
-		if (needCoaches) {
-			allUsers = [...allUsers, ...coachesList.map((u: any) => ({ ...u, role: 'coach' }))];
-		}
-		if (needAdmins) {
-			allUsers = [...allUsers, ...adminsList.map((u: any) => ({ ...u, role: 'admin' }))];
-		}
+		const allUsers: any[] = [
+			...membersList.map((u: any) => ({ ...u, role: 'member' })),
+			...coachesList.map((u: any) => ({ ...u, role: 'coach' })),
+			...adminsList.map((u: any) => ({ ...u, role: 'admin' })),
+		];
 
-		// Filter by date range
-		let filteredUsers = allUsers;
-		if (userExportStartDate || userExportEndDate) {
-			filteredUsers = allUsers.filter((user) => {
-				if (!user.createdAt) return false;
-
-				const userDate = new Date(user.createdAt);
-				userDate.setHours(0, 0, 0, 0);
-
-				if (userExportStartDate) {
-					const start = new Date(userExportStartDate);
-					start.setHours(0, 0, 0, 0);
-					if (userDate < start) return false;
-				}
-
-				if (userExportEndDate) {
-					const end = new Date(userExportEndDate);
-					end.setHours(23, 59, 59, 999);
-					if (userDate > end) return false;
-				}
-
-				return true;
-			});
-		}
-
-		if (filteredUsers.length === 0) {
-			alert('No users found matching the selected criteria.');
+		if (allUsers.length === 0) {
+			alert('No users found to export.');
 			return;
 		}
 
@@ -1232,7 +1533,7 @@ export function ReportsPage() {
 		let csvContent = headers.join(',') + '\n';
 
 		// Add user rows
-		filteredUsers.forEach((user: any) => {
+		allUsers.forEach((user: any) => {
 			const row = [
 				escapeCSV(user.attendanceId || ''),
 				escapeCSV('Xtrimfitgym-users'),
@@ -1250,19 +1551,7 @@ export function ReportsPage() {
 			csvContent += row.join(',') + '\n';
 		});
 
-		// Generate filename
-		let filename = 'users_export';
-		if (userExportType !== 'all') {
-			filename += `_${userExportType}`;
-		}
-		if (userExportStartDate || userExportEndDate) {
-			const start = userExportStartDate ? userExportStartDate.replace(/-/g, '') : 'all';
-			const end = userExportEndDate ? userExportEndDate.replace(/-/g, '') : 'all';
-			filename += `_${start}_to_${end}`;
-		} else {
-			filename += '_all';
-		}
-		filename += `_${new Date().toISOString().split('T')[0]}.csv`;
+		const filename = `users_export_all_${new Date().toISOString().split('T')[0]}.csv`;
 
 		// Create blob and download
 		const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1325,7 +1614,7 @@ export function ReportsPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between">
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<h1 className="text-3xl font-bold flex items-center gap-2">
 						<BarChart3 className="w-8 h-8" color="var(--primary-yellow)" />
@@ -1335,98 +1624,91 @@ export function ReportsPage() {
 						Comprehensive insights and analytics for your gym operations
 					</p>
 				</div>
-				<div className="flex items-center gap-3">
-					<button
-						onClick={exportToCSV}
-						className="flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.1)] border border-[rgba(249,197,19,0.3)] rounded-lg text-[var(--primary-yellow)] font-medium hover:bg-[rgba(249,197,19,0.2)] transition-all"
-						title="Export all analytics data to CSV"
-					>
-						<Download className="w-4 h-4" />
-						Export Analytics
-					</button>
-					<button
-						onClick={exportUsersToCSV}
-						disabled={userExportLoading}
-						className="flex items-center gap-2 px-4 py-2 bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] rounded-lg text-[#3B82F6] font-medium hover:bg-[rgba(59,130,246,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-						title={userExportLoading ? 'Loading user data...' : 'Export users data to CSV'}
-					>
-						<Download className="w-4 h-4" />
-						{userExportLoading ? 'Loading...' : 'Export Users'}
-					</button>
-				</div>
-			</div>
-
-			{/* User Export Filters */}
-			<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 backdrop-blur-md">
-				<div className="flex flex-col gap-4">
-					<div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-						<Users className="w-4 h-4" />
-						<span>User Export Filters</span>
-					</div>
-					<div className="flex flex-col sm:flex-row gap-4">
-						<div className="flex items-center gap-2">
-							<label
-								htmlFor="userExportType"
-								className="text-sm text-[var(--text-secondary)] whitespace-nowrap"
-							>
-								User Type:
-							</label>
-							<select
-								id="userExportType"
-								value={userExportType}
-								onChange={(e) => setUserExportType(e.target.value)}
-								className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
-							>
-								<option value="all">All Users</option>
-								<option value="member">Members Only</option>
-								<option value="coach">Coaches Only</option>
-								<option value="admin">Admins Only</option>
-							</select>
-						</div>
-						<div className="flex items-center gap-2">
-							<Calendar className="w-4 h-4 text-[var(--text-secondary)]" />
-							<label
-								htmlFor="userExportStartDate"
-								className="text-sm text-[var(--text-secondary)] whitespace-nowrap"
-							>
-								Join Date From:
-							</label>
-							<input
-								id="userExportStartDate"
-								type="date"
-								value={userExportStartDate}
-								onChange={(e) => setUserExportStartDate(e.target.value)}
-								className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+				<div className="flex shrink-0 justify-start sm:justify-end">
+				<Popover open={downloadablesOpen} onOpenChange={setDownloadablesOpen}>
+					<PopoverTrigger asChild>
+						<button
+							type="button"
+							className="flex items-center gap-2 px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm font-medium hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)] transition-all focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.15)]"
+							aria-label="Downloadables: exports menu"
+						>
+							<Download className="w-4 h-4 text-[var(--primary-yellow)]" />
+							Downloadables
+							<ChevronDown
+								className={`w-4 h-4 text-[var(--text-secondary)] transition-transform ${downloadablesOpen ? 'rotate-180' : ''}`}
 							/>
-						</div>
-						<div className="flex items-center gap-2">
-							<label
-								htmlFor="userExportEndDate"
-								className="text-sm text-[var(--text-secondary)] whitespace-nowrap"
-							>
-								To:
-							</label>
-							<input
-								id="userExportEndDate"
-								type="date"
-								value={userExportEndDate}
-								onChange={(e) => setUserExportEndDate(e.target.value)}
-								className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
-							/>
-						</div>
-						{(userExportStartDate || userExportEndDate) && (
+						</button>
+					</PopoverTrigger>
+					<PopoverContent
+						align="end"
+						sideOffset={8}
+						className="w-[min(100vw-2rem,20rem)] rounded-xl border border-[rgba(255,255,255,0.12)] p-2 text-[var(--text-primary)] shadow-2xl ring-1 ring-black/25 !bg-[#16181f]"
+					>
+						<div className="flex flex-col gap-0.5">
 							<button
+								type="button"
 								onClick={() => {
-									setUserExportStartDate('');
-									setUserExportEndDate('');
+									setDownloadablesOpen(false);
+									exportToCSV();
 								}}
-								className="px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors whitespace-nowrap"
-								title="Clear date filter"
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
 							>
-								Clear dates
+								<Download className="h-4 w-4 shrink-0 text-[#4ade80]" aria-hidden />
+								<span>Analytics (CSV)</span>
 							</button>
-						)}
-					</div>
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
+									void exportRevenuePdf();
+								}}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#fb923c]" aria-hidden />
+								<span>Revenue (PDF)</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
+									void exportNearEndingMembershipPdf();
+								}}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#fb923c]" aria-hidden />
+								<span>Near-ending memberships (PDF)</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
+									void exportWalkInPdf();
+								}}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#fb923c]" aria-hidden />
+								<span>Walk-in (PDF)</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
+									exportUsersToCSV();
+								}}
+								disabled={userExportLoading}
+								title={
+									userExportLoading
+										? 'Loading user data...'
+										: 'Download CSV of all members, coaches, and admins'
+								}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors disabled:pointer-events-none disabled:opacity-45"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#4ade80]" aria-hidden />
+								<span>{userExportLoading ? 'Loading users…' : 'All users (CSV)'}</span>
+							</button>
+						</div>
+					</PopoverContent>
+				</Popover>
 				</div>
 			</div>
 
@@ -1726,6 +2008,135 @@ export function ReportsPage() {
 					</div>
 				</div>
 			</div>
+
+			{/* Recent report exports — secondary; placed last */}
+			<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 backdrop-blur-md">
+				<h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">
+					Recent Report Exports
+				</h2>
+				<div className="overflow-x-auto">
+					<table className="w-full text-sm">
+						<thead>
+							<tr className="text-left text-[var(--text-secondary)] border-b border-[var(--card-border)]">
+								<th className="px-3 py-2 font-medium">Exported At</th>
+								<th className="px-3 py-2 font-medium">Report</th>
+								<th className="px-3 py-2 font-medium">Exported By</th>
+								<th className="px-3 py-2 font-medium">Role</th>
+								<th className="px-3 py-2 font-medium">File</th>
+							</tr>
+						</thead>
+						<tbody className="divide-y divide-[var(--card-border)]">
+							{reportLogsLoading ? (
+								<tr>
+									<td colSpan={5} className="px-3 py-6 text-center text-[var(--text-secondary)]">
+										Loading export logs...
+									</td>
+								</tr>
+							) : recentReportLogs.length === 0 ? (
+								<tr>
+									<td colSpan={5} className="px-3 py-6 text-center text-[var(--text-secondary)]">
+										No export logs yet.
+									</td>
+								</tr>
+							) : (
+								recentReportLogs.map((row: any) => {
+									const asText = (value: unknown): string => {
+										if (typeof value === 'string') return value.trim();
+										if (typeof value === 'number') return String(value);
+										if (value && typeof value === 'object') {
+											const obj = value as Record<string, unknown>;
+											const candidate = [
+												obj.fullName,
+												obj.name,
+												obj.email,
+												obj.id,
+												obj._id,
+												obj.value,
+											].find((entry) => typeof entry === 'string' && entry.trim().length > 0);
+											return typeof candidate === 'string' ? candidate.trim() : '';
+										}
+										return '';
+									};
+									const firstName = asText(row.downloadedBy?.firstName);
+									const lastName = asText(row.downloadedBy?.lastName);
+									const matchedLocalLog = localExportLogs.find((localRow) => {
+										if (!localRow) return false;
+										const sameFile =
+											asText(localRow.fileName) !== '' &&
+											asText(localRow.fileName) === asText(row.fileName);
+										const sameReportType =
+											asText(localRow.reportType) !== '' &&
+											asText(localRow.reportType).toUpperCase() ===
+												asText(row.reportType).toUpperCase();
+										return sameFile && sameReportType;
+									});
+									const localName = [
+										asText(matchedLocalLog?.downloadedBy?.firstName),
+										asText(matchedLocalLog?.downloadedBy?.lastName),
+									]
+										.filter((value) => value.length > 0)
+										.join(' ')
+										.trim();
+									const localEmail = asText(matchedLocalLog?.downloadedBy?.email);
+									const fullName = [firstName, lastName]
+										.filter((value) => value.length > 0)
+										.join(' ')
+										.trim();
+									const sameAsCurrentUser =
+										!!currentUser?.id && row.downloadedById === currentUser.id;
+									const fallbackCurrentUserName =
+										sameAsCurrentUser
+											? [currentUser?.firstName, currentUser?.lastName]
+													.filter(Boolean)
+													.join(' ')
+													.trim()
+											: '';
+									const downloadedByEmail = asText(row.downloadedBy?.email);
+									const downloadedByIdValue = asText(row.downloadedById);
+									const downloadedByObjectValue = asText(row.downloadedBy);
+									const exporterDisplay =
+										fullName ||
+										localName ||
+										fallbackCurrentUserName ||
+										downloadedByEmail ||
+										localEmail ||
+										downloadedByObjectValue ||
+										downloadedByIdValue ||
+										'Unknown user';
+									const safeExporterDisplay = /^\[object Object\](\s+\[object Object\])*$/.test(
+										exporterDisplay
+									)
+										? 'Unknown user'
+										: exporterDisplay;
+									return (
+										<tr key={row.id} className="hover:bg-[rgba(255,255,255,0.03)]">
+											<td className="px-3 py-2 text-[var(--text-primary)]">
+												{row.createdAt
+													? new Date(row.createdAt).toLocaleString('en-PH', {
+															timeZone: 'Asia/Manila',
+														})
+													: '-'}
+											</td>
+											<td className="px-3 py-2 text-[var(--text-primary)]">
+												{String(row.reportType || '').replaceAll('_', ' ')}
+											</td>
+											<td className="px-3 py-2 text-[var(--text-primary)]">
+												{safeExporterDisplay}
+											</td>
+											<td className="px-3 py-2 text-[var(--text-secondary)] uppercase">
+												{row.downloadedByRole || '-'}
+											</td>
+											<td className="px-3 py-2 text-[var(--text-secondary)]">
+												{row.fileName || '-'}
+											</td>
+										</tr>
+									);
+								})
+							)}
+						</tbody>
+					</table>
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -1753,7 +2164,7 @@ function SummaryCard({
 			<h3 className="text-[0.85rem] font-medium text-[var(--text-secondary)] mb-2 uppercase">
 				{title}
 			</h3>
-			<div className="stat-value text-[2.2rem] font-bold text-[var(--text-primary)] mb-2 font-['Poppins']">
+			<div className="stat-value text-[2.2rem] font-bold tracking-tight text-[var(--text-primary)] mb-2 font-['Inter',ui-sans-serif,system-ui,sans-serif] tabular-nums">
 				{value}
 			</div>
 			<div

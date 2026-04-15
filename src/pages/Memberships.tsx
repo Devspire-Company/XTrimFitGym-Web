@@ -73,12 +73,11 @@ export function MembershipsPage() {
 
 	const [deleteMembership, { loading: deleting }] = useMutation(DELETE_MEMBERSHIP, {
 		onCompleted: () => {
-			setSuccessMessage('Membership plan deleted successfully!');
+			setSuccessMessage('Membership plan removed successfully!');
 			setIsSuccessModalOpen(true);
 			setIsDeleteModalOpen(false);
 			setSelectedPlan(null);
-			// Subscription will automatically update the data
-			dispatch(addToast({ type: 'success', message: 'Membership plan deleted!' }));
+			dispatch(addToast({ type: 'success', message: 'Membership plan removed!' }));
 		},
 		onError: (error) => {
 			dispatch(addToast({ type: 'error', message: error.message }));
@@ -317,7 +316,7 @@ export function MembershipsPage() {
 									className="btn-small btn-delete flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] flex items-center justify-center gap-2"
 								>
 									<Trash2 className="w-4 h-4" />
-									Delete
+									Remove
 								</button>
 							</div>
 						</div>
@@ -355,9 +354,11 @@ export function MembershipsPage() {
 					setSelectedPlan(null);
 				}}
 				onConfirm={handleConfirmDelete}
-				title="Delete Membership Plan?"
-				message={`Are you sure you want to delete "${selectedPlan?.name}"? This action cannot be undone.`}
+				title="Remove Membership Plan?"
+				message={`Are you sure you want to remove "${selectedPlan?.name}"? This action cannot be undone.`}
 				isDeleting={deleting}
+				confirmLabel="Remove"
+				confirmingLabel="Removing..."
 			/>
 
 			<SuccessModal

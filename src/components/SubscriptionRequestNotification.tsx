@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { Bell, X, Check, XCircle, ChevronUp, ChevronDown, Clock } from 'lucide-react';
+import { Bell, X, Check, ChevronUp, ChevronDown, Clock } from 'lucide-react';
 import {
 	GET_PENDING_SUBSCRIPTION_REQUESTS,
 	APPROVE_SUBSCRIPTION_REQUEST,
-	REJECT_SUBSCRIPTION_REQUEST,
 	GET_USERS,
 } from '@/graphql/operations/index';
 import { useAppDispatch } from '@/store/hooks';
@@ -100,30 +99,6 @@ export function SubscriptionRequestNotification() {
 		},
 	});
 
-	const [rejectRequest] = useMutation(REJECT_SUBSCRIPTION_REQUEST, {
-		refetchQueries: [
-			{ query: GET_USERS, variables: { role: 'member' } },
-			{ query: GET_USERS, variables: { role: 'coach' } },
-		],
-		onCompleted: () => {
-			dispatch(
-				addToast({
-					type: 'success',
-					message: 'Subscription request rejected',
-				})
-			);
-			refetch();
-		},
-		onError: (mutationError) => {
-			dispatch(
-				addToast({
-					type: 'error',
-					message: mutationError.message || 'Failed to reject subscription request',
-				})
-			);
-		},
-	});
-
 	const pendingRequests = useMemo(() => {
 		const raw = (data?.getPendingSubscriptionRequests || []).filter(
 			(request) => request && request.member && request.membership && request.membership.id
@@ -139,18 +114,6 @@ export function SubscriptionRequestNotification() {
 	const handleApprove = async (requestId: string) => {
 		try {
 			await approveRequest({
-				variables: {
-					input: { requestId },
-				},
-			});
-		} catch {
-			// Error handled in onError
-		}
-	};
-
-	const handleReject = async (requestId: string) => {
-		try {
-			await rejectRequest({
 				variables: {
 					input: { requestId },
 				},
@@ -285,6 +248,8 @@ export function SubscriptionRequestNotification() {
 															setIsExpanded(false);
 															setIsMinimized(true);
 														}}
+														aria-label="Close subscription request card"
+														title="Close"
 														className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ml-2"
 													>
 														<X className="w-4 h-4" />
@@ -311,18 +276,10 @@ export function SubscriptionRequestNotification() {
 													<button
 														type="button"
 														onClick={() => handleApprove(request.id)}
-														className="flex-1 flex items-center justify-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+														className="w-full flex items-center justify-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
 													>
 														<Check className="w-4 h-4" />
 														Approve
-													</button>
-													<button
-														type="button"
-														onClick={() => handleReject(request.id)}
-														className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
-													>
-														<XCircle className="w-4 h-4" />
-														Reject
 													</button>
 												</div>
 											</div>

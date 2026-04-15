@@ -19,6 +19,7 @@ import {
 	UserRound,
 } from 'lucide-react';
 import { SubscriptionRequestNotification } from '../SubscriptionRequestNotification';
+import { SystemNotificationBell } from '../SystemNotificationBell';
 
 export function AdminLayout() {
 	const location = useLocation();
@@ -138,6 +139,7 @@ export function AdminLayout() {
 						/>
 					</div>
 					<div className="nav-right flex items-center gap-4">
+						<SystemNotificationBell />
 						<div className="relative">
 							<button
 								onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}

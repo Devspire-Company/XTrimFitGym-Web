@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { subDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
 	SEARCH_WALK_IN_CLIENTS,
 	WALK_IN_ATTENDANCE_LOGS,
@@ -19,24 +20,13 @@ import type { SearchWalkInClientsQuery } from '@/graphql/generated/graphql';
 import { WalkInModalShell } from '@/components/modals/WalkInModalShell';
 
 type WalkInClientRow = SearchWalkInClientsQuery['searchWalkInClients'][number];
-
-type WalkInClientFields = {
-	id: string;
-	firstName: string;
-	middleName?: string | null;
-	lastName: string;
-	phoneNumber?: string | null;
-	email?: string | null;
-	gender: WalkInGender;
-	notes?: string | null;
-};
+type WalkInClientFields = WalkInClientRow;
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import {
 	UserPlus,
 	Search,
 	Clock,
-	CalendarDays,
 	ChevronLeft,
 	ChevronRight,
 	Loader2,
@@ -65,6 +55,15 @@ function manilaYmdPlusOneDay(ymd: string): string {
 	const [y, m, d] = ymd.split('-').map(Number);
 	const anchor = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
 	return subDays(anchor, -1).toLocaleDateString('en-CA', { timeZone: MANILA });
+}
+
+function parseYmdToManilaDate(ymd: string): Date | undefined {
+	if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return undefined;
+	return new Date(`${ymd}T12:00:00+08:00`);
+}
+
+function formatManilaYmdFromDate(date: Date): string {
+	return date.toLocaleDateString('en-CA', { timeZone: MANILA });
 }
 
 function formatWalkInName(c: {
@@ -100,6 +99,14 @@ function formatTimeManila(iso: string): string {
 	} catch {
 		return iso;
 	}
+}
+
+function parseAgeYearsInput(raw: string): number | null {
+	const t = raw.trim();
+	if (t === '') return null;
+	const n = Number(t);
+	if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0 || n > 120) return null;
+	return n;
 }
 
 export function WalkInAttendancePage() {
@@ -159,6 +166,17 @@ export function WalkInAttendancePage() {
 	const [editEmail, setEditEmail] = useState('');
 	const [editGender, setEditGender] = useState<WalkInGender>(WalkInGender.Male);
 	const [editNotes, setEditNotes] = useState('');
+	const [ageYears, setAgeYears] = useState('');
+	const [minorWaiverAck, setMinorWaiverAck] = useState(false);
+	const [minorGuardianName, setMinorGuardianName] = useState('');
+	const [editAgeYears, setEditAgeYears] = useState('');
+	const [editMinorWaiverAck, setEditMinorWaiverAck] = useState(false);
+	const [editMinorGuardianName, setEditMinorGuardianName] = useState('');
+
+	const parsedNewAge = parseAgeYearsInput(ageYears);
+	const showNewMinorBlock = parsedNewAge !== null && parsedNewAge < 18;
+	const parsedEditAge = parseAgeYearsInput(editAgeYears);
+	const showEditMinorBlock = parsedEditAge !== null && parsedEditAge < 18;
 
 	const [accountsPage, setAccountsPage] = useState(0);
 	const [feeDraft, setFeeDraft] = useState('60');
@@ -283,6 +301,9 @@ export function WalkInAttendancePage() {
 			setEmail('');
 			setNotes('');
 			setGender(WalkInGender.Male);
+			setAgeYears('');
+			setMinorWaiverAck(false);
+			setMinorGuardianName('');
 			setTimeInNow(true);
 			setNewModalOpen(false);
 			refetchLogs();
@@ -325,6 +346,11 @@ export function WalkInAttendancePage() {
 		setEditEmail(c.email ?? '');
 		setEditGender(c.gender);
 		setEditNotes(c.notes ?? '');
+		setEditAgeYears(c.ageYears != null ? String(c.ageYears) : '');
+		const isMinor = typeof c.ageYears === 'number' && c.ageYears < 18;
+		const hasWaiver = Boolean(c.minorWaiverAcceptedAt && c.minorWaiverGuardianName?.trim());
+		setEditMinorWaiverAck(isMinor && hasWaiver ? true : false);
+		setEditMinorGuardianName(isMinor ? (c.minorWaiverGuardianName ?? '') : '');
 		setEditModalOpen(true);
 	}, []);
 
@@ -347,6 +373,9 @@ export function WalkInAttendancePage() {
 					email: u.email,
 					gender: u.gender,
 					notes: u.notes,
+					ageYears: u.ageYears,
+					minorWaiverGuardianName: u.minorWaiverGuardianName,
+					minorWaiverAcceptedAt: u.minorWaiverAcceptedAt,
 					createdAt: u.createdAt,
 					updatedAt: u.updatedAt,
 				});
@@ -363,6 +392,23 @@ export function WalkInAttendancePage() {
 				dispatch(addToast({ type: 'error', message: 'First and last name are required.' }));
 				return;
 			}
+			const ageParsed = parseAgeYearsInput(editAgeYears);
+			if (ageParsed === null) {
+				dispatch(addToast({ type: 'error', message: 'Enter a valid age (0–120 whole years).' }));
+				return;
+			}
+			if (ageParsed < 18) {
+				if (!editMinorWaiverAck || !editMinorGuardianName.trim()) {
+					dispatch(
+						addToast({
+							type: 'error',
+							message:
+								'Guests under 18 need a parent/guardian liability waiver: check the box and enter the guardian full name.',
+						}),
+					);
+					return;
+				}
+			}
 			updateWalkInClient({
 				variables: {
 					walkInClientId: editClientId,
@@ -374,6 +420,13 @@ export function WalkInAttendancePage() {
 						email: editEmail.trim() || undefined,
 						gender: editGender,
 						notes: editNotes.trim() || undefined,
+						ageYears: ageParsed,
+						...(ageParsed < 18
+							? {
+									minorWaiverAcknowledged: editMinorWaiverAck,
+									minorWaiverGuardianName: editMinorGuardianName.trim(),
+								}
+							: {}),
 					},
 				},
 			});
@@ -388,6 +441,9 @@ export function WalkInAttendancePage() {
 			editEmail,
 			editGender,
 			editNotes,
+			editAgeYears,
+			editMinorWaiverAck,
+			editMinorGuardianName,
 			updateWalkInClient,
 		]
 	);
@@ -399,6 +455,23 @@ export function WalkInAttendancePage() {
 				dispatch(addToast({ type: 'error', message: 'First and last name are required.' }));
 				return;
 			}
+			const ageParsed = parseAgeYearsInput(ageYears);
+			if (ageParsed === null) {
+				dispatch(addToast({ type: 'error', message: 'Enter a valid age (0–120 whole years).' }));
+				return;
+			}
+			if (ageParsed < 18) {
+				if (!minorWaiverAck || !minorGuardianName.trim()) {
+					dispatch(
+						addToast({
+							type: 'error',
+							message:
+								'Guests under 18 need a parent/guardian liability waiver: check the box and enter the guardian full name.',
+						}),
+					);
+					return;
+				}
+			}
 			createWalkIn({
 				variables: {
 					input: {
@@ -409,6 +482,13 @@ export function WalkInAttendancePage() {
 						email: email.trim() || undefined,
 						gender,
 						notes: notes.trim() || undefined,
+						ageYears: ageParsed,
+						...(ageParsed < 18
+							? {
+									minorWaiverAcknowledged: minorWaiverAck,
+									minorWaiverGuardianName: minorGuardianName.trim(),
+								}
+							: {}),
 					},
 					timeInNow,
 				},
@@ -423,6 +503,9 @@ export function WalkInAttendancePage() {
 			email,
 			gender,
 			notes,
+			ageYears,
+			minorWaiverAck,
+			minorGuardianName,
 			timeInNow,
 			dispatch,
 		]
@@ -482,14 +565,14 @@ export function WalkInAttendancePage() {
 						type="number"
 						min={0}
 						step={1}
+						aria-label="Default walk-in fee in pesos"
 						value={feeDraft}
 						onChange={(e) => setFeeDraft(e.target.value)}
-						className="w-full max-w-[200px] bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-[var(--text-primary)] text-sm"
+						className="w-full max-w-[200px] rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 font-['Inter',sans-serif] text-sm tabular-nums text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(249,197,19,0.12)]"
 					/>
 				</div>
-				<Button
+				<button
 					type="button"
-					className="btn-primary shrink-0"
 					disabled={savingFee}
 					onClick={() => {
 						const n = Number(feeDraft);
@@ -499,79 +582,96 @@ export function WalkInAttendancePage() {
 						}
 						updateWalkInFee({ variables: { paymentPesos: n } });
 					}}
+					className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-all hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.1)] disabled:pointer-events-none disabled:opacity-50"
 				>
-					{savingFee ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-					Save default
-				</Button>
+					{savingFee ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+					Save default fee
+				</button>
 			</div>
 
 			{/* Date toolbar */}
-			<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 md:p-5">
-				<div className="flex flex-wrap items-center gap-2">
-					<span className="text-sm text-[var(--text-secondary)] mr-2">View logs for</span>
-					<Button
-						type="button"
-						variant={isToday ? 'default' : 'outline'}
-						className={isToday ? 'btn-primary' : 'btn-secondary'}
-						onClick={() => setLogDate(todayYmd)}
-					>
-						<Clock className="w-4 h-4" />
-						Today
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						className="btn-secondary"
-						onClick={() => setLogDate(manilaYmdMinusOneDay(todayYmd))}
-					>
-						Yesterday
-					</Button>
-					<div className="flex items-center gap-2 ml-1">
-						<button
-							type="button"
-							aria-label="Previous day"
-							className="p-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--primary-yellow)] hover:bg-[rgba(255,255,255,0.05)]"
-							onClick={() => setLogDate((d) => manilaYmdMinusOneDay(d))}
+			<div className="flex flex-col gap-4 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 md:p-5 sm:flex-row sm:items-center sm:justify-between">
+				<div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+					<span className="text-sm font-medium text-[var(--text-secondary)]">View logs for</span>
+					<div className="flex flex-wrap items-center gap-2">
+						<div
+							className="inline-flex rounded-xl border border-[var(--card-border)] bg-[rgba(0,0,0,0.22)] p-1"
+							role="group"
+							aria-label="Quick log date"
 						>
-							<ChevronLeft className="w-5 h-5" />
-						</button>
-						<label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-							<CalendarDays className="w-4 h-4" />
-							<input
-								type="date"
-								value={logDate}
-								onChange={(e) => e.target.value && setLogDate(e.target.value)}
-								className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-[var(--text-primary)] text-sm"
-							/>
-						</label>
-						<button
-							type="button"
-							aria-label="Next day"
-							className="p-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--primary-yellow)] hover:bg-[rgba(255,255,255,0.05)]"
-							onClick={() => setLogDate((d) => manilaYmdPlusOneDay(d))}
-						>
-							<ChevronRight className="w-5 h-5" />
-						</button>
+							<button
+								type="button"
+								onClick={() => setLogDate(todayYmd)}
+								className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+									isToday
+										? 'bg-[rgba(249,197,19,0.18)] text-[var(--text-primary)] ring-1 ring-[rgba(249,197,19,0.35)]'
+										: 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--text-primary)]'
+								}`}
+							>
+								<Clock className="h-4 w-4" />
+								Today
+							</button>
+							<button
+								type="button"
+								onClick={() => setLogDate(manilaYmdMinusOneDay(todayYmd))}
+								className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+									logDate === manilaYmdMinusOneDay(todayYmd)
+										? 'bg-[rgba(249,197,19,0.18)] text-[var(--text-primary)] ring-1 ring-[rgba(249,197,19,0.35)]'
+										: 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--text-primary)]'
+								}`}
+							>
+								Yesterday
+							</button>
+						</div>
+						<div className="flex items-center gap-1.5">
+							<button
+								type="button"
+								aria-label="Previous day"
+								className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--primary-yellow)]"
+								onClick={() => setLogDate((d) => manilaYmdMinusOneDay(d))}
+							>
+								<ChevronLeft className="h-5 w-5" />
+							</button>
+							<div className="w-[min(100%,220px)]">
+								<DatePicker
+									date={parseYmdToManilaDate(logDate)}
+									onDateChange={(d) => d && setLogDate(formatManilaYmdFromDate(d))}
+									placeholder="Pick date"
+									className="!w-full min-w-[180px]"
+								/>
+							</div>
+							<button
+								type="button"
+								aria-label="Next day"
+								className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--primary-yellow)]"
+								onClick={() => setLogDate((d) => manilaYmdPlusOneDay(d))}
+							>
+								<ChevronRight className="h-5 w-5" />
+							</button>
+						</div>
 					</div>
 				</div>
 				<div className="flex flex-wrap items-center justify-end gap-2 text-sm">
 					<span className="text-[var(--text-secondary)]">Entries</span>
-					<span className="px-3 py-1 rounded-lg bg-[rgba(249,197,19,0.12)] text-[var(--primary-yellow)] font-semibold border border-[rgba(249,197,19,0.25)]">
+					<span className="rounded-lg border border-[rgba(249,197,19,0.25)] bg-[rgba(249,197,19,0.12)] px-3 py-1 font-semibold font-['Inter',sans-serif] tabular-nums text-[var(--primary-yellow)]">
 						{logsLoading ? '…' : totalCount}
 					</span>
-					<Button type="button" className="btn-primary gap-2" onClick={() => setNewModalOpen(true)}>
-						<UserPlus className="w-4 h-4" />
-						New walk-in
-					</Button>
-					<Button
+					<button
 						type="button"
-						variant="outline"
-						className="btn-secondary gap-2"
-						onClick={() => setReturningModalOpen(true)}
+						onClick={() => setNewModalOpen(true)}
+						className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-yellow)] px-4 py-2.5 text-sm font-semibold text-[#1a1a1a] shadow-md transition-transform hover:brightness-105 active:translate-y-px"
 					>
-						<Search className="w-4 h-4" />
+						<UserPlus className="h-4 w-4" />
+						New walk-in
+					</button>
+					<button
+						type="button"
+						onClick={() => setReturningModalOpen(true)}
+						className="inline-flex items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.05)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)]"
+					>
+						<Search className="h-4 w-4" />
 						Returning walk-in
-					</Button>
+					</button>
 				</div>
 			</div>
 
@@ -592,6 +692,7 @@ export function WalkInAttendancePage() {
 								<th className="px-4 py-3 font-medium">Time in</th>
 								<th className="px-4 py-3 font-medium">Payment</th>
 								<th className="px-4 py-3 font-medium">Name</th>
+								<th className="px-4 py-3 font-medium whitespace-nowrap">Age</th>
 								<th className="px-4 py-3 font-medium">Gender</th>
 								<th className="px-4 py-3 font-medium">Contact</th>
 								<th className="px-4 py-3 font-medium">Email</th>
@@ -602,13 +703,13 @@ export function WalkInAttendancePage() {
 						<tbody>
 							{logsLoading ? (
 								<tr>
-									<td colSpan={8} className="px-4 py-12 text-center text-[var(--text-secondary)]">
+									<td colSpan={9} className="px-4 py-12 text-center text-[var(--text-secondary)]">
 										<Loader2 className="w-8 h-8 animate-spin mx-auto" />
 									</td>
 								</tr>
 							) : logs.length === 0 ? (
 								<tr>
-									<td colSpan={8} className="px-4 py-10 text-center text-[var(--text-secondary)]">
+									<td colSpan={9} className="px-4 py-10 text-center text-[var(--text-secondary)]">
 										No time-ins for this date.
 									</td>
 								</tr>
@@ -621,11 +722,14 @@ export function WalkInAttendancePage() {
 										<td className="px-4 py-3 text-[var(--text-primary)] whitespace-nowrap">
 											{formatTimeManila(row.timedInAt)}
 										</td>
-										<td className="px-4 py-3 text-[var(--text-primary)] whitespace-nowrap tabular-nums">
+										<td className="px-4 py-3 whitespace-nowrap font-['Inter',sans-serif] text-[var(--text-primary)] tabular-nums">
 											₱{Number(row.payment ?? 0).toLocaleString()}
 										</td>
 										<td className="px-4 py-3 font-medium text-[var(--text-primary)]">
 											{formatWalkInName(row.walkInClient)}
+										</td>
+										<td className="px-4 py-3 whitespace-nowrap font-['Inter',sans-serif] tabular-nums text-[var(--text-secondary)]">
+											{row.walkInClient.ageYears != null ? row.walkInClient.ageYears : '—'}
 										</td>
 										<td className="px-4 py-3 text-[var(--text-secondary)]">
 											{genderLabel(row.walkInClient.gender)}
@@ -767,6 +871,7 @@ export function WalkInAttendancePage() {
 										<th className="px-4 py-3 font-medium">Date (Manila)</th>
 										<th className="px-4 py-3 font-medium">Time in</th>
 										<th className="px-4 py-3 font-medium">Payment</th>
+										<th className="px-4 py-3 font-medium whitespace-nowrap">Age</th>
 										<th className="px-4 py-3 font-medium">Contact</th>
 										<th className="px-4 py-3 font-medium">Email</th>
 										<th className="px-4 py-3 font-medium">Profile notes</th>
@@ -775,14 +880,14 @@ export function WalkInAttendancePage() {
 								<tbody>
 									{personHistoryLoading ? (
 										<tr>
-											<td colSpan={6} className="px-4 py-12 text-center">
+											<td colSpan={7} className="px-4 py-12 text-center">
 												<Loader2 className="w-8 h-8 animate-spin mx-auto text-[var(--text-secondary)]" />
 											</td>
 										</tr>
 									) : personHistoryLogs.length === 0 ? (
 										<tr>
 											<td
-												colSpan={6}
+												colSpan={7}
 												className="px-4 py-8 text-center text-[var(--text-secondary)]"
 											>
 												No time-in visits recorded yet for this person.
@@ -800,8 +905,11 @@ export function WalkInAttendancePage() {
 												<td className="px-4 py-3 text-[var(--text-primary)] whitespace-nowrap">
 													{formatTimeManila(row.timedInAt)}
 												</td>
-												<td className="px-4 py-3 text-[var(--text-primary)] whitespace-nowrap tabular-nums">
+												<td className="px-4 py-3 whitespace-nowrap font-['Inter',sans-serif] text-[var(--text-primary)] tabular-nums">
 													₱{Number(row.payment ?? 0).toLocaleString()}
+												</td>
+												<td className="px-4 py-3 whitespace-nowrap font-['Inter',sans-serif] tabular-nums text-[var(--text-secondary)]">
+													{row.walkInClient.ageYears != null ? row.walkInClient.ageYears : '—'}
 												</td>
 												<td className="px-4 py-3 text-[var(--text-secondary)]">
 													{row.walkInClient.phoneNumber ?? '—'}
@@ -886,6 +994,7 @@ export function WalkInAttendancePage() {
 								<th className="px-4 py-3 font-medium">Name</th>
 								<th className="px-4 py-3 font-medium">Contact</th>
 								<th className="px-4 py-3 font-medium">Email</th>
+								<th className="px-4 py-3 font-medium whitespace-nowrap">Age</th>
 								<th className="px-4 py-3 font-medium">Gender</th>
 								<th className="px-4 py-3 font-medium whitespace-nowrap">Time-ins</th>
 								<th className="px-4 py-3 font-medium w-[1%] whitespace-nowrap"> </th>
@@ -894,13 +1003,13 @@ export function WalkInAttendancePage() {
 						<tbody>
 							{accountsSectionLoading ? (
 								<tr>
-									<td colSpan={6} className="px-4 py-12 text-center text-[var(--text-secondary)]">
+									<td colSpan={7} className="px-4 py-12 text-center text-[var(--text-secondary)]">
 										<Loader2 className="w-8 h-8 animate-spin mx-auto" />
 									</td>
 								</tr>
 							) : accountRows.length === 0 ? (
 								<tr>
-									<td colSpan={6} className="px-4 py-10 text-center text-[var(--text-secondary)]">
+									<td colSpan={7} className="px-4 py-10 text-center text-[var(--text-secondary)]">
 										No walk-in profiles yet.
 									</td>
 								</tr>
@@ -919,10 +1028,13 @@ export function WalkInAttendancePage() {
 										<td className="px-4 py-3 text-[var(--text-secondary)] max-w-[180px] truncate">
 											{row.client.email ?? '—'}
 										</td>
+										<td className="px-4 py-3 whitespace-nowrap font-['Inter',sans-serif] text-[var(--text-secondary)] tabular-nums">
+											{row.client.ageYears != null ? row.client.ageYears : '—'}
+										</td>
 										<td className="px-4 py-3 text-[var(--text-secondary)]">
 											{genderLabel(row.client.gender)}
 										</td>
-										<td className="px-4 py-3 text-[var(--text-primary)] font-semibold tabular-nums">
+										<td className="px-4 py-3 font-semibold font-['Inter',sans-serif] text-[var(--text-primary)] tabular-nums">
 											{row.timeInCount == null ? '—' : row.timeInCount}
 										</td>
 										<td className="px-4 py-3 text-right">
@@ -983,7 +1095,7 @@ export function WalkInAttendancePage() {
 				open={newModalOpen}
 				onClose={() => setNewModalOpen(false)}
 				title="New walk-in"
-				subtitle="Add their details. You can save the profile only, or also record today's time-in."
+				subtitle="Add their details (including age). Guests under 18 need a guardian waiver on file. You can save the profile only, or also record today's time-in."
 			>
 				<form onSubmit={handleSubmitNew} className="space-y-4">
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1045,6 +1157,7 @@ export function WalkInAttendancePage() {
 								Gender <span className="text-red-400">*</span>
 							</label>
 							<select
+								aria-label="Gender"
 								value={gender}
 								onChange={(e) => setGender(e.target.value as WalkInGender)}
 								className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm"
@@ -1055,6 +1168,55 @@ export function WalkInAttendancePage() {
 								<option value={WalkInGender.PreferNotToSay}>Prefer not to say</option>
 							</select>
 						</div>
+						<div className="sm:col-span-2">
+							<label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+								Age (years) <span className="text-red-400">*</span>
+							</label>
+							<input
+								type="number"
+								aria-label="Age in whole years"
+								min={0}
+								max={120}
+								step={1}
+								required
+								value={ageYears}
+								onChange={(e) => setAgeYears(e.target.value)}
+								className="w-full max-w-[200px] rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 font-['Inter',sans-serif] text-sm tabular-nums text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(249,197,19,0.12)]"
+							/>
+						</div>
+						{showNewMinorBlock && (
+							<div className="sm:col-span-2 space-y-3 rounded-xl border border-[rgba(249,197,19,0.28)] bg-[rgba(249,197,19,0.07)] p-4">
+								<p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+									Guests under 18 cannot use the gym without a parent/guardian liability waiver on file.
+									Confirm below so the gym is not held responsible if an incident occurs during the
+									visit.
+								</p>
+								<div>
+									<label className="mb-1 block text-sm font-medium text-[var(--text-primary)]">
+										Parent / guardian full name <span className="text-red-400">*</span>
+									</label>
+									<input
+										aria-label="Parent or guardian full name"
+										value={minorGuardianName}
+										onChange={(e) => setMinorGuardianName(e.target.value)}
+										className="w-full rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(249,197,19,0.12)]"
+										placeholder="e.g. Maria Santos (mother)"
+									/>
+								</div>
+								<label className="flex cursor-pointer items-start gap-3">
+									<input
+										type="checkbox"
+										checked={minorWaiverAck}
+										onChange={(e) => setMinorWaiverAck(e.target.checked)}
+										className="mt-1 h-4 w-4 rounded border-[var(--card-border)]"
+									/>
+									<span className="text-sm text-[var(--text-primary)]">
+										I confirm the guardian has signed/read the waiver and accepts responsibility for
+										this minor while at X-Trim Fit Gym.
+									</span>
+								</label>
+							</div>
+						)}
 						<div className="sm:col-span-2">
 							<label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
 								Notes
@@ -1088,7 +1250,11 @@ export function WalkInAttendancePage() {
 						</div>
 					</label>
 
-					<Button type="submit" className="btn-primary w-full gap-2" disabled={creating}>
+					<Button
+						type="submit"
+						disabled={creating}
+						className="w-full gap-2 rounded-xl border-0 bg-[var(--primary-yellow)] py-3 font-semibold text-[#1a1a1a] shadow-md hover:brightness-105 disabled:opacity-50"
+					>
 						{creating ? (
 							<Loader2 className="w-4 h-4 animate-spin" />
 						) : (
@@ -1168,7 +1334,7 @@ export function WalkInAttendancePage() {
 					<div className="space-y-2">
 						<Button
 							type="button"
-							className="btn-primary w-full gap-2"
+							className="w-full gap-2 rounded-xl border-0 bg-[var(--primary-yellow)] py-3 font-semibold text-[#1a1a1a] shadow-md hover:brightness-105 disabled:opacity-50"
 							disabled={!selectedReturningId || timingIn}
 							onClick={handleTimeInReturning}
 						>
@@ -1216,7 +1382,7 @@ export function WalkInAttendancePage() {
 				open={editModalOpen}
 				onClose={() => setEditModalOpen(false)}
 				title="Edit walk-in profile"
-				subtitle="Update name, contact, gender, and notes. Past attendance rows stay linked to this profile."
+				subtitle="Update name, age, contact, gender, and notes. Past attendance rows stay linked to this profile."
 			>
 				<form onSubmit={handleSubmitEdit} className="space-y-4">
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1278,6 +1444,7 @@ export function WalkInAttendancePage() {
 								Gender <span className="text-red-400">*</span>
 							</label>
 							<select
+								aria-label="Gender"
 								value={editGender}
 								onChange={(e) => setEditGender(e.target.value as WalkInGender)}
 								className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm"
@@ -1288,6 +1455,53 @@ export function WalkInAttendancePage() {
 								<option value={WalkInGender.PreferNotToSay}>Prefer not to say</option>
 							</select>
 						</div>
+						<div className="sm:col-span-2">
+							<label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+								Age (years) <span className="text-red-400">*</span>
+							</label>
+							<input
+								type="number"
+								aria-label="Age in whole years"
+								min={0}
+								max={120}
+								step={1}
+								required
+								value={editAgeYears}
+								onChange={(e) => setEditAgeYears(e.target.value)}
+								className="w-full max-w-[200px] rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 font-['Inter',sans-serif] text-sm tabular-nums text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(249,197,19,0.12)]"
+							/>
+						</div>
+						{showEditMinorBlock && (
+							<div className="sm:col-span-2 space-y-3 rounded-xl border border-[rgba(249,197,19,0.28)] bg-[rgba(249,197,19,0.07)] p-4">
+								<p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+									Guests under 18 need a guardian liability waiver on file. Update the guardian name and
+									confirm acknowledgment before saving.
+								</p>
+								<div>
+									<label className="mb-1 block text-sm font-medium text-[var(--text-primary)]">
+										Parent / guardian full name <span className="text-red-400">*</span>
+									</label>
+									<input
+										aria-label="Parent or guardian full name"
+										value={editMinorGuardianName}
+										onChange={(e) => setEditMinorGuardianName(e.target.value)}
+										className="w-full rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(249,197,19,0.12)]"
+										placeholder="e.g. Maria Santos (mother)"
+									/>
+								</div>
+								<label className="flex cursor-pointer items-start gap-3">
+									<input
+										type="checkbox"
+										checked={editMinorWaiverAck}
+										onChange={(e) => setEditMinorWaiverAck(e.target.checked)}
+										className="mt-1 h-4 w-4 rounded border-[var(--card-border)]"
+									/>
+									<span className="text-sm text-[var(--text-primary)]">
+										I confirm the guardian waiver is on file and the information above is accurate.
+									</span>
+								</label>
+							</div>
+						)}
 						<div className="sm:col-span-2">
 							<label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
 								Notes
@@ -1302,7 +1516,11 @@ export function WalkInAttendancePage() {
 						</div>
 					</div>
 
-					<Button type="submit" className="btn-primary w-full gap-2" disabled={updatingWalkIn}>
+					<Button
+						type="submit"
+						disabled={updatingWalkIn}
+						className="w-full gap-2 rounded-xl border-0 bg-[var(--primary-yellow)] py-3 font-semibold text-[#1a1a1a] shadow-md hover:brightness-105 disabled:opacity-50"
+					>
 						{updatingWalkIn ? (
 							<Loader2 className="w-4 h-4 animate-spin" />
 						) : (

@@ -88,6 +88,8 @@ mutation UpdateMembershipTransactionDuration($input: UpdateMembershipTransaction
 		expiresAt
 		monthDuration
 		dayDuration
+		lastAdjustedReason
+		lastAdjustedAt
 		status
 		createdAt
 		updatedAt

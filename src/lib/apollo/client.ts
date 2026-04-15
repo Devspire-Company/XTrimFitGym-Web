@@ -1,34 +1,36 @@
 import { ApolloClient, InMemoryCache, createHttpLink, from, split } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
+import { RetryLink } from '@apollo/client/link/retry';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 import { getAuthBearerToken } from '@/lib/clerkTokenBridge';
 
-const getGraphQLUrl = (): string => {
-	// In production (e.g. Vercel), you MUST set VITE_GRAPHQL_URL to your deployed API URL + /graphql.
-	// Example: https://xtrimfitgym-api.onrender.com/graphql
+/** Resolved HTTP(S) GraphQL URL (same value passed to createHttpLink). */
+const resolvedGraphqlHttpUrl = (() => {
 	const url =
 		(import.meta.env.VITE_GRAPHQL_URL || '').trim() ||
 		(import.meta.env.DEV ? 'http://localhost:8000/graphql' : '');
-	if (import.meta.env.DEV) {
-		console.log(`[Apollo Client] GraphQL endpoint: ${url}`);
-	} else {
-		// In production, log once so you can verify in DevTools that the app points to your API
-		if (url) {
-			console.info(`[Apollo Client] GraphQL endpoint: ${url.replace(/\/graphql\/?$/, '/graphql')}`);
-		} else {
-			console.error(
-				'[Apollo Client] VITE_GRAPHQL_URL is not set. Login will fail. Set it in Vercel → Settings → Environment Variables to e.g. https://xtrimfitgym-api.onrender.com/graphql then redeploy.'
-			);
-		}
-	}
 	return url || (import.meta.env.DEV ? 'http://localhost:8000/graphql' : '');
-};
+})();
+
+if (import.meta.env.DEV) {
+	console.log(`[Apollo Client] GraphQL endpoint: ${resolvedGraphqlHttpUrl}`);
+} else if (resolvedGraphqlHttpUrl) {
+	console.info(
+		`[Apollo Client] GraphQL endpoint: ${resolvedGraphqlHttpUrl.replace(/\/graphql\/?$/, '/graphql')}`,
+	);
+} else {
+	console.error(
+		'[Apollo Client] VITE_GRAPHQL_URL is not set. Login will fail. Set it in Vercel → Settings → Environment Variables to e.g. https://xtrimfitgym-api.onrender.com/graphql then redeploy.',
+	);
+}
+
+const getGraphQLUrl = (): string => resolvedGraphqlHttpUrl;
 
 const httpLink = createHttpLink({
-	uri: getGraphQLUrl(),
+	uri: resolvedGraphqlHttpUrl,
 	fetchOptions: {
 		mode: 'cors',
 	},
@@ -92,6 +94,33 @@ const authLink = setContext(async (_, { headers }) => {
 	};
 });
 
+// Transient 502/503 from Render (cold start) often surface as "Failed to fetch" + misleading CORS in DevTools.
+// Retry queries only (not mutations) with backoff.
+const retryLink = new RetryLink({
+	delay: {
+		initial: 2000,
+		max: 20_000,
+		jitter: true,
+	},
+	attempts: {
+		max: 6,
+		retryIf: (error, operation) => {
+			const def = getMainDefinition(operation.query);
+			if (def.kind === 'OperationDefinition' && def.operation === 'mutation') {
+				return false;
+			}
+			if (!error) return false;
+			const status = (error as { statusCode?: number }).statusCode;
+			if (status === 502 || status === 503 || status === 504) return true;
+			const msg = String((error as Error).message || '');
+			if (msg.includes('Failed to fetch') || msg.includes('Load failed') || msg.includes('NetworkError')) {
+				return true;
+			}
+			return false;
+		},
+	},
+});
+
 const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
 	if (graphQLErrors) {
 		graphQLErrors.forEach(({ message, locations, path }) => {
@@ -135,15 +164,24 @@ const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
 
 		// Only log real network errors for non-analytics queries
 		if (isRealNetworkError) {
-			const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL;
+			const endpoint = resolvedGraphqlHttpUrl || '(not configured)';
+			const status = (networkError as { statusCode?: number }).statusCode;
 			console.error(`[Network error]: ${networkError}`);
-			console.error(`Failed to connect to GraphQL endpoint: ${graphqlUrl}`);
-			console.error('Possible causes:');
-			console.error('1. Backend server is not running (check XTrimFitGym-Api)');
-			console.error('2. GraphQL endpoint URL is incorrect');
-			console.error('3. CORS configuration issue');
-			console.error(`4. Check if ${graphqlUrl} is accessible`);
-			console.error('5. Make sure the backend server is running on port 8000');
+			console.error(`Failed to reach GraphQL endpoint: ${endpoint}`);
+			if (status === 502 || status === 503 || status === 504) {
+				console.error(
+					'HTTP 502/503/504: the API gateway could not reach your app. On Render Free, the instance may be waking up — wait ~60s and retry, or open Render → XTrimFitGym-Api → Logs / Restart.',
+				);
+			}
+			console.error('Other checks:');
+			console.error('1. Render (or local) API is running and latest deploy succeeded');
+			console.error('2. VITE_GRAPHQL_URL points to …/graphql for this environment');
+			console.error(
+				'3. If the console also shows a CORS error alongside 502, the CORS message is usually a side effect of the failed response — fix the 502 first.',
+			);
+			if (import.meta.env.DEV && endpoint.includes('localhost')) {
+				console.error('4. Local dev: start the API (e.g. npm run dev in XTrimFitGym-Api) so it listens on the same port as in VITE_GRAPHQL_URL (default 8000).');
+			}
 		}
 	}
 });
@@ -156,7 +194,7 @@ const splitLink = split(
 		return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';
 	},
 	wsLink,
-	from([errorLink, authLink, httpLink])
+	from([errorLink, authLink, retryLink, httpLink])
 );
 
 export const apolloClient = new ApolloClient({
