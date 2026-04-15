@@ -137,8 +137,23 @@ export function MembersPage() {
 		skip: !data, // Skip if initial data not loaded
 	});
 
-	// Use subscription data if available, otherwise fall back to query data
-	const membersData = subscriptionData?.usersUpdated || data?.getUsers || [];
+	// Merge subscription payload into the last query result so rows don't disappear
+	// if the websocket sends a partial usersUpdated list.
+	const membersData = useMemo(() => {
+		const queriedMembers = (data?.getUsers || []) as any[];
+		const subscribedMembers = (subscriptionData?.usersUpdated || []) as any[];
+		if (subscribedMembers.length === 0) return queriedMembers;
+
+		const mergedById = new Map<string, any>();
+		queriedMembers.forEach((member) => {
+			mergedById.set(member.id, member);
+		});
+		subscribedMembers.forEach((member) => {
+			const previous = mergedById.get(member.id) || {};
+			mergedById.set(member.id, { ...previous, ...member });
+		});
+		return Array.from(mergedById.values());
+	}, [data?.getUsers, subscriptionData?.usersUpdated]);
 
 	const [disableUserMutation] = useMutation(DISABLE_USER, {
 		onCompleted: () => {
