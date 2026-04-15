@@ -1,29 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Check, X as XIcon, Clock, CheckCircle2, XCircle, Search } from 'lucide-react';
-import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
-import { SuccessModal } from '@/components/modals/SuccessModal';
-import {
-	GET_ALL_SUBSCRIPTION_REQUESTS,
-	APPROVE_SUBSCRIPTION_REQUEST,
-	DELETE_SUBSCRIPTION_REQUEST,
-} from '@/graphql/operations/index';
+import { X as XIcon, Clock, CheckCircle2, XCircle, Search } from 'lucide-react';
+import { GET_ALL_SUBSCRIPTION_REQUESTS } from '@/graphql/operations/index';
 import type { GetAllSubscriptionRequestsQuery } from '@/graphql/generated/types';
-import { useAppDispatch } from '@/store/hooks';
-import { addToast } from '@/store/slices/uiSlice';
 
 export function SubscriptionRequestsPage() {
 	useEffect(() => {
 		document.title = 'Subscription Requests - X-TRIM FIT GYM';
 	}, []);
 
-	const dispatch = useAppDispatch();
 	type SubscriptionRequestItem = GetAllSubscriptionRequestsQuery['getAllSubscriptionRequests'][number];
-	const [selectedRequest, setSelectedRequest] = useState<SubscriptionRequestItem | null>(null);
-	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-	const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-	const [successMessage, setSuccessMessage] = useState('');
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -33,74 +20,43 @@ export function SubscriptionRequestsPage() {
 		fetchPolicy: 'cache-and-network',
 	});
 
-	const [approveRequest, { loading: approving }] = useMutation(APPROVE_SUBSCRIPTION_REQUEST, {
-		onCompleted: () => {
-			setSuccessMessage('Subscription request approved successfully!');
-			setIsSuccessModalOpen(true);
-			refetch();
-			dispatch(addToast({ type: 'success', message: 'Subscription request approved!' }));
-		},
-		onError: (error) => {
-			dispatch(addToast({ type: 'error', message: error.message }));
-		},
-	});
-
-	const [deleteRequest, { loading: deleting }] = useMutation(DELETE_SUBSCRIPTION_REQUEST, {
-		onCompleted: () => {
-			setSuccessMessage('Subscription request dismissed successfully!');
-			setIsSuccessModalOpen(true);
-			setIsDeleteModalOpen(false);
-			setSelectedRequest(null);
-			refetch();
-			dispatch(addToast({ type: 'success', message: 'Subscription request dismissed!' }));
-		},
-		onError: (error) => {
-			dispatch(addToast({ type: 'error', message: error.message }));
-		},
-	});
-
-	const handleApprove = (request: SubscriptionRequestItem) => {
-		approveRequest({
-			variables: {
-				input: {
-					requestId: request.id,
-				},
-			},
-		});
-	};
-
-	const handleDelete = (request: SubscriptionRequestItem) => {
-		setSelectedRequest(request);
-		setIsDeleteModalOpen(true);
-	};
-
-	const handleConfirmDelete = () => {
-		if (selectedRequest) {
-			deleteRequest({
-				variables: {
-					id: selectedRequest.id,
-				},
-			});
-		}
-	};
-
 	// Process data - must be before conditional returns to follow Rules of Hooks
 	const requests: SubscriptionRequestItem[] = data?.getAllSubscriptionRequests || [];
+	const normalizeText = (value: string | null | undefined) =>
+		(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+	const activeRequests = useMemo(
+		() =>
+			requests.filter((request) => {
+				const member = request.member;
+				if (!member) return false;
+				const searchableIdentity = normalizeText(
+					`${member.firstName || ''} ${member.lastName || ''} ${member.email || ''}`
+				);
+				return searchableIdentity.length > 0;
+			}),
+		[requests]
+	);
 
 	// Filter requests based on search term and status
 	const filteredRequests = useMemo(() => {
-		const filtered = requests.filter((request) => {
+		const normalizedSearch = normalizeText(searchTerm);
+		const normalizedStatus = normalizeText(statusFilter);
+		const filtered = activeRequests.filter((request) => {
 			// Search filter - search in member name, email, and plan name
-			const matchesSearch =
-				!searchTerm ||
+			const memberName = normalizeText(
 				`${request.member?.firstName || ''} ${request.member?.lastName || ''}`
-					.toLowerCase()
-					.includes(searchTerm.toLowerCase()) ||
-				request.member?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				request.membership?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+			);
+			const memberEmail = normalizeText(request.member?.email);
+			const planName = normalizeText(request.membership?.name);
+			const matchesSearch =
+				!normalizedSearch ||
+				memberName.includes(normalizedSearch) ||
+				memberEmail.includes(normalizedSearch) ||
+				planName.includes(normalizedSearch);
 
 			// Status filter
-			const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
+			const requestStatus = normalizeText(request.status);
+			const matchesStatus = normalizedStatus === 'all' || requestStatus === normalizedStatus;
 
 			return matchesSearch && matchesStatus;
 		});
@@ -112,12 +68,11 @@ export function SubscriptionRequestsPage() {
 		};
 
 		return [...filtered].sort((a, b) => ts(b) - ts(a));
-	}, [requests, searchTerm, statusFilter]);
+	}, [activeRequests, searchTerm, statusFilter]);
 
 	// Group filtered requests by status for statistics
 	const pendingRequests = filteredRequests.filter((r) => r.status === 'PENDING');
 	const approvedRequests = filteredRequests.filter((r) => r.status === 'APPROVED');
-	const rejectedRequests = filteredRequests.filter((r) => r.status === 'REJECTED');
 
 	// Show loading state
 	if (loading) {
@@ -225,7 +180,7 @@ export function SubscriptionRequestsPage() {
 						Subscription Requests
 					</h1>
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
-						Manage all subscription requests from members ({filteredRequests.length} of {requests.length} shown)
+						Manage all subscription requests from members ({filteredRequests.length} of {activeRequests.length} shown)
 					</p>
 				</div>
 			</div>
@@ -277,7 +232,7 @@ export function SubscriptionRequestsPage() {
 			</div>
 
 			{/* Statistics Cards */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 				<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
 					<div className="flex items-center justify-between">
 						<div>
@@ -294,15 +249,6 @@ export function SubscriptionRequestsPage() {
 							<p className="text-2xl font-bold text-[var(--text-primary)]">{approvedRequests.length}</p>
 						</div>
 						<CheckCircle2 className="w-8 h-8 text-[#10B981]" />
-					</div>
-				</div>
-				<div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
-					<div className="flex items-center justify-between">
-						<div>
-							<p className="text-sm text-[var(--text-secondary)] mb-1">Rejected</p>
-							<p className="text-2xl font-bold text-[var(--text-primary)]">{rejectedRequests.length}</p>
-						</div>
-						<XCircle className="w-8 h-8 text-[#EF4444]" />
 					</div>
 				</div>
 			</div>
@@ -328,17 +274,14 @@ export function SubscriptionRequestsPage() {
 								<th className="px-6 py-4 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
 									Processed By
 								</th>
-								<th className="px-6 py-4 text-right text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-									Actions
-								</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-[rgba(255,255,255,0.08)]">
 							{filteredRequests.length === 0 ? (
 								<tr>
-									<td colSpan={6} className="px-6 py-12 text-center">
+									<td colSpan={5} className="px-6 py-12 text-center">
 										<p className="text-[var(--text-secondary)]">
-											{requests.length === 0
+											{activeRequests.length === 0
 												? 'No subscription requests found'
 												: 'No subscription requests match your search criteria'}
 										</p>
@@ -393,43 +336,6 @@ export function SubscriptionRequestsPage() {
 												<p className="text-sm text-[var(--text-secondary)]">-</p>
 											)}
 										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-right">
-											{request.status === 'PENDING' ? (
-												<div className="flex items-center justify-end gap-2">
-													<Button
-														onClick={() => handleApprove(request)}
-														disabled={approving || deleting}
-														className="btn-small btn-success"
-													>
-														<Check className="w-4 h-4" />
-														Approve
-													</Button>
-													<Button
-														onClick={() => handleDelete(request)}
-														disabled={approving || deleting}
-														className="btn-small btn-danger"
-														title="Dismiss request"
-													>
-														<XCircle className="w-4 h-4" />
-														Dismiss
-													</Button>
-												</div>
-											) : request.status === 'REJECTED' ? (
-												<div className="flex items-center justify-end gap-2">
-													<Button
-														onClick={() => handleDelete(request)}
-														disabled={deleting}
-														className="btn-small btn-danger"
-														title="Dismiss request"
-													>
-														<XCircle className="w-4 h-4" />
-														Dismiss
-													</Button>
-												</div>
-											) : (
-												<p className="text-sm text-[var(--text-secondary)]">-</p>
-											)}
-										</td>
 									</tr>
 									);
 								})
@@ -438,28 +344,6 @@ export function SubscriptionRequestsPage() {
 					</table>
 				</div>
 			</div>
-
-			{/* Modals */}
-			<DeleteConfirmModal
-				isOpen={isDeleteModalOpen}
-				onClose={() => {
-					setIsDeleteModalOpen(false);
-					setSelectedRequest(null);
-				}}
-				onConfirm={handleConfirmDelete}
-				title="Dismiss Subscription Request?"
-				message={`Are you sure you want to dismiss the subscription request from ${selectedRequest?.member?.firstName} ${selectedRequest?.member?.lastName} for the ${selectedRequest?.membership?.name} plan?`}
-				isDeleting={deleting}
-				confirmLabel="Dismiss"
-				confirmingLabel="Dismissing..."
-			/>
-
-			<SuccessModal
-				isOpen={isSuccessModalOpen}
-				onClose={() => setIsSuccessModalOpen(false)}
-				title="Success!"
-				message={successMessage}
-			/>
 		</div>
 	);
 }
