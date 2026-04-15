@@ -120,7 +120,7 @@ export function MembersPage() {
 	const closeMemberActionsMenu = () => setOpenDropdownId(null);
 
 	const memberMenuItemClass =
-		'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] outline-none transition-colors hover:bg-[rgba(255,255,255,0.08)] focus-visible:bg-[rgba(255,255,255,0.08)] focus-visible:ring-2 focus-visible:ring-[rgba(249,197,19,0.35)] disabled:pointer-events-none disabled:opacity-45';
+		'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] outline-none transition-colors focus-visible:bg-[rgba(255,255,255,0.08)] focus-visible:ring-2 focus-visible:ring-[rgba(249,197,19,0.35)] disabled:pointer-events-none disabled:opacity-45';
 
 	// Initial data fetch with query
 	const { data, loading, error } = useQuery(GET_USERS, {
@@ -769,10 +769,10 @@ export function MembersPage() {
 								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
 									Contact
 								</th>
-								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+								<th className="px-4 py-5 text-center text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
 									Membership
 								</th>
-								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+								<th className="px-4 py-5 text-center text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
 									Status
 								</th>
 								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
@@ -781,7 +781,7 @@ export function MembersPage() {
 								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
 									Expires
 								</th>
-								<th className="px-4 py-5 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+								<th className="px-4 py-5 text-center text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
 									Actions
 								</th>
 							</tr>
@@ -797,10 +797,10 @@ export function MembersPage() {
 								filteredMembers.map((member) => (
 									<tr
 										key={member.id}
-										className={`members-table tbody tr transition-colors ${
+										className={`members-table tbody tr ${
 											member.status === 'Disabled'
-												? 'bg-[rgba(239,68,68,0.08)] opacity-[0.68] hover:opacity-[0.82]'
-												: 'hover:bg-[rgba(255,255,255,0.02)]'
+												? 'bg-[rgba(148,163,184,0.14)] opacity-60'
+												: ''
 										}`}
 									>
 										<td className="px-4 py-5">
@@ -822,28 +822,30 @@ export function MembersPage() {
 												<div className="text-[var(--text-secondary)]">{member.phone}</div>
 											</div>
 										</td>
-										<td className="px-4 py-5">
+										<td className="px-4 py-5 text-center">
 											<span
-												className={`membership-badge px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
+												className={`membership-badge inline-flex min-w-[110px] items-center justify-center px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
 													member.membership === 'Student'
-														? 'student bg-[rgba(106,123,148,0.2)] text-[var(--primary-gray)] border border-[rgba(106,123,148,0.3)]'
+														? 'student bg-[rgba(59,130,246,0.14)] text-[#93C5FD] border border-[rgba(59,130,246,0.3)]'
 														: member.membership === 'PROMO Student'
-															? 'promo-student bg-gradient-to-br from-[rgba(249,197,19,0.2)] to-[rgba(228,30,38,0.2)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]'
-															: 'non-student bg-gradient-to-br from-[rgba(139,69,19,0.2)] to-[rgba(160,82,45,0.2)] text-[#D2691E] border border-[rgba(160,82,45,0.3)]'
+															? 'promo-student bg-[rgba(139,92,246,0.14)] text-[#C4B5FD] border border-[rgba(139,92,246,0.3)]'
+															: member.membership === 'No Plan'
+																? 'bg-[rgba(148,163,184,0.14)] text-[#CBD5E1] border border-[rgba(148,163,184,0.3)]'
+																: 'non-student bg-[rgba(20,184,166,0.14)] text-[#99F6E4] border border-[rgba(20,184,166,0.3)]'
 												}`}
 											>
 												{member.membership}
 											</span>
 										</td>
-										<td className="px-4 py-5">
+										<td className="px-4 py-5 text-center">
 											<span
-												className={`status-badge px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
+												className={`status-badge inline-flex min-w-[90px] items-center justify-center px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
 													member.status === 'Active'
 														? 'active bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
 															: member.status === 'Inactive'
 															? 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
 																: member.status === 'Pending'
-																	? 'bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]'
+																	? 'bg-[rgba(59,130,246,0.15)] text-[#93C5FD] border border-[rgba(59,130,246,0.3)]'
 															: 'suspended bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]'
 												}`}
 											>
@@ -882,7 +884,7 @@ export function MembersPage() {
 												<span className="text-[var(--text-secondary)]">—</span>
 											)}
 										</td>
-										<td className="px-4 py-5">
+										<td className="px-4 py-5 text-center">
 											<Popover
 												open={openDropdownId === member.id}
 												onOpenChange={(open) =>
@@ -892,7 +894,12 @@ export function MembersPage() {
 												<PopoverTrigger asChild>
 													<button
 														type="button"
-														className="btn-small inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] border border-[var(--card-border)] hover:bg-[rgba(255,255,255,0.1)] transition-colors data-[state=open]:border-[var(--primary-yellow)] data-[state=open]:ring-2 data-[state=open]:ring-[rgba(249,197,19,0.2)]"
+														disabled={member.status === 'Disabled'}
+														className={`btn-small inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] border border-[var(--card-border)] transition-colors data-[state=open]:border-[var(--primary-yellow)] data-[state=open]:ring-2 data-[state=open]:ring-[rgba(249,197,19,0.2)] ${
+															member.status === 'Disabled'
+																? 'cursor-not-allowed opacity-45 pointer-events-none'
+																: ''
+														}`}
 														title="Member actions"
 														aria-label={`Open actions for ${member.name}`}
 													>
@@ -1022,7 +1029,7 @@ export function MembersPage() {
 															<button
 																type="button"
 																role="menuitem"
-																className={`${memberMenuItemClass} hover:bg-[rgba(239,68,68,0.12)] focus-visible:ring-[rgba(239,68,68,0.35)]`}
+																className={`${memberMenuItemClass} focus-visible:ring-[rgba(239,68,68,0.35)]`}
 																onClick={() => {
 																	handleDelete(member);
 																	closeMemberActionsMenu();
@@ -1235,7 +1242,7 @@ export function MembersPage() {
 								</button>
 								<button
 									type="button"
-									className="btn-primary flex-1 rounded-xl px-4 py-3 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+									className="flex-1 rounded-xl border border-[#DC2626] bg-[#DC2626] px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
 									onClick={confirmUnsubscribe}
 									disabled={isUnsubscribing}
 								>
