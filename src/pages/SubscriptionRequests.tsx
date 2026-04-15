@@ -211,7 +211,6 @@ export function SubscriptionRequestsPage() {
 							<option value="all">All Status</option>
 							<option value="PENDING">Pending</option>
 							<option value="APPROVED">Approved</option>
-							<option value="REJECTED">Rejected</option>
 						</select>
 					</div>
 

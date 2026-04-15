@@ -588,14 +588,14 @@ export function EquipmentPage() {
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
-					<div className="inline-flex rounded-lg border border-[var(--card-border)] overflow-hidden">
+					<div className="inline-flex items-center rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-1">
 						<button
 							type="button"
 							onClick={() => setViewTab('CURRENT')}
-							className={`px-3 py-2 text-xs font-semibold ${
+							className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
 								viewTab === 'CURRENT'
-									? 'bg-[var(--primary-yellow)] text-black'
-									: 'bg-[var(--card-bg)] text-[var(--text-primary)]'
+									? 'bg-[rgba(249,197,19,0.2)] text-[var(--primary-yellow)]'
+									: 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
 							}`}
 						>
 							Current
@@ -603,10 +603,10 @@ export function EquipmentPage() {
 						<button
 							type="button"
 							onClick={() => setViewTab('ARCHIVED')}
-							className={`px-3 py-2 text-xs font-semibold ${
+							className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
 								viewTab === 'ARCHIVED'
-									? 'bg-[var(--primary-yellow)] text-black'
-									: 'bg-[var(--card-bg)] text-[var(--text-primary)]'
+									? 'bg-[rgba(249,197,19,0.2)] text-[var(--primary-yellow)]'
+									: 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
 							}`}
 						>
 							Archived
@@ -633,9 +633,6 @@ export function EquipmentPage() {
 					</Button>
 				</div>
 			</div>
-			<p className="text-xs text-[var(--text-secondary)]">
-				Current = non-archived equipment. Condition filter controls availability state.
-			</p>
 
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 				{visibleList.map((item) => (
@@ -704,7 +701,7 @@ export function EquipmentPage() {
 										type="button"
 										onClick={() => handleRestore(item)}
 										disabled={restoring}
-										className="btn-small flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)] flex items-center justify-center gap-2 disabled:opacity-60"
+										className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.14)] px-4 text-sm font-semibold text-[#34D399] transition hover:bg-[rgba(16,185,129,0.2)] disabled:opacity-60"
 									>
 										<RotateCcw className="w-4 h-4" />
 										{restoring ? 'Restoring...' : 'Restore'}
@@ -714,7 +711,7 @@ export function EquipmentPage() {
 										<button
 											type="button"
 											onClick={() => handleEdit(item)}
-											className="btn-small btn-edit flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)] flex items-center justify-center gap-2"
+											className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(249,197,19,0.35)] bg-[rgba(249,197,19,0.14)] px-4 text-sm font-semibold text-[var(--primary-yellow)] transition hover:bg-[rgba(249,197,19,0.22)]"
 										>
 											<Edit className="w-4 h-4" />
 											Edit
@@ -722,7 +719,7 @@ export function EquipmentPage() {
 										<button
 											type="button"
 											onClick={() => handleDelete(item)}
-											className="btn-small btn-delete flex-1 px-4 py-2 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] flex items-center justify-center gap-2"
+											className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.14)] px-4 text-sm font-semibold text-[#F87171] transition hover:bg-[rgba(239,68,68,0.22)]"
 										>
 											<Archive className="w-4 h-4" />
 											Archive
