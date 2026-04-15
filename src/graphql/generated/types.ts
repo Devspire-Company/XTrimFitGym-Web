@@ -1797,6 +1797,7 @@ export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: st
 
 export type GetUsersQueryVariables = Exact<{
   role?: InputMaybe<RoleType>;
+  includeDisabled?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 

@@ -124,7 +124,7 @@ export function MembersPage() {
 
 	// Initial data fetch with query
 	const { data, loading, error } = useQuery(GET_USERS, {
-		variables: { role: RoleType.Member },
+		variables: { role: RoleType.Member, includeDisabled: true },
 		errorPolicy: 'none',
 	});
 	const { data: pendingData } = useQuery(GET_PENDING_SUBSCRIPTION_REQUESTS, {
@@ -156,6 +156,7 @@ export function MembersPage() {
 	}, [data?.getUsers, subscriptionData?.usersUpdated]);
 
 	const [disableUserMutation] = useMutation(DISABLE_USER, {
+		refetchQueries: [{ query: GET_USERS, variables: { role: RoleType.Member, includeDisabled: true } }],
 		onCompleted: () => {
 			dispatch(
 				addToast({
@@ -175,6 +176,7 @@ export function MembersPage() {
 		},
 	});
 	const [enableUserMutation] = useMutation(ENABLE_USER, {
+		refetchQueries: [{ query: GET_USERS, variables: { role: RoleType.Member, includeDisabled: true } }],
 		onCompleted: () => {
 			dispatch(addToast({ type: 'success', message: 'Member enabled successfully' }));
 		},

@@ -12,8 +12,8 @@ query Me {
 	}
 }
 
-query GetUsers($role: RoleType) {
-	getUsers(role: $role) {
+query GetUsers($role: RoleType, $includeDisabled: Boolean) {
+	getUsers(role: $role, includeDisabled: $includeDisabled) {
 		id
 		firstName
 		middleName
