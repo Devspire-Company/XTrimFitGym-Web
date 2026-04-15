@@ -1181,40 +1181,38 @@ export function MembersPage() {
 				>
 					<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
 						<div className="modal-body">
-							<div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-								<div
-									className="modal-error-icon-large"
-									style={{
-										background: 'linear-gradient(135deg, #EF4444, #DC2626)',
-									}}
-								>
-									<X size={48} style={{ color: 'white' }} />
-								</div>
+							<div className="mb-4 rounded-xl border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.14)] px-4 py-3">
+								<p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#FCA5A5]">
+									Destructive action
+								</p>
+								<p className="mt-1 text-sm font-medium text-[#FEE2E2]">
+									This will cancel the member's active subscription.
+								</p>
 							</div>
 
-							<h2 className="modal-title" style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-								Unsubscribe Member?
-							</h2>
+							<h2 className="modal-title mb-2 text-left">Unsubscribe member</h2>
 
-							<p className="modal-text" style={{ textAlign: 'center', marginBottom: '2rem' }}>
-								Are you sure you want to unsubscribe <strong>{memberToUnsubscribe.name}</strong>?
-								This action will cancel their current membership subscription.
+							<p className="modal-text mb-5 text-left">
+								Confirm unsubscribe for <strong>{memberToUnsubscribe.name}</strong>. They will be marked as
+								inactive until subscribed again.
 							</p>
-							<div className="mb-4">
-								<label className="block text-sm text-[var(--text-secondary)] mb-2">Reason</label>
+							<div className="mb-5">
+								<label className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
+									Reason
+								</label>
 								<input
 									type="text"
 									value={unsubscribeReason}
 									onChange={(e) => setUnsubscribeReason(e.target.value)}
 									placeholder="Required reason"
-									className="w-full px-3 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-primary)]"
+									className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2.5 text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.15)]"
 								/>
+								<p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+									This note is required for audit trail.
+								</p>
 							</div>
 
-							<div
-								className="modal-actions"
-								style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}
-							>
+							<div className="modal-actions mt-6 flex gap-3">
 								<button
 									type="button"
 									className="btn-secondary"
@@ -1223,55 +1221,18 @@ export function MembersPage() {
 										setMemberToUnsubscribe(null);
 										setUnsubscribeReason('');
 									}}
-									style={{
-										flex: 1,
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'center',
-										gap: '0.5rem',
-										padding: '0.75rem 1.5rem',
-										borderRadius: '0.75rem',
-										fontWeight: '600',
-										transition: 'all 0.2s',
-										cursor: 'pointer',
-									}}
+									disabled={isUnsubscribing}
+									className="btn-secondary flex-1 rounded-xl px-4 py-3 font-semibold disabled:opacity-60"
 								>
-									<X className="w-4 h-4" />
 									Cancel
 								</button>
 								<button
 									type="button"
-									className="btn-primary"
+									className="btn-primary flex-1 rounded-xl px-4 py-3 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
 									onClick={confirmUnsubscribe}
 									disabled={isUnsubscribing}
-									style={{
-										flex: 1,
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'center',
-										gap: '0.5rem',
-										padding: '0.75rem 1.5rem',
-										borderRadius: '0.75rem',
-										fontWeight: '600',
-										transition: 'all 0.2s',
-										cursor: isUnsubscribing ? 'not-allowed' : 'pointer',
-										opacity: isUnsubscribing ? 0.6 : 1,
-										background: 'linear-gradient(135deg, #EF4444, #DC2626)',
-										color: 'white',
-										border: 'none',
-									}}
 								>
-									{isUnsubscribing ? (
-										<>
-											<Loader2 className="w-4 h-4 animate-spin" />
-											Processing...
-										</>
-									) : (
-										<>
-											<X className="w-4 h-4" />
-											Unsubscribe
-										</>
-									)}
+									{isUnsubscribing ? 'Processing...' : 'Unsubscribe'}
 								</button>
 							</div>
 						</div>
