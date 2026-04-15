@@ -39,6 +39,7 @@ import autoTable from 'jspdf-autotable';
 import { useAppSelector } from '@/store/hooks';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { collectAnalyticsExportSections } from '@/pages/reportsAnalyticsExport';
+import { readRemovedMembershipLogs, type RemovedMembershipLog } from '@/lib/membershipRemovalLogs';
 
 type LocalExportLog = {
 	id: string;
@@ -211,6 +212,9 @@ export function ReportsPage() {
 	const [auditApiSupported, setAuditApiSupported] = useState(true);
 	const [downloadablesOpen, setDownloadablesOpen] = useState(false);
 	const [localExportLogs, setLocalExportLogs] = useState<LocalExportLog[]>([]);
+	const [removedMembershipPlans] = useState<RemovedMembershipLog[]>(() =>
+		typeof window === 'undefined' ? [] : readRemovedMembershipLogs()
+	);
 
 	useEffect(() => {
 		try {
@@ -660,6 +664,7 @@ export function ReportsPage() {
 		expiredSubscriptions,
 		avgRevenuePerMember,
 		subscriptionRetentionRate,
+		removedMembershipPlans,
 	});
 
 	const exportAnalyticsPdf = async () => {

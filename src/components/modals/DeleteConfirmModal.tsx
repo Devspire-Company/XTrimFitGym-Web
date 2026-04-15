@@ -9,6 +9,12 @@ interface DeleteConfirmModalProps {
 	isDeleting?: boolean;
 	confirmLabel?: string;
 	confirmingLabel?: string;
+	requireReason?: boolean;
+	reasonValue?: string;
+	onReasonChange?: (value: string) => void;
+	reasonLabel?: string;
+	reasonPlaceholder?: string;
+	reasonError?: string;
 }
 
 export function DeleteConfirmModal({
@@ -20,8 +26,15 @@ export function DeleteConfirmModal({
 	isDeleting = false,
 	confirmLabel = 'Confirm',
 	confirmingLabel = 'Processing...',
+	requireReason = false,
+	reasonValue = '',
+	onReasonChange,
+	reasonLabel = 'Reason',
+	reasonPlaceholder = 'Type your reason here...',
+	reasonError,
 }: DeleteConfirmModalProps) {
 	if (!isOpen) return null;
+	const reasonIsValid = reasonValue.trim().length > 0;
 
 	return (
 		<div className={`modal-overlay ${isOpen ? 'active' : ''}`} onClick={onClose}>
@@ -32,6 +45,26 @@ export function DeleteConfirmModal({
 					</div>
 					<h2 className="modal-delete-title">{title}</h2>
 					<p className="modal-delete-text">{message}</p>
+					{requireReason && (
+						<div className="mb-5 text-left">
+							<label className="mb-2 block text-sm font-semibold text-[var(--text-primary)]">
+								{reasonLabel} <span className="text-[#EF4444]">*</span>
+							</label>
+							<textarea
+								value={reasonValue}
+								onChange={(e) => onReasonChange?.(e.target.value)}
+								placeholder={reasonPlaceholder}
+								className="w-full min-h-[88px] rounded-xl border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.03)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--primary-yellow)] focus:ring-2 focus:ring-[rgba(249,197,19,0.2)]"
+							/>
+							{reasonError ? (
+								<p className="mt-2 text-xs font-medium text-[#F87171]">{reasonError}</p>
+							) : (
+								<p className="mt-2 text-xs text-[var(--text-secondary)]">
+									Reason will be saved in report exports.
+								</p>
+							)}
+						</div>
+					)}
 					<div className="modal-delete-actions">
 						<button
 							type="button"
@@ -79,7 +112,7 @@ export function DeleteConfirmModal({
 							type="button"
 							className="btn-danger"
 							onClick={onConfirm}
-							disabled={isDeleting}
+							disabled={isDeleting || (requireReason && !reasonIsValid)}
 						>
 							{isDeleting ? confirmingLabel : confirmLabel}
 						</button>

@@ -24,6 +24,14 @@ export type AnalyticsExportContext = {
 	expiredSubscriptions: number;
 	avgRevenuePerMember: number;
 	subscriptionRetentionRate: string;
+	removedMembershipPlans?: Array<{
+		planName: string;
+		planPrice: number;
+		planDurationType: string;
+		reason: string;
+		removedAt: string;
+		removedBy: string;
+	}>;
 };
 
 function formatDate(dateString: string | null | undefined): string {
@@ -57,6 +65,21 @@ function calculateAge(dob: string | null | undefined): string {
 	}
 }
 
+function formatDurationLabel(durationType: string | null | undefined): string {
+	switch ((durationType || '').toUpperCase()) {
+		case 'MONTHLY':
+			return 'month';
+		case 'QUARTERLY':
+			return 'quarter';
+		case 'YEARLY':
+			return 'year';
+		case 'DAILY':
+			return 'day pass';
+		default:
+			return durationType || 'N/A';
+	}
+}
+
 export function collectAnalyticsExportSections(ctx: AnalyticsExportContext): AnalyticsExportSection[] {
 	const {
 		data,
@@ -76,6 +99,7 @@ export function collectAnalyticsExportSections(ctx: AnalyticsExportContext): Ana
 		expiredSubscriptions,
 		avgRevenuePerMember,
 		subscriptionRetentionRate,
+		removedMembershipPlans = [],
 	} = ctx;
 
 	const sections: AnalyticsExportSection[] = [];
@@ -667,6 +691,22 @@ export function collectAnalyticsExportSections(ctx: AnalyticsExportContext): Ana
 				`From ${formatDate(dailyRange[0]?.date || new Date().toISOString())} to ${formatDate(lastDaily || new Date().toISOString())}`,
 			],
 		],
+	});
+
+	sections.push({
+		title: 'REMOVED MEMBERSHIP PLANS',
+		head: ['Removed At', 'Plan Name', 'Price', 'Duration', 'Reason', 'Removed By'],
+		rows:
+			removedMembershipPlans.length > 0
+				? removedMembershipPlans.map((item) => [
+						formatDate(item.removedAt),
+						item.planName || 'N/A',
+						`₱${Number(item.planPrice || 0).toLocaleString()}`,
+						formatDurationLabel(item.planDurationType),
+						item.reason || 'N/A',
+						item.removedBy || 'N/A',
+				  ])
+				: [['N/A', 'No removed plans yet', 'N/A', 'N/A', 'N/A', 'N/A']],
 	});
 
 	return sections;

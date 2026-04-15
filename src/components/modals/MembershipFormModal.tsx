@@ -151,7 +151,7 @@ export function MembershipFormModal({
 							<div className="form-group">
 								<label htmlFor="monthlyPrice">Price (₱) *</label>
 								<div className="relative">
-									<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-secondary)]">
+									<span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-bold leading-none text-[var(--text-primary)]">
 										₱
 									</span>
 									<input
@@ -164,7 +164,7 @@ export function MembershipFormModal({
 										onChange={(e) => setPriceInput(e.target.value.replace(/[^\d]/g, ''))}
 										required
 										placeholder="e.g., 500"
-										className="pl-8"
+										className="pl-12"
 									/>
 								</div>
 							</div>

@@ -15,8 +15,13 @@ import {
 } from '@/graphql/operations/index';
 import type { Membership } from '@/graphql/generated/types';
 import { MembershipStatus, DurationType } from '@/graphql/generated/graphql';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
+import {
+	appendRemovedMembershipLog,
+	readRemovedMembershipLogs,
+	type RemovedMembershipLog,
+} from '@/lib/membershipRemovalLogs';
 
 export function MembershipsPage() {
 	useEffect(() => {
@@ -31,6 +36,13 @@ export function MembershipsPage() {
 	const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 	const [successMessage, setSuccessMessage] = useState('');
 	const [isEditMode, setIsEditMode] = useState(false);
+	const [activeTab, setActiveTab] = useState<'active' | 'removed'>('active');
+	const [deleteReason, setDeleteReason] = useState('');
+	const [deleteReasonError, setDeleteReasonError] = useState('');
+	const [removedPlans, setRemovedPlans] = useState<RemovedMembershipLog[]>(() =>
+		typeof window === 'undefined' ? [] : readRemovedMembershipLogs()
+	);
+	const currentUser = useAppSelector((state) => state.auth.user);
 
 	// Initial data fetch with query
 	const { data, loading, error } = useQuery(GET_ALL_MEMBERSHIPS, {
@@ -73,10 +85,28 @@ export function MembershipsPage() {
 
 	const [deleteMembership, { loading: deleting }] = useMutation(DELETE_MEMBERSHIP, {
 		onCompleted: () => {
+			if (selectedPlan && deleteReason.trim()) {
+				const exporter = [currentUser?.firstName, currentUser?.lastName]
+					.filter(Boolean)
+					.join(' ')
+					.trim();
+				const nextLogs = appendRemovedMembershipLog({
+					planId: selectedPlan.id,
+					planName: selectedPlan.name,
+					planPrice: Number(selectedPlan.monthlyPrice) || 0,
+					planDurationType: selectedPlan.durationType || 'MONTHLY',
+					reason: deleteReason.trim(),
+					removedAt: new Date().toISOString(),
+					removedBy: exporter || currentUser?.email || 'Admin',
+				});
+				setRemovedPlans(nextLogs);
+			}
 			setSuccessMessage('Membership plan removed successfully!');
 			setIsSuccessModalOpen(true);
 			setIsDeleteModalOpen(false);
 			setSelectedPlan(null);
+			setDeleteReason('');
+			setDeleteReasonError('');
 			dispatch(addToast({ type: 'success', message: 'Membership plan removed!' }));
 		},
 		onError: (error) => {
@@ -101,6 +131,8 @@ export function MembershipsPage() {
 		setSelectedPlan(plan);
 		setIsDeleteModalOpen(true);
 		setIsViewModalOpen(false);
+		setDeleteReason('');
+		setDeleteReasonError('');
 	};
 
 	const handleFormSubmit = (formData: MembershipFormData) => {
@@ -157,7 +189,13 @@ export function MembershipsPage() {
 	};
 
 	const handleConfirmDelete = () => {
+		const reason = deleteReason.trim();
+		if (!reason) {
+			setDeleteReasonError('Please provide a reason before removing this plan.');
+			return;
+		}
 		if (selectedPlan) {
+			setDeleteReasonError('');
 			deleteMembership({
 				variables: {
 					id: selectedPlan.id,
@@ -204,6 +242,12 @@ export function MembershipsPage() {
 	}
 
 	const plans: Membership[] = membershipsData;
+	const durationMap: Record<string, string> = {
+		MONTHLY: 'month',
+		QUARTERLY: 'quarter',
+		YEARLY: 'year',
+		DAILY: 'day pass',
+	};
 
 	return (
 		<div className="space-y-6">
@@ -214,36 +258,60 @@ export function MembershipsPage() {
 						Membership Management
 					</h1>
 					<p className="text-gray-600 dark:text-gray-400 mt-1">
-						Manage membership plans, pricing, and features ({plans.length} plans)
+						Manage membership plans, pricing, and features (
+						{activeTab === 'active' ? plans.length : removedPlans.length}{' '}
+						{activeTab === 'active' ? 'plans' : 'removed'})
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<Button onClick={handleCreatePlan}>
-						<Plus className="w-4 h-4" />
-						Add New Plan
-					</Button>
+					{activeTab === 'active' && (
+						<Button onClick={handleCreatePlan}>
+							<Plus className="w-4 h-4" />
+							Add New Plan
+						</Button>
+					)}
 				</div>
 			</div>
 
-			<div className="plans-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-				{plans.map((plan) => {
+			<div className="inline-flex items-center rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-1">
+				<button
+					type="button"
+					onClick={() => setActiveTab('active')}
+					className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+						activeTab === 'active'
+							? 'bg-[rgba(249,197,19,0.2)] text-[var(--primary-yellow)]'
+							: 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+					}`}
+				>
+					Active Plans
+				</button>
+				<button
+					type="button"
+					onClick={() => setActiveTab('removed')}
+					className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+						activeTab === 'removed'
+							? 'bg-[rgba(239,68,68,0.2)] text-[#fda4af]'
+							: 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+					}`}
+				>
+					Removed Plans
+				</button>
+			</div>
+
+			{activeTab === 'active' ? (
+				<div className="plans-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+					{plans.map((plan) => {
 					const isFeatured = plan.name.includes('PROMO');
 					const statusMap: Record<string, string> = {
 						ACTIVE: 'Active',
 						INACTIVE: 'Inactive',
 						COMING_SOON: 'Coming Soon',
 					};
-					const durationMap: Record<string, string> = {
-						MONTHLY: 'month',
-						QUARTERLY: 'quarter',
-						YEARLY: 'year',
-						DAILY: 'day pass',
-					};
 
 					return (
 						<div
 							key={plan.id}
-							className={`plan-card bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] p-8 backdrop-blur-md ${
+							className={`plan-card flex h-full min-h-[34rem] flex-col bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] p-8 backdrop-blur-md ${
 								isFeatured
 									? 'featured border-2 border-[var(--primary-yellow)] shadow-[0_0_30px_rgba(249,197,19,0.2)]'
 									: ''
@@ -273,7 +341,7 @@ export function MembershipsPage() {
 							</div>
 							<div className="plan-price flex items-baseline gap-2 mb-4">
 								<span className="plan-price-value text-[2.5rem] font-bold text-[var(--primary-yellow)] font-['Inter',ui-sans-serif,system-ui,sans-serif]">
-									<span className="mr-1">₱</span>
+									<span className="mr-1.5 text-[1.2em] font-extrabold leading-none">₱</span>
 									{plan.monthlyPrice.toLocaleString()}
 								</span>
 								<span className="plan-price-period text-base text-[var(--text-secondary)] font-medium">
@@ -294,7 +362,7 @@ export function MembershipsPage() {
 									</li>
 								))}
 							</ul>
-							<div className="plan-actions flex gap-3">
+							<div className="plan-actions mt-auto flex gap-3 pt-2">
 								<button
 									onClick={() => {
 										setSelectedPlan(plan);
@@ -322,8 +390,59 @@ export function MembershipsPage() {
 							</div>
 						</div>
 					);
-				})}
-			</div>
+					})}
+				</div>
+			) : (
+				<div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5">
+					<h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Removed Plans History</h2>
+					{removedPlans.length === 0 ? (
+						<p className="rounded-xl border border-dashed border-[var(--card-border)] px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
+							No removed plans yet.
+						</p>
+					) : (
+						<div className="overflow-x-auto">
+							<table className="w-full text-sm">
+								<thead>
+									<tr className="border-b border-[var(--card-border)] text-left text-[var(--text-secondary)]">
+										<th className="px-3 py-2 font-medium">Removed At</th>
+										<th className="px-3 py-2 font-medium">Plan</th>
+										<th className="px-3 py-2 font-medium">Price</th>
+										<th className="px-3 py-2 font-medium">Duration</th>
+										<th className="px-3 py-2 font-medium">Reason</th>
+										<th className="px-3 py-2 font-medium">Removed By</th>
+									</tr>
+								</thead>
+								<tbody className="divide-y divide-[var(--card-border)]">
+									{removedPlans.map((log) => (
+										<tr key={log.id} className="align-top">
+											<td className="px-3 py-3 text-[var(--text-primary)]">
+												{new Date(log.removedAt).toLocaleString('en-PH', {
+													timeZone: 'Asia/Manila',
+												})}
+											</td>
+											<td className="px-3 py-3 font-semibold text-[var(--text-primary)]">
+												{log.planName}
+											</td>
+											<td className="px-3 py-3 text-[var(--text-primary)]">
+												₱{Number(log.planPrice || 0).toLocaleString()}
+											</td>
+											<td className="px-3 py-3 text-[var(--text-secondary)]">
+												{durationMap[log.planDurationType] || log.planDurationType}
+											</td>
+											<td className="max-w-[24rem] px-3 py-3 text-[var(--text-primary)]">
+												{log.reason}
+											</td>
+											<td className="px-3 py-3 text-[var(--text-secondary)]">
+												{log.removedBy}
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
+					)}
+				</div>
+			)}
 
 			{/* Modals */}
 			<MembershipViewModal
@@ -353,6 +472,8 @@ export function MembershipsPage() {
 				onClose={() => {
 					setIsDeleteModalOpen(false);
 					setSelectedPlan(null);
+					setDeleteReason('');
+					setDeleteReasonError('');
 				}}
 				onConfirm={handleConfirmDelete}
 				title="Remove Membership Plan?"
@@ -360,6 +481,15 @@ export function MembershipsPage() {
 				isDeleting={deleting}
 				confirmLabel="Remove"
 				confirmingLabel="Removing..."
+				requireReason
+				reasonValue={deleteReason}
+				onReasonChange={(value) => {
+					setDeleteReason(value);
+					if (deleteReasonError) setDeleteReasonError('');
+				}}
+				reasonLabel="Removal reason"
+				reasonPlaceholder="e.g., Replaced by a new pricing structure"
+				reasonError={deleteReasonError}
 			/>
 
 			<SuccessModal
