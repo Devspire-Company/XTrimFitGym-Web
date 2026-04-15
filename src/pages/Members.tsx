@@ -799,7 +799,7 @@ export function MembersPage() {
 										key={member.id}
 										className={`members-table tbody tr ${
 											member.status === 'Disabled'
-												? 'bg-[rgba(148,163,184,0.14)] opacity-60'
+												? 'bg-[rgba(148,163,184,0.18)] opacity-45'
 												: ''
 										}`}
 									>
@@ -829,7 +829,7 @@ export function MembersPage() {
 														? 'student bg-[rgba(59,130,246,0.14)] text-[#93C5FD] border border-[rgba(59,130,246,0.3)]'
 														: member.membership === 'PROMO Student'
 															? 'promo-student bg-[rgba(139,92,246,0.14)] text-[#C4B5FD] border border-[rgba(139,92,246,0.3)]'
-															: member.membership === 'No Plan'
+															: member.membership.toLowerCase().includes('no plan')
 																? 'bg-[rgba(148,163,184,0.14)] text-[#CBD5E1] border border-[rgba(148,163,184,0.3)]'
 																: 'non-student bg-[rgba(20,184,166,0.14)] text-[#99F6E4] border border-[rgba(20,184,166,0.3)]'
 												}`}
@@ -846,7 +846,7 @@ export function MembersPage() {
 															? 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
 																: member.status === 'Pending'
 																	? 'bg-[rgba(59,130,246,0.15)] text-[#93C5FD] border border-[rgba(59,130,246,0.3)]'
-															: 'suspended bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]'
+															: 'suspended bg-[rgba(148,163,184,0.16)] text-[#E2E8F0] border border-[rgba(148,163,184,0.35)]'
 												}`}
 											>
 												{member.status}
@@ -885,34 +885,40 @@ export function MembersPage() {
 											)}
 										</td>
 										<td className="px-4 py-5 text-center">
-											<Popover
-												open={openDropdownId === member.id}
-												onOpenChange={(open) =>
-													setOpenDropdownId(open ? member.id : null)
-												}
-											>
-												<PopoverTrigger asChild>
-													<button
-														type="button"
-														disabled={member.status === 'Disabled'}
-														className={`btn-small inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] border border-[var(--card-border)] transition-colors data-[state=open]:border-[var(--primary-yellow)] data-[state=open]:ring-2 data-[state=open]:ring-[rgba(249,197,19,0.2)] ${
-															member.status === 'Disabled'
-																? 'cursor-not-allowed opacity-45 pointer-events-none'
-																: ''
-														}`}
-														title="Member actions"
-														aria-label={`Open actions for ${member.name}`}
-													>
-														<MoreVertical className="w-4 h-4" aria-hidden />
-													</button>
-												</PopoverTrigger>
-												<PopoverContent
-													align="end"
-													sideOffset={8}
-													collisionPadding={16}
-													onCloseAutoFocus={(e) => e.preventDefault()}
-													className="w-[min(100vw-2rem,15rem)] rounded-xl border border-[rgba(255,255,255,0.12)] !bg-[#16181f] p-1.5 text-[var(--text-primary)] shadow-2xl ring-1 ring-black/25"
+											{member.status === 'Disabled' ? (
+												<button
+													type="button"
+													disabled
+													className="btn-small inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(148,163,184,0.18)] text-[#CBD5E1] border border-[rgba(148,163,184,0.3)] cursor-not-allowed opacity-40"
+													title="Actions disabled for disabled accounts"
+													aria-label={`Actions disabled for ${member.name}`}
 												>
+													<MoreVertical className="w-4 h-4" aria-hidden />
+												</button>
+											) : (
+												<Popover
+													open={openDropdownId === member.id}
+													onOpenChange={(open) =>
+														setOpenDropdownId(open ? member.id : null)
+													}
+												>
+													<PopoverTrigger asChild>
+														<button
+															type="button"
+															className="btn-small inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] border border-[var(--card-border)] transition-colors data-[state=open]:border-[var(--primary-yellow)] data-[state=open]:ring-2 data-[state=open]:ring-[rgba(249,197,19,0.2)]"
+															title="Member actions"
+															aria-label={`Open actions for ${member.name}`}
+														>
+															<MoreVertical className="w-4 h-4" aria-hidden />
+														</button>
+													</PopoverTrigger>
+													<PopoverContent
+														align="end"
+														sideOffset={8}
+														collisionPadding={16}
+														onCloseAutoFocus={(e) => e.preventDefault()}
+														className="w-[min(100vw-2rem,15rem)] rounded-xl border border-[rgba(255,255,255,0.12)] !bg-[#16181f] p-1.5 text-[var(--text-primary)] shadow-2xl ring-1 ring-black/25"
+													>
 													<div
 														role="menu"
 														className="flex flex-col gap-0.5"
@@ -1041,8 +1047,9 @@ export function MembersPage() {
 														</>
 													)}
 													</div>
-												</PopoverContent>
-											</Popover>
+													</PopoverContent>
+												</Popover>
+											)}
 										</td>
 									</tr>
 								))

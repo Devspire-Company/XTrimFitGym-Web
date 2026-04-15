@@ -856,8 +856,8 @@
 
 .members-table tbody tr:hover,
 .coaches-table tbody tr:hover {
-	background: rgba(249, 197, 19, 0.05);
-	transform: translateX(5px);
+	background: transparent;
+	transform: none;
 }
 
 /* Small Button Hover - Matching vanilla_js */
@@ -866,7 +866,7 @@
 }
 
 .btn-small:hover {
-	transform: translateY(-2px);
+	transform: none;
 }
 
 /* View All Link Hover - Matching vanilla_js */
