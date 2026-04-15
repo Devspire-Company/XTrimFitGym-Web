@@ -140,12 +140,6 @@ export function EquipmentViewModal({
 						</div>
 					</div>
 				</div>
-
-				<div className="modal-footer shrink-0">
-					<button className="btn-secondary" onClick={onClose}>
-						Close
-					</button>
-				</div>
 			</div>
 		</div>
 	);

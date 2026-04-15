@@ -1,6 +1,7 @@
-import type { FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { EquipmentStatus, type Equipment } from '@/graphql/generated/graphql';
+import { DatePicker } from '@/components/ui/date-picker';
 
 export interface EquipmentFormData {
 	name: string;
@@ -29,13 +30,27 @@ export function EquipmentFormModal({
 	isLoading = false,
 	uploading = false,
 }: EquipmentFormModalProps) {
+	const [acquiredDate, setAcquiredDate] = useState<Date | undefined>(undefined);
+
+	useEffect(() => {
+		if (!isOpen) return;
+		if (!equipment?.acquiredAt) {
+			setAcquiredDate(undefined);
+			return;
+		}
+		const parsed = new Date(equipment.acquiredAt);
+		setAcquiredDate(Number.isFinite(parsed.getTime()) ? parsed : undefined);
+	}, [isOpen, equipment?.acquiredAt]);
+
 	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const formData = new FormData(e.currentTarget);
 		const name = (formData.get('name') as string)?.trim() || '';
 		const description = (formData.get('description') as string)?.trim() || '';
 		const notes = (formData.get('notes') as string)?.trim() || '';
-		const acquiredAt = (formData.get('acquiredAt') as string)?.trim() || '';
+		const acquiredAt = acquiredDate
+			? `${acquiredDate.getFullYear()}-${String(acquiredDate.getMonth() + 1).padStart(2, '0')}-${String(acquiredDate.getDate()).padStart(2, '0')}`
+			: '';
 		const imageUrl = (formData.get('imageUrl') as string)?.trim() || '';
 		const imageFile = formData.get('imageFile') as File | null;
 		const statusRaw = (formData.get('status') as string) || EquipmentStatus.Available;
@@ -103,15 +118,11 @@ export function EquipmentFormModal({
 							</div>
 							<div className="form-group">
 								<label htmlFor="acquiredAt">Acquired date</label>
-								<input
-									id="acquiredAt"
-									name="acquiredAt"
-									type="date"
-									defaultValue={
-										equipment?.acquiredAt
-											? new Date(equipment.acquiredAt).toISOString().slice(0, 10)
-											: ''
-									}
+								<DatePicker
+									date={acquiredDate}
+									onDateChange={setAcquiredDate}
+									placeholder="Select acquired date"
+									className="w-full"
 								/>
 							</div>
 							<div className="form-group" style={{ gridColumn: '1 / -1' }}>
@@ -138,7 +149,7 @@ export function EquipmentFormModal({
 								</small>
 							</div>
 							<div className="form-group" style={{ gridColumn: '1 / -1' }}>
-								<label>Image *</label>
+								<label htmlFor="imageFile">Image *</label>
 								{equipment?.imageUrl && (
 									<div className="mb-3">
 										<img
