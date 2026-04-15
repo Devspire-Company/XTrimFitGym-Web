@@ -799,7 +799,7 @@ export function MembersPage() {
 										key={member.id}
 										className={`members-table tbody tr ${
 											member.status === 'Disabled'
-												? 'bg-[rgba(148,163,184,0.18)] opacity-45'
+												? 'bg-[rgba(71,85,105,0.30)] opacity-40'
 												: ''
 										}`}
 									>
@@ -885,40 +885,33 @@ export function MembersPage() {
 											)}
 										</td>
 										<td className="px-4 py-5 text-center">
-											{member.status === 'Disabled' ? (
-												<button
-													type="button"
-													disabled
-													className="btn-small inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(148,163,184,0.18)] text-[#CBD5E1] border border-[rgba(148,163,184,0.3)] cursor-not-allowed opacity-40"
-													title="Actions disabled for disabled accounts"
-													aria-label={`Actions disabled for ${member.name}`}
-												>
-													<MoreVertical className="w-4 h-4" aria-hidden />
-												</button>
-											) : (
-												<Popover
-													open={openDropdownId === member.id}
-													onOpenChange={(open) =>
-														setOpenDropdownId(open ? member.id : null)
-													}
-												>
-													<PopoverTrigger asChild>
-														<button
-															type="button"
-															className="btn-small inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] border border-[var(--card-border)] transition-colors data-[state=open]:border-[var(--primary-yellow)] data-[state=open]:ring-2 data-[state=open]:ring-[rgba(249,197,19,0.2)]"
-															title="Member actions"
-															aria-label={`Open actions for ${member.name}`}
-														>
-															<MoreVertical className="w-4 h-4" aria-hidden />
-														</button>
-													</PopoverTrigger>
-													<PopoverContent
-														align="end"
-														sideOffset={8}
-														collisionPadding={16}
-														onCloseAutoFocus={(e) => e.preventDefault()}
-														className="w-[min(100vw-2rem,15rem)] rounded-xl border border-[rgba(255,255,255,0.12)] !bg-[#16181f] p-1.5 text-[var(--text-primary)] shadow-2xl ring-1 ring-black/25"
+											<Popover
+												open={openDropdownId === member.id}
+												onOpenChange={(open) =>
+													setOpenDropdownId(open ? member.id : null)
+												}
+											>
+												<PopoverTrigger asChild>
+													<button
+														type="button"
+														className={`btn-small inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors data-[state=open]:border-[var(--primary-yellow)] data-[state=open]:ring-2 data-[state=open]:ring-[rgba(249,197,19,0.2)] ${
+															member.status === 'Disabled'
+																? 'bg-[rgba(71,85,105,0.28)] text-[#CBD5E1] border-[rgba(148,163,184,0.35)]'
+																: 'bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] border-[var(--card-border)]'
+														}`}
+														title="Member actions"
+														aria-label={`Open actions for ${member.name}`}
 													>
+														<MoreVertical className="w-4 h-4" aria-hidden />
+													</button>
+												</PopoverTrigger>
+												<PopoverContent
+													align="end"
+													sideOffset={8}
+													collisionPadding={16}
+													onCloseAutoFocus={(e) => e.preventDefault()}
+													className="w-[min(100vw-2rem,15rem)] rounded-xl border border-[rgba(255,255,255,0.12)] !bg-[#16181f] p-1.5 text-[var(--text-primary)] shadow-2xl ring-1 ring-black/25"
+												>
 													<div
 														role="menu"
 														className="flex flex-col gap-0.5"
@@ -1047,9 +1040,8 @@ export function MembersPage() {
 														</>
 													)}
 													</div>
-													</PopoverContent>
-												</Popover>
-											)}
+												</PopoverContent>
+											</Popover>
 										</td>
 									</tr>
 								))
