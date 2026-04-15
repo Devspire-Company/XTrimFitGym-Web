@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Archive, Dumbbell, Download, AlertTriangle, RotateCcw } from 'lucide-react';
 import { EquipmentFormModal, type EquipmentFormData } from '@/components/modals/EquipmentFormModal';
+import { EquipmentViewModal } from '@/components/modals/EquipmentViewModal';
 import { SuccessModal } from '@/components/modals/SuccessModal';
 import {
 	GET_EQUIPMENTS,
@@ -225,6 +226,8 @@ export function EquipmentPage() {
 	const [isFormOpen, setIsFormOpen] = useState(false);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 	const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+	const [isViewOpen, setIsViewOpen] = useState(false);
+	const [viewingEquipment, setViewingEquipment] = useState<any | null>(null);
 	const [successMessage, setSuccessMessage] = useState('');
 	const [isEdit, setIsEdit] = useState(false);
 	const [uploading, setUploading] = useState(false);
@@ -551,6 +554,11 @@ export function EquipmentPage() {
 		setIsEdit(true);
 		setSelected(item);
 		setIsFormOpen(true);
+	};
+
+	const handleView = (item: any) => {
+		setViewingEquipment(item);
+		setIsViewOpen(true);
 	};
 
 	const handleDelete = (item: any) => {
@@ -958,9 +966,12 @@ export function EquipmentPage() {
 				{visibleList.map((item) => (
 					<div
 						key={item.id}
-						className="flex h-full min-h-[31rem] flex-col bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] overflow-hidden backdrop-blur-md"
+						className="flex h-full min-h-[31rem] flex-col overflow-hidden rounded-[20px] border border-[var(--card-border)] bg-[var(--card-bg)] backdrop-blur-md transition hover:border-[rgba(249,197,19,0.35)]"
 					>
-						<div className="h-52 md:h-56 bg-[var(--bg-darker)]">
+						<div
+							className="h-52 cursor-pointer bg-[var(--bg-darker)] md:h-56"
+							onClick={() => handleView(item)}
+						>
 							<img
 								src={item.imageUrl}
 								alt={item.name}
@@ -968,7 +979,11 @@ export function EquipmentPage() {
 							/>
 						</div>
 						<div className="flex h-full flex-col p-5">
-							<div className="flex items-start justify-between gap-2 mb-2">
+							<div
+								className="mb-2 cursor-pointer"
+								onClick={() => handleView(item)}
+							>
+								<div className="flex items-start justify-between gap-2">
 								<h3 className="text-lg font-bold text-[var(--text-primary)] flex-1">
 									{item.name}
 								</h3>
@@ -977,9 +992,10 @@ export function EquipmentPage() {
 								>
 									{statusLabel(item.status)}
 								</span>
+								</div>
 							</div>
 							{(item.description || item.notes) && (
-								<div className="mb-4 space-y-2">
+								<div className="mb-4 cursor-pointer space-y-2" onClick={() => handleView(item)}>
 									{item.description ? (
 										<p className="text-sm text-[var(--text-secondary)] line-clamp-2">
 											{item.description}
@@ -992,7 +1008,7 @@ export function EquipmentPage() {
 									) : null}
 								</div>
 							)}
-							<div className="mb-4 text-xs text-[var(--text-secondary)] space-y-1">
+							<div className="mb-4 cursor-pointer space-y-1 text-xs text-[var(--text-secondary)]" onClick={() => handleView(item)}>
 								<div>
 									Added:{' '}
 									{item.createdAt
@@ -1025,7 +1041,10 @@ export function EquipmentPage() {
 								{item.isArchived ? (
 									<button
 										type="button"
-										onClick={() => handleRestore(item)}
+										onClick={(e) => {
+											e.stopPropagation();
+											handleRestore(item);
+										}}
 										disabled={restoring}
 										className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.14)] px-4 text-sm font-semibold text-[#34D399] transition hover:bg-[rgba(16,185,129,0.2)] disabled:opacity-60"
 									>
@@ -1036,7 +1055,10 @@ export function EquipmentPage() {
 									<>
 										<button
 											type="button"
-											onClick={() => handleEdit(item)}
+											onClick={(e) => {
+												e.stopPropagation();
+												handleEdit(item);
+											}}
 											className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(249,197,19,0.35)] bg-[rgba(249,197,19,0.14)] px-4 text-sm font-semibold text-[var(--primary-yellow)] transition hover:bg-[rgba(249,197,19,0.22)]"
 										>
 											<Edit className="w-4 h-4" />
@@ -1044,7 +1066,10 @@ export function EquipmentPage() {
 										</button>
 										<button
 											type="button"
-											onClick={() => handleDelete(item)}
+											onClick={(e) => {
+												e.stopPropagation();
+												handleDelete(item);
+											}}
 											className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.14)] px-4 text-sm font-semibold text-[#F87171] transition hover:bg-[rgba(239,68,68,0.22)]"
 										>
 											<Archive className="w-4 h-4" />
@@ -1096,6 +1121,18 @@ export function EquipmentPage() {
 				equipment={isEdit ? selected : null}
 				isLoading={creating || updating}
 				uploading={uploading}
+			/>
+
+			<EquipmentViewModal
+				isOpen={isViewOpen}
+				onClose={() => {
+					setIsViewOpen(false);
+					setViewingEquipment(null);
+				}}
+				equipment={viewingEquipment}
+				maintenanceSince={
+					viewingEquipment ? maintenanceSetAtByEquipmentId[viewingEquipment.id] : undefined
+				}
 			/>
 
 			{isDeleteOpen && (
