@@ -770,7 +770,14 @@ export function MembersPage() {
 								</tr>
 							) : (
 								filteredMembers.map((member) => (
-									<tr key={member.id} className="members-table tbody tr">
+									<tr
+										key={member.id}
+										className={`members-table tbody tr transition-colors ${
+											member.status === 'Disabled'
+												? 'bg-[rgba(239,68,68,0.08)] opacity-[0.68] hover:opacity-[0.82]'
+												: 'hover:bg-[rgba(255,255,255,0.02)]'
+										}`}
+									>
 										<td className="px-4 py-5">
 											<div className="member-info flex items-center gap-3">
 												<div className="member-avatar w-11 h-11 rounded-xl bg-gradient-to-br from-[var(--primary-red)] to-[var(--primary-yellow)] flex items-center justify-center font-bold text-white text-sm flex-shrink-0">
