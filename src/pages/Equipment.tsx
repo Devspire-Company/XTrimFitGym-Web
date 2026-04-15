@@ -960,7 +960,7 @@ export function EquipmentPage() {
 						key={item.id}
 						className="flex h-full min-h-[31rem] flex-col bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] overflow-hidden backdrop-blur-md"
 					>
-						<div className="aspect-[4/3] bg-[var(--bg-darker)]">
+						<div className="h-52 md:h-56 bg-[var(--bg-darker)]">
 							<img
 								src={item.imageUrl}
 								alt={item.name}
