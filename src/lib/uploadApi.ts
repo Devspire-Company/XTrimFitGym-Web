@@ -1,9 +1,9 @@
+import { DEFAULT_GRAPHQL_HTTP_URL } from '@/lib/defaultGraphqlEndpoint';
+
 /** Base API URL (no /graphql) for REST uploads */
 export function getUploadBaseUrl(): string {
-	const url =
-		(import.meta.env.VITE_GRAPHQL_URL || '').trim() ||
-		(import.meta.env.DEV ? 'http://localhost:8000/graphql' : '');
-	const base = url.replace(/\/graphql\/?$/, '') || (import.meta.env.DEV ? 'http://localhost:8000' : '');
+	const url = (import.meta.env.VITE_GRAPHQL_URL || '').trim() || DEFAULT_GRAPHQL_HTTP_URL;
+	const base = url.replace(/\/graphql\/?$/, '') || DEFAULT_GRAPHQL_HTTP_URL.replace(/\/graphql\/?$/, '');
 	return base;
 }
 

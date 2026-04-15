@@ -8,6 +8,7 @@ import { store, persistor } from './store';
 import { router } from './routes';
 import { ToastContainer } from './components/ui/toast';
 import { AuthValidator } from './components/AuthValidator';
+import { DEFAULT_GRAPHQL_HTTP_URL, DEFAULT_GRAPHQL_WS_URL } from './lib/defaultGraphqlEndpoint';
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
@@ -29,8 +30,9 @@ function App() {
 					</p>
 					<pre className="rounded-lg bg-black/30 p-4 overflow-x-auto text-sm">
 {`VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-VITE_GRAPHQL_URL=http://localhost:8000/graphql
-VITE_GRAPHQL_WS_URL=ws://localhost:8000/graphql`}
+# Optional — defaults to Render if omitted:
+VITE_GRAPHQL_URL=${DEFAULT_GRAPHQL_HTTP_URL}
+VITE_GRAPHQL_WS_URL=${DEFAULT_GRAPHQL_WS_URL}`}
 					</pre>
 				</div>
 			</div>

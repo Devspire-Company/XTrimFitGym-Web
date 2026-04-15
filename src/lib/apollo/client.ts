@@ -6,24 +6,19 @@ import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 import { getAuthBearerToken } from '@/lib/clerkTokenBridge';
+import { DEFAULT_GRAPHQL_HTTP_URL, DEFAULT_GRAPHQL_WS_URL } from '@/lib/defaultGraphqlEndpoint';
 
 /** Resolved HTTP(S) GraphQL URL (same value passed to createHttpLink). */
 const resolvedGraphqlHttpUrl = (() => {
-	const url =
-		(import.meta.env.VITE_GRAPHQL_URL || '').trim() ||
-		(import.meta.env.DEV ? 'http://localhost:8000/graphql' : '');
-	return url || (import.meta.env.DEV ? 'http://localhost:8000/graphql' : '');
+	const url = (import.meta.env.VITE_GRAPHQL_URL || '').trim();
+	return url || DEFAULT_GRAPHQL_HTTP_URL;
 })();
 
 if (import.meta.env.DEV) {
 	console.log(`[Apollo Client] GraphQL endpoint: ${resolvedGraphqlHttpUrl}`);
-} else if (resolvedGraphqlHttpUrl) {
+} else {
 	console.info(
 		`[Apollo Client] GraphQL endpoint: ${resolvedGraphqlHttpUrl.replace(/\/graphql\/?$/, '/graphql')}`,
-	);
-} else {
-	console.error(
-		'[Apollo Client] VITE_GRAPHQL_URL is not set. Login will fail. Set it in Vercel → Settings → Environment Variables to e.g. https://xtrimfitgym-api.onrender.com/graphql then redeploy.',
 	);
 }
 
@@ -44,7 +39,7 @@ const getWebSocketUrl = (): string => {
 	if (explicitWs) return explicitWs;
 	if (graphqlUrl.startsWith('https://')) return graphqlUrl.replace(/^https:\/\//, 'wss://');
 	if (graphqlUrl.startsWith('http://')) return graphqlUrl.replace(/^http:\/\//, 'ws://');
-	return import.meta.env.DEV ? 'ws://localhost:8000/graphql' : '';
+	return DEFAULT_GRAPHQL_WS_URL;
 };
 
 const wsLink = new GraphQLWsLink(
@@ -175,12 +170,14 @@ const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
 			}
 			console.error('Other checks:');
 			console.error('1. Render (or local) API is running and latest deploy succeeded');
-			console.error('2. VITE_GRAPHQL_URL points to …/graphql for this environment');
+			console.error('2. VITE_GRAPHQL_URL points to …/graphql for this environment (defaults to Render if unset)');
 			console.error(
 				'3. If the console also shows a CORS error alongside 502, the CORS message is usually a side effect of the failed response — fix the 502 first.',
 			);
-			if (import.meta.env.DEV && endpoint.includes('localhost')) {
-				console.error('4. Local dev: start the API (e.g. npm run dev in XTrimFitGym-Api) so it listens on the same port as in VITE_GRAPHQL_URL (default 8000).');
+			if (import.meta.env.DEV) {
+				console.error(
+					'4. To use a different API in dev, set VITE_GRAPHQL_URL / VITE_GRAPHQL_WS_URL in .env and restart Vite.',
+				);
 			}
 		}
 	}
