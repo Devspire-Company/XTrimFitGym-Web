@@ -32,6 +32,7 @@ query GetUsers($role: RoleType) {
 			workOutTime
 			coachesIds
 			hasEnteredDetails
+			facilityBiometricEnrollmentComplete
 			membershipTransaction {
 				id
 				membershipId
@@ -114,6 +115,7 @@ query GetUser($id: ID!) {
 			workOutTime
 			coachesIds
 			hasEnteredDetails
+			facilityBiometricEnrollmentComplete
 			membershipTransaction {
 				id
 				membershipId
@@ -227,6 +229,7 @@ mutation UpdateUser($id: ID!, $input: UpdateUserInput!) {
 			workOutTime
 			coachesIds
 			hasEnteredDetails
+			facilityBiometricEnrollmentComplete
 		}
 		coachDetails {
 			clientsIds
@@ -344,6 +347,7 @@ subscription UsersUpdated($role: RoleType) {
 			workOutTime
 			coachesIds
 			hasEnteredDetails
+			facilityBiometricEnrollmentComplete
 			membershipTransaction {
 				id
 				membershipId

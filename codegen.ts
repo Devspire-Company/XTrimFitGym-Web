@@ -1,7 +1,7 @@
 import { CodegenConfig } from '@graphql-codegen/cli';
 
 const config: CodegenConfig = {
-	schema: '../XTrimFitGym-Api/src/graphql/**/*.graphql',
+	schema: './XTrimFitGym-Api-clean/src/graphql/**/*.graphql',
 	documents: ['src/**/*.{ts,tsx}', 'src/**/*.graphql'],
 	generates: {
 		'./src/graphql/generated/': {
