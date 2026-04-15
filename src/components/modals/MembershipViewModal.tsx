@@ -59,7 +59,10 @@ export function MembershipViewModal({
 								</div>
 								<div className="detail-item">
 									<label>Price</label>
-									<p className="price-value">₱{membership.monthlyPrice.toLocaleString()}</p>
+									<p className="price-value font-['Inter',ui-sans-serif,system-ui,sans-serif]">
+										<span style={{ marginRight: '0.2rem' }}>₱</span>
+										{membership.monthlyPrice.toLocaleString()}
+									</p>
 								</div>
 								<div className="detail-item">
 									<label>Duration</label>

@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import type { Membership } from '@/graphql/generated/types';
 
@@ -27,30 +27,70 @@ export function MembershipFormModal({
 	membership,
 	isLoading = false,
 }: MembershipFormModalProps) {
+	const [priceInput, setPriceInput] = useState('');
+	const [planLengthInput, setPlanLengthInput] = useState('1');
+	const [featureInputs, setFeatureInputs] = useState<string[]>(['']);
+	const [featuresError, setFeaturesError] = useState('');
+
+	useEffect(() => {
+		if (!isOpen) return;
+		setPriceInput(
+			membership?.monthlyPrice != null ? String(Math.round(Number(membership.monthlyPrice))) : ''
+		);
+		setPlanLengthInput(String(membership?.monthDuration || 1));
+		const initialFeatures =
+			membership?.features && membership.features.length > 0 ? membership.features : [''];
+		setFeatureInputs(initialFeatures);
+		setFeaturesError('');
+	}, [isOpen, membership]);
+
+	const parseNumericInput = (raw: string, fallback = 0) => {
+		const digits = raw.replace(/[^\d]/g, '');
+		if (!digits) return fallback;
+		const parsed = Number.parseInt(digits, 10);
+		return Number.isFinite(parsed) ? parsed : fallback;
+	};
+
+	const handleFeatureChange = (idx: number, value: string) => {
+		setFeatureInputs((prev) => prev.map((item, i) => (i === idx ? value : item)));
+		if (featuresError) setFeaturesError('');
+	};
+
+	const addFeatureInput = () => {
+		setFeatureInputs((prev) => [...prev, '']);
+	};
+
+	const removeFeatureInput = (idx: number) => {
+		setFeatureInputs((prev) => {
+			if (prev.length <= 1) return [''];
+			return prev.filter((_, i) => i !== idx);
+		});
+	};
+
 	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const formData = new FormData(e.currentTarget);
 
-		const featuresText = formData.get('features') as string;
-		const features = featuresText
-			.split('\n')
+		const features = featureInputs
 			.map((f) => f.trim())
 			.filter((f) => f.length > 0);
+		if (features.length === 0) {
+			setFeaturesError('Please add at least one feature.');
+			return;
+		}
 
 		const data: MembershipFormData = {
 			name: formData.get('name') as string,
-			monthlyPrice: Number(formData.get('monthlyPrice')),
+			monthlyPrice: parseNumericInput(priceInput, 0),
 			description: formData.get('description') as string,
 			features,
 			status: formData.get('status') as MembershipFormData['status'],
 			durationType: formData.get('durationType') as MembershipFormData['durationType'],
-			monthDuration: Number(formData.get('monthDuration')) || 1,
+			monthDuration: Math.max(1, parseNumericInput(planLengthInput, 1)),
 		};
 
 		onSubmit(data);
 	};
-
-	const defaultFeatures = membership?.features?.join('\n') || '';
 
 	// Map API status values to form values
 	const statusMap: Record<string, string> = {
@@ -110,16 +150,23 @@ export function MembershipFormModal({
 
 							<div className="form-group">
 								<label htmlFor="monthlyPrice">Price (₱) *</label>
-								<input
-									type="number"
-									id="monthlyPrice"
-									name="monthlyPrice"
-									defaultValue={membership?.monthlyPrice}
-									required
-									min="0"
-									step="1"
-									placeholder="e.g., 500"
-								/>
+								<div className="relative">
+									<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-secondary)]">
+										₱
+									</span>
+									<input
+										type="text"
+										id="monthlyPrice"
+										name="monthlyPrice"
+										inputMode="numeric"
+										pattern="[0-9]*"
+										value={priceInput}
+										onChange={(e) => setPriceInput(e.target.value.replace(/[^\d]/g, ''))}
+										required
+										placeholder="e.g., 500"
+										className="pl-8"
+									/>
+								</div>
 							</div>
 
 							<div className="form-group">
@@ -142,14 +189,15 @@ export function MembershipFormModal({
 									Plan length *
 								</label>
 								<input
-									type="number"
+									type="text"
 									id="monthDuration"
 									name="monthDuration"
-									defaultValue={membership?.monthDuration || 1}
+									inputMode="numeric"
+									pattern="[0-9]*"
+									value={planLengthInput}
+									onChange={(e) => setPlanLengthInput(e.target.value.replace(/[^\d]/g, ''))}
 									required
-									min="1"
-									step="1"
-									placeholder="e.g., 3 for 3 months, or 15 for 15-day promo"
+									placeholder="e.g., 3 for monthly plans, 15 for daily promo"
 								/>
 								<small
 									id="monthDurationHint"
@@ -181,20 +229,49 @@ export function MembershipFormModal({
 							</div>
 
 							<div className="form-group" style={{ gridColumn: '1 / -1' }}>
-								<label htmlFor="features">Features (one per line) *</label>
-								<textarea
-									id="features"
-									name="features"
-									defaultValue={defaultFeatures}
-									required
-									rows={6}
-									placeholder="Gym access (6am-10pm)&#10;Basic equipment access&#10;Locker facilities"
-								/>
-								<small
-									style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'block' }}
-								>
-									Enter each feature on a new line
-								</small>
+								<label>Features *</label>
+								<div className="space-y-3">
+									{featureInputs.map((feature, idx) => (
+										<div
+											key={`feature-${idx}`}
+											className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.02)] p-2"
+										>
+											<input
+												type="text"
+												value={feature}
+												onChange={(e) => handleFeatureChange(idx, e.target.value)}
+												placeholder={`Feature ${idx + 1}`}
+												className="border-0 bg-transparent px-2 py-2"
+											/>
+											<button
+												type="button"
+												onClick={() => removeFeatureInput(idx)}
+												disabled={featureInputs.length === 1}
+												className="rounded-lg border border-[var(--card-border)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:opacity-40"
+											>
+												Remove
+											</button>
+										</div>
+									))}
+									<button
+										type="button"
+										onClick={addFeatureInput}
+										className="w-full rounded-xl border border-dashed border-[rgba(249,197,19,0.45)] bg-[rgba(249,197,19,0.08)] px-3 py-2.5 text-sm font-semibold text-[var(--primary-yellow)]"
+									>
+										+ Add feature
+									</button>
+								</div>
+								{featuresError ? (
+									<small style={{ color: '#f87171', marginTop: '0.5rem', display: 'block' }}>
+										{featuresError}
+									</small>
+								) : (
+									<small
+										style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'block' }}
+									>
+										Add one feature per field for cleaner plan details.
+									</small>
+								)}
 							</div>
 						</div>
 					</div>

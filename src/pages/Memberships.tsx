@@ -272,8 +272,9 @@ export function MembershipsPage() {
 								</span>
 							</div>
 							<div className="plan-price flex items-baseline gap-2 mb-4">
-								<span className="plan-price-value text-[2.5rem] font-bold text-[var(--primary-yellow)] font-['Poppins']">
-									₱{plan.monthlyPrice.toLocaleString()}
+								<span className="plan-price-value text-[2.5rem] font-bold text-[var(--primary-yellow)] font-['Inter',ui-sans-serif,system-ui,sans-serif]">
+									<span className="mr-1">₱</span>
+									{plan.monthlyPrice.toLocaleString()}
 								</span>
 								<span className="plan-price-period text-base text-[var(--text-secondary)] font-medium">
 									/{durationMap[plan.durationType] || 'month'}
