@@ -15,7 +15,16 @@ import {
 	UserRound,
 	Zap,
 } from 'lucide-react';
-import { GET_USERS, GET_REVENUE_SUMMARY, REVENUE_SUMMARY_UPDATED, USERS_UPDATED, GET_ATTENDANCE_RECORDS, ATTENDANCE_RECORD_ADDED, ATTENDANCE_UPDATED } from '@/graphql/operations/index';
+import {
+	GET_USERS,
+	GET_REVENUE_SUMMARY,
+	REVENUE_SUMMARY_UPDATED,
+	USERS_UPDATED,
+	GET_ATTENDANCE_RECORDS,
+	ATTENDANCE_RECORD_ADDED,
+	ATTENDANCE_UPDATED,
+	WALK_IN_STATS,
+} from '@/graphql/operations/index';
 import { RoleType } from '@/graphql/generated/graphql';
 import type { AttendanceRecord } from '@/graphql/generated/types';
 import {
@@ -63,6 +72,11 @@ export function DashboardPage() {
 	const { data: analyticsData } = useQuery(GET_REVENUE_SUMMARY, {
 		errorPolicy: 'all',
 		fetchPolicy: 'network-only',
+	});
+
+	const { data: walkInStatsData } = useQuery(WALK_IN_STATS, {
+		errorPolicy: 'all',
+		fetchPolicy: 'cache-and-network',
 	});
 
 	// Fetch recent attendance records
@@ -379,11 +393,8 @@ export function DashboardPage() {
 	const membershipRev = analytics?.membershipSubscriptionRevenue ?? 0;
 	const walkInRev = analytics?.walkInRevenue ?? 0;
 	const activeSubscriptions = analytics?.activeSubscriptions || 0;
-	const walkInCheckInsTotal =
-		analytics?.revenueByPeriod?.reduce(
-			(sum: number, p: { walkInCount?: number | null }) => sum + (p.walkInCount ?? 0),
-			0,
-		) ?? 0;
+	const totalWalkInTimeIns = walkInStatsData?.walkInStats?.totalTimeInRecords ?? 0;
+	const totalWalkInAccounts = walkInStatsData?.walkInStats?.totalWalkInAccounts ?? 0;
 
 	// Recent members (last 3) - sort by join date
 	const recentMembers = [...members]
@@ -419,10 +430,10 @@ export function DashboardPage() {
 			{/* Stats Grid */}
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
 				<StatCard
-					icon={Users}
-					title="Total Members"
-					value={totalMembers}
-					change={`+${members.filter((m) => m.joinDate === 'November 2024').length} this month`}
+					icon={PhilippinePeso}
+					title="Total revenue"
+					value={`₱${monthlyRevenue.toLocaleString()}`}
+					change="Membership + walk-in fees"
 					changeType="positive"
 				/>
 				<StatCard
@@ -433,20 +444,20 @@ export function DashboardPage() {
 					changeType="neutral"
 				/>
 				<StatCard
-					icon={PhilippinePeso}
-					title="Total revenue"
-					value={`₱${monthlyRevenue.toLocaleString()}`}
-					change="Membership + walk-in fees"
+					icon={Users}
+					title="Total Members"
+					value={totalMembers}
+					change={`+${members.filter((m) => m.joinDate === 'November 2024').length} this month`}
 					changeType="positive"
 				/>
 				<StatCard
 					icon={UserRound}
-					title="Walk-in fees"
-					value={`₱${Number(walkInRev).toLocaleString()}`}
+					title="Total walk-ins"
+					value={totalWalkInTimeIns}
 					change={
-						walkInCheckInsTotal > 0
-							? `${walkInCheckInsTotal} time-in${walkInCheckInsTotal === 1 ? '' : 's'} (tracked days)`
-							: 'Walk-in time-in revenue'
+						totalWalkInAccounts > 0
+							? `${totalWalkInAccounts} walk-in account${totalWalkInAccounts === 1 ? '' : 's'} · ₱${Number(walkInRev).toLocaleString()} fees`
+							: `₱${Number(walkInRev).toLocaleString()} walk-in fees`
 					}
 					changeType="positive"
 				/>
