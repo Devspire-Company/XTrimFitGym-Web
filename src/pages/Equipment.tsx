@@ -696,7 +696,7 @@ export function EquipmentPage() {
 								) : null}
 							</div>
 							<div className="flex gap-3">
-								{item.isArchived && !useLegacyApi ? (
+								{item.isArchived ? (
 									<button
 										type="button"
 										onClick={() => handleRestore(item)}
