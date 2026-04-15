@@ -462,7 +462,7 @@ export function MembersPage() {
 	});
 
 	const filteredMembers = useMemo(() => {
-		return apiMembers.filter((member) => {
+		const filtered = apiMembers.filter((member) => {
 			const matchesSearch =
 				!searchTerm ||
 				member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -471,8 +471,16 @@ export function MembersPage() {
 			const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
 			const matchesMembership =
 				membershipFilter === 'all' || member.membership === membershipFilter;
-			
+
 			return matchesSearch && matchesStatus && matchesMembership;
+		});
+
+		// Keep disabled accounts at the bottom for better admin prioritization.
+		return [...filtered].sort((a, b) => {
+			const aDisabled = a.status === 'Disabled';
+			const bDisabled = b.status === 'Disabled';
+			if (aDisabled === bDisabled) return 0;
+			return aDisabled ? 1 : -1;
 		});
 	}, [apiMembers, searchTerm, statusFilter, membershipFilter]);
 
@@ -1186,7 +1194,7 @@ export function MembersPage() {
 									Destructive action
 								</p>
 								<p className="mt-1 text-sm font-medium text-[#FEE2E2]">
-									This will cancel the member's active subscription.
+									Review details before continuing. This cannot be undone automatically.
 								</p>
 							</div>
 
@@ -1215,7 +1223,6 @@ export function MembersPage() {
 							<div className="modal-actions mt-6 flex gap-3">
 								<button
 									type="button"
-									className="btn-secondary"
 									onClick={() => {
 										setIsUnsubscribeModalOpen(false);
 										setMemberToUnsubscribe(null);
