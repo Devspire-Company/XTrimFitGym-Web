@@ -696,7 +696,7 @@ export function WalkInAttendancePage() {
 					<button
 						type="button"
 						onClick={handleExportPdf}
-						className="inline-flex items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.05)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)]"
+						className="btn-export-pdf"
 					>
 						<Download className="h-4 w-4" />
 						Export PDF

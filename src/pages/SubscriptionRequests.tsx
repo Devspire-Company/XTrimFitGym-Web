@@ -208,7 +208,7 @@ export function SubscriptionRequestsPage() {
 						Manage all subscription requests from members ({filteredRequests.length} of {activeRequests.length} shown)
 					</p>
 				</div>
-				<Button onClick={handleExportPdf} className="btn-secondary">
+				<Button onClick={handleExportPdf} className="btn-export-pdf">
 					<Download className="w-4 h-4" />
 					Export PDF
 				</Button>

@@ -763,7 +763,7 @@ export function MembersPage() {
 						Manage all gym members, view details, and update information ({apiMembers.length} total, {filteredMembers.length} filtered)
 					</p>
 				</div>
-				<button onClick={handleExportPdf} className="btn-secondary inline-flex items-center gap-2">
+				<button onClick={handleExportPdf} className="btn-export-pdf">
 					<Download className="w-4 h-4" />
 					Export PDF
 				</button>

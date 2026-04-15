@@ -666,7 +666,7 @@ export function AttendancePage() {
 						Attendance Logs
 					</h1>
 					<p className="text-[var(--text-secondary)] mt-1">
-						Real-time attendance monitoring from iVMS-4200
+						Real-time attendance monitoring
 					</p>
 				</div>
 
@@ -685,7 +685,7 @@ export function AttendancePage() {
 
 				<button
 					onClick={handleExportPdf}
-					className="self-start flex items-center gap-2 px-4 py-2 bg-[rgba(249,197,19,0.12)] text-[var(--primary-yellow)] rounded-lg border border-[rgba(249,197,19,0.3)]"
+					className="btn-export-pdf self-start"
 				>
 					<Download className="w-4 h-4" />
 					Export PDF

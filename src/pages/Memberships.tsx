@@ -300,7 +300,7 @@ export function MembershipsPage() {
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<Button onClick={handleExportPdf} className="btn-secondary">
+					<Button onClick={handleExportPdf} className="btn-export-pdf">
 						<Download className="w-4 h-4" />
 						Export PDF
 					</Button>

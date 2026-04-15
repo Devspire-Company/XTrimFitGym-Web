@@ -787,6 +787,35 @@
 	color: var(--text-primary);
 }
 
+/* Unified Export PDF button style (used across all pages). */
+.btn-export-pdf {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	padding: 0.62rem 1rem;
+	border-radius: 0.75rem;
+	background: rgba(249, 197, 19, 0.08) !important;
+	border: 1px solid rgba(249, 197, 19, 0.38) !important;
+	color: var(--primary-yellow) !important;
+	font-size: 0.95rem;
+	font-weight: 600;
+	line-height: 1;
+	transition: var(--transition);
+}
+
+.btn-export-pdf:hover {
+	background: rgba(249, 197, 19, 0.16) !important;
+	border-color: rgba(249, 197, 19, 0.58) !important;
+	color: #ffe28a !important;
+	box-shadow: 0 8px 18px rgba(249, 197, 19, 0.14);
+}
+
+.btn-export-pdf:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(249, 197, 19, 0.2);
+}
+
 /* Button Gradient Animation */
 .btn-gradient,
 .btn-primary {

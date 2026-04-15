@@ -955,7 +955,7 @@ export function EquipmentPage() {
 						<Plus className="w-4 h-4" />
 						Add Equipment
 					</Button>
-					<Button onClick={handleExportPdf} className="btn-secondary">
+					<Button onClick={handleExportPdf} className="btn-export-pdf">
 						<Download className="w-4 h-4" />
 						Export PDF
 					</Button>
