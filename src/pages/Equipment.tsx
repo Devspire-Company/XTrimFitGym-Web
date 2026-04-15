@@ -198,6 +198,12 @@ function actionTypeText(actionType: EquipmentActionLog['actionType']): string {
 	}
 }
 
+function toEpoch(dateValue: string | null | undefined): number {
+	if (!dateValue) return 0;
+	const t = new Date(dateValue).getTime();
+	return Number.isFinite(t) ? t : 0;
+}
+
 const ARCHIVE_REASON_OPTIONS = [
 	'Damaged beyond repair',
 	'Replaced by a new unit',
@@ -360,6 +366,40 @@ export function EquipmentPage() {
 			if (latestIso) {
 				map[item.id] = latestIso;
 			}
+		});
+		return map;
+	}, [normalizedList, equipmentActionLogs]);
+	const conditionSetAtByEquipmentId = useMemo(() => {
+		const map: Record<string, Record<EquipmentStatus, string>> = {};
+		normalizedList.forEach((item) => {
+			const byStatus: Record<EquipmentStatus, string> = {
+				[EquipmentStatus.Available]: '',
+				[EquipmentStatus.Damaged]: '',
+				[EquipmentStatus.Undermaintenance]: '',
+			};
+			const lifecycleLogs = Array.isArray(item.lifecycleLogs) ? item.lifecycleLogs : [];
+			lifecycleLogs.forEach((entry: any) => {
+				const status = entry?.status as EquipmentStatus | undefined;
+				if (!status || !(status in byStatus)) return;
+				const changedAt = entry?.changedAt as string | undefined;
+				if (!changedAt) return;
+				if (!byStatus[status] || toEpoch(changedAt) > toEpoch(byStatus[status])) {
+					byStatus[status] = changedAt;
+				}
+			});
+			equipmentActionLogs.forEach((entry) => {
+				if (entry.equipmentId !== item.id) return;
+				const status = entry.toStatus;
+				if (!status || !(status in byStatus)) return;
+				if (!byStatus[status] || toEpoch(entry.createdAt) > toEpoch(byStatus[status])) {
+					byStatus[status] = entry.createdAt;
+				}
+			});
+			const currentStatus = item.status as EquipmentStatus;
+			if (currentStatus && !byStatus[currentStatus]) {
+				byStatus[currentStatus] = item.updatedAt || item.createdAt || '';
+			}
+			map[item.id] = byStatus;
 		});
 		return map;
 	}, [normalizedList, equipmentActionLogs]);
@@ -748,40 +788,56 @@ export function EquipmentPage() {
 			40
 		);
 		doc.text(`Exported by: ${exportedByLabel}`, 14, 46);
-
-		autoTable(doc, {
-			startY: 52,
-			head: [
-				[
+		const renderConditionTable = (
+			title: string,
+			conditionStatus: EquipmentStatus,
+			conditionDateLabel: string
+		) => {
+			const rows = reportRows.filter((eq) => eq.status === conditionStatus);
+			const startY = ((doc as any).lastAutoTable?.finalY ?? 52) + 10;
+			doc.setFontSize(11);
+			doc.setFont(interReady ? 'Inter' : 'helvetica', 'bold');
+			doc.text(title, 14, startY - 3);
+			autoTable(doc, {
+				startY,
+				head: [[
 					'Name',
-					'Condition',
 					'Record State',
 					'Added Date',
-					'Under maintenance since',
+					conditionDateLabel,
 					'Archived Date',
 					'Archive Reason',
 					'Acquired Date',
 					'Notes',
-				],
-			],
-			body: reportRows.map((eq) => [
-				eq.name,
-				statusLabel(eq.status),
-				eq.isArchived ? 'Archived' : 'Current',
-				formatDateManila(eq.createdAt),
-				formatDateManila(maintenanceSetAtByEquipmentId[eq.id]),
-				formatDateManila(eq.archivedAt),
-				eq.archiveReason || '-',
-				formatDateManila(eq.acquiredAt),
-				eq.notes || '-',
-			]),
-			styles: { fontSize: 8 },
-			headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
-			alternateRowStyles: { fillColor: [245, 245, 248] },
-			margin: { left: 14, right: 14 },
-		});
+				]],
+				body:
+					rows.length > 0
+						? rows.map((eq) => [
+								eq.name,
+								eq.isArchived ? 'Archived' : 'Current',
+								formatDateManila(eq.createdAt),
+								formatDateManila(conditionSetAtByEquipmentId[eq.id]?.[conditionStatus]),
+								formatDateManila(eq.archivedAt),
+								eq.archiveReason || '-',
+								formatDateManila(eq.acquiredAt),
+								eq.notes || '-',
+						  ])
+						: [['-', '-', '-', '-', '-', '-', '-', 'No equipment in this condition']],
+				styles: { fontSize: 8 },
+				headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
+				alternateRowStyles: { fillColor: [245, 245, 248] },
+				margin: { left: 14, right: 14 },
+			});
+		};
+		renderConditionTable('Available Equipment', EquipmentStatus.Available, 'Available since');
+		renderConditionTable(
+			'Under Maintenance Equipment',
+			EquipmentStatus.Undermaintenance,
+			'Under maintenance since'
+		);
+		renderConditionTable('Damaged Equipment', EquipmentStatus.Damaged, 'Damaged since');
 		autoTable(doc, {
-			startY: ((doc as any).lastAutoTable?.finalY ?? 52) + 8,
+			startY: ((doc as any).lastAutoTable?.finalY ?? 52) + 10,
 			head: [['Equipment', 'Action', 'From status', 'To status', 'Reason/Notes', 'Changed by', 'Date']],
 			body:
 				timelineEntries.length > 0
@@ -902,7 +958,7 @@ export function EquipmentPage() {
 				{visibleList.map((item) => (
 					<div
 						key={item.id}
-						className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] overflow-hidden backdrop-blur-md"
+						className="flex h-full min-h-[31rem] flex-col bg-[var(--card-bg)] border border-[var(--card-border)] rounded-[20px] overflow-hidden backdrop-blur-md"
 					>
 						<div className="aspect-[4/3] bg-[var(--bg-darker)]">
 							<img
@@ -911,7 +967,7 @@ export function EquipmentPage() {
 								className="w-full h-full object-cover"
 							/>
 						</div>
-						<div className="p-5">
+						<div className="flex h-full flex-col p-5">
 							<div className="flex items-start justify-between gap-2 mb-2">
 								<h3 className="text-lg font-bold text-[var(--text-primary)] flex-1">
 									{item.name}
@@ -965,7 +1021,7 @@ export function EquipmentPage() {
 									</>
 								) : null}
 							</div>
-							<div className="flex gap-3">
+							<div className="mt-auto flex gap-3 pt-2">
 								{item.isArchived ? (
 									<button
 										type="button"
