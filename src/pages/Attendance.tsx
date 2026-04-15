@@ -623,7 +623,9 @@ export function AttendancePage() {
 		);
 	}
 
-	if (error && !data) {
+	// With errorPolicy: 'all', GraphQL field errors still set `error` but `data` may be a non-empty object
+	// (e.g. { getAttendanceRecords: null }). `error && !data` would miss that and show an empty page.
+	if (error && !loading && !data?.getAttendanceRecords) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
 				<div className="text-center">
