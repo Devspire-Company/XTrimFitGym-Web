@@ -35,6 +35,7 @@ import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
 import { AdjustSubscriptionDurationModal } from '@/components/modals/AdjustSubscriptionDurationModal';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Member {
 	id: string;
@@ -115,26 +116,11 @@ export function MembersPage() {
 		currentStartedAtIso?: string;
 	} | null>(null);
 	const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
-	const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(
-		null
-	);
 
-	// Close dropdown when clicking outside
-	useEffect(() => {
-		const handleClickOutside = () => {
-			if (openDropdownId) {
-				setOpenDropdownId(null);
-			}
-		};
+	const closeMemberActionsMenu = () => setOpenDropdownId(null);
 
-		if (openDropdownId) {
-			document.addEventListener('mousedown', handleClickOutside);
-		}
-
-		return () => {
-			document.removeEventListener('mousedown', handleClickOutside);
-		};
-	}, [openDropdownId]);
+	const memberMenuItemClass =
+		'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] outline-none transition-colors hover:bg-[rgba(255,255,255,0.08)] focus-visible:bg-[rgba(255,255,255,0.08)] focus-visible:ring-2 focus-visible:ring-[rgba(249,197,19,0.35)] disabled:pointer-events-none disabled:opacity-45';
 
 	// Initial data fetch with query
 	const { data, loading, error } = useQuery(GET_USERS, {
@@ -646,22 +632,6 @@ export function MembersPage() {
 	};
 
 
-	// Debug: Log when modal state changes
-	useEffect(() => {
-		console.log('📊 Subscribe modal state changed:', {
-			isOpen: isSubscribeModalOpen,
-			memberToSubscribe,
-		});
-	}, [isSubscribeModalOpen, memberToSubscribe]);
-
-	// Debug: Log when modal state changes
-	useEffect(() => {
-		console.log('📊 Subscribe modal state:', {
-			isOpen: isSubscribeModalOpen,
-			memberToSubscribe,
-		});
-	}, [isSubscribeModalOpen, memberToSubscribe]);
-
 	// Show loading state
 	if (loading) {
 		return (
@@ -881,29 +851,159 @@ export function MembersPage() {
 											)}
 										</td>
 										<td className="px-4 py-5">
-											<div className="relative">
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														const button = e.currentTarget;
-														const rect = button.getBoundingClientRect();
-														if (openDropdownId === member.id) {
-															setOpenDropdownId(null);
-															setDropdownPosition(null);
-														} else {
-															setOpenDropdownId(member.id);
-															setDropdownPosition({
-																top: rect.bottom + 4,
-																right: window.innerWidth - rect.right,
-															});
-														}
-													}}
-													className="btn-small px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] border border-[var(--card-border)] hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-													title="Actions"
+											<Popover
+												open={openDropdownId === member.id}
+												onOpenChange={(open) =>
+													setOpenDropdownId(open ? member.id : null)
+												}
+											>
+												<PopoverTrigger asChild>
+													<button
+														type="button"
+														className="btn-small inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] border border-[var(--card-border)] hover:bg-[rgba(255,255,255,0.1)] transition-colors data-[state=open]:border-[var(--primary-yellow)] data-[state=open]:ring-2 data-[state=open]:ring-[rgba(249,197,19,0.2)]"
+														title="Member actions"
+														aria-label={`Open actions for ${member.name}`}
+													>
+														<MoreVertical className="w-4 h-4" aria-hidden />
+													</button>
+												</PopoverTrigger>
+												<PopoverContent
+													align="end"
+													sideOffset={8}
+													collisionPadding={16}
+													onCloseAutoFocus={(e) => e.preventDefault()}
+													className="w-[min(100vw-2rem,15rem)] rounded-xl border border-[rgba(255,255,255,0.12)] !bg-[#16181f] p-1.5 text-[var(--text-primary)] shadow-2xl ring-1 ring-black/25"
 												>
-													<MoreVertical className="w-4 h-4" />
-												</button>
-											</div>
+													<div
+														role="menu"
+														className="flex flex-col gap-0.5"
+														aria-label={`Actions for ${member.name}`}
+													>
+													<button
+														type="button"
+														role="menuitem"
+														className={memberMenuItemClass}
+														onClick={() => {
+															handleView(member);
+															closeMemberActionsMenu();
+														}}
+													>
+														<Eye className="h-4 w-4 shrink-0 text-[#60A5FA]" aria-hidden />
+														View details
+													</button>
+
+													{member.status === 'Disabled' ? (
+														<>
+															<div
+																className="mx-1 my-1 h-px bg-[rgba(255,255,255,0.08)]"
+																role="separator"
+															/>
+															<button
+																type="button"
+																role="menuitem"
+																className={memberMenuItemClass}
+																onClick={async () => {
+																	try {
+																		await enableUserMutation({
+																			variables: { id: member.id },
+																		});
+																		closeMemberActionsMenu();
+																	} catch {
+																		/* toast from mutation */
+																	}
+																}}
+															>
+																<CheckCircle2 className="h-4 w-4 shrink-0 text-[#34D399]" aria-hidden />
+																Enable account
+															</button>
+														</>
+													) : member.status === 'Active' && member.transactionId ? (
+														<>
+															<div
+																className="mx-1 my-1 h-px bg-[rgba(255,255,255,0.08)]"
+																role="separator"
+															/>
+															<button
+																type="button"
+																role="menuitem"
+																className={memberMenuItemClass}
+																onClick={() => {
+																	handleRenew(member);
+																	closeMemberActionsMenu();
+																}}
+															>
+																<RotateCw className="h-4 w-4 shrink-0 text-[var(--primary-yellow)]" aria-hidden />
+																Renew plan
+															</button>
+															<button
+																type="button"
+																role="menuitem"
+																className={memberMenuItemClass}
+																onClick={() => {
+																	handleAdjustDuration(member);
+																	closeMemberActionsMenu();
+																}}
+															>
+																<Calendar className="h-4 w-4 shrink-0 text-[#60A5FA]" aria-hidden />
+																Edit subscription length
+															</button>
+															<button
+																type="button"
+																role="menuitem"
+																className={memberMenuItemClass}
+																onClick={() => {
+																	handleUnsubscribe(member);
+																	closeMemberActionsMenu();
+																}}
+															>
+																<X className="h-4 w-4 shrink-0 text-[#F87171]" aria-hidden />
+																Unsubscribe
+															</button>
+														</>
+													) : (
+														<>
+															<div
+																className="mx-1 my-1 h-px bg-[rgba(255,255,255,0.08)]"
+																role="separator"
+															/>
+															<button
+																type="button"
+																role="menuitem"
+																className={memberMenuItemClass}
+																onClick={() => {
+																	handleSubscribe(member);
+																	closeMemberActionsMenu();
+																}}
+															>
+																<CreditCard className="h-4 w-4 shrink-0 text-[#34D399]" aria-hidden />
+																Subscribe to plan
+															</button>
+														</>
+													)}
+
+													{member.status !== 'Disabled' && (
+														<>
+															<div
+																className="mx-1 my-1 h-px bg-[rgba(255,255,255,0.08)]"
+																role="separator"
+															/>
+															<button
+																type="button"
+																role="menuitem"
+																className={`${memberMenuItemClass} hover:bg-[rgba(239,68,68,0.12)] focus-visible:ring-[rgba(239,68,68,0.35)]`}
+																onClick={() => {
+																	handleDelete(member);
+																	closeMemberActionsMenu();
+																}}
+															>
+																<Ban className="h-4 w-4 shrink-0 text-[#F87171]" aria-hidden />
+																Disable account
+															</button>
+														</>
+													)}
+													</div>
+												</PopoverContent>
+											</Popover>
 										</td>
 									</tr>
 								))
@@ -912,151 +1012,6 @@ export function MembersPage() {
 					</table>
 				</div>
 			</div>
-
-			{/* Dropdown Menu - Rendered outside table */}
-			{openDropdownId && dropdownPosition && (
-				<>
-					<div
-						className="fixed inset-0 z-[45]"
-						onClick={() => {
-							setOpenDropdownId(null);
-							setDropdownPosition(null);
-						}}
-						style={{ pointerEvents: 'auto' }}
-					></div>
-					<div
-						className="fixed w-48 bg-[#1a1a1a] border border-[var(--card-border)] rounded-lg shadow-lg z-[60]"
-						style={{
-							top: `${dropdownPosition.top}px`,
-							right: `${dropdownPosition.right}px`,
-							pointerEvents: 'auto',
-						}}
-						onClick={(e) => e.stopPropagation()}
-						onMouseDown={(e) => e.stopPropagation()}
-					>
-						<div className="py-1">
-							{(() => {
-								const member = filteredMembers.find((m) => m.id === openDropdownId);
-								if (!member) return null;
-								return (
-									<>
-										<button
-											type="button"
-											onClick={(e) => {
-												e.preventDefault();
-												e.stopPropagation();
-												handleView(member);
-												setOpenDropdownId(null);
-												setDropdownPosition(null);
-											}}
-											onMouseDown={(e) => e.stopPropagation()}
-											className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(59,130,246,0.1)] flex items-center gap-2 cursor-pointer"
-										>
-											<Eye className="w-4 h-4 text-[#3B82F6]" />
-											View
-										</button>
-										{member.status === 'Disabled' ? (
-											<button
-												type="button"
-												onClick={async (e) => {
-													e.preventDefault();
-													e.stopPropagation();
-													await enableUserMutation({ variables: { id: member.id } });
-													setOpenDropdownId(null);
-													setDropdownPosition(null);
-												}}
-												className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(16,185,129,0.1)] flex items-center gap-2 cursor-pointer"
-											>
-												<CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-												Enable
-											</button>
-										) : member.status === 'Active' && member.transactionId ? (
-											<>
-												<button
-													type="button"
-													onClick={(e) => {
-														e.preventDefault();
-														e.stopPropagation();
-														handleRenew(member);
-														setOpenDropdownId(null);
-														setDropdownPosition(null);
-													}}
-													onMouseDown={(e) => e.stopPropagation()}
-													className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(249,197,19,0.1)] flex items-center gap-2 cursor-pointer"
-												>
-													<RotateCw className="w-4 h-4 text-[var(--primary-yellow)]" />
-													Renew
-												</button>
-												<button
-													type="button"
-													onClick={(e) => {
-														e.preventDefault();
-														e.stopPropagation();
-														handleAdjustDuration(member);
-														setOpenDropdownId(null);
-														setDropdownPosition(null);
-													}}
-													onMouseDown={(e) => e.stopPropagation()}
-													className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(59,130,246,0.1)] flex items-center gap-2 cursor-pointer"
-												>
-													<Calendar className="w-4 h-4 text-[#3B82F6]" />
-													Edit subscription length
-												</button>
-											<button
-												type="button"
-												onClick={(e) => {
-													e.preventDefault();
-													e.stopPropagation();
-													handleUnsubscribe(member);
-													setOpenDropdownId(null);
-													setDropdownPosition(null);
-												}}
-												onMouseDown={(e) => e.stopPropagation()}
-												className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(239,68,68,0.1)] flex items-center gap-2 cursor-pointer"
-											>
-												<X className="w-4 h-4 text-[#EF4444]" />
-												Unsubscribe
-											</button>
-											</>
-										) : (
-											<button
-												type="button"
-												onClick={(e) => {
-													e.preventDefault();
-													e.stopPropagation();
-													handleSubscribe(member);
-													setOpenDropdownId(null);
-													setDropdownPosition(null);
-												}}
-												onMouseDown={(e) => e.stopPropagation()}
-												className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(16,185,129,0.1)] flex items-center gap-2 cursor-pointer"
-											>
-												<CreditCard className="w-4 h-4 text-[#10B981]" />
-												Subscribe
-											</button>
-										)}
-										<button
-											type="button"
-											onClick={(e) => {
-												e.preventDefault();
-												e.stopPropagation();
-												handleDelete(member);
-												setOpenDropdownId(null);
-												setDropdownPosition(null);
-											}}
-											onMouseDown={(e) => e.stopPropagation()}
-											className="w-full text-left px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[rgba(239,68,68,0.1)] flex items-center gap-2 cursor-pointer"
-										>
-											<Ban className="w-4 h-4 text-[#EF4444]" />
-											Disable
-										</button>
-									</>
-								);
-							})()}
-						</div>
-					</div>
-				</>
-			)}
 
 			{/* View Modal */}
 			<div
