@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Plus, Eye, Edit, Trash2, CreditCard, Crown, Check } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, CreditCard, Crown, Check, Download } from 'lucide-react';
 import { MembershipFormModal, type MembershipFormData } from '@/components/modals/MembershipFormModal';
 import { MembershipViewModal } from '@/components/modals/MembershipViewModal';
 import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
@@ -22,6 +22,7 @@ import {
 	readRemovedMembershipLogs,
 	type RemovedMembershipLog,
 } from '@/lib/membershipRemovalLogs';
+import { exportTablePdf } from '@/lib/pdfExport';
 
 export function MembershipsPage() {
 	useEffect(() => {
@@ -249,6 +250,41 @@ export function MembershipsPage() {
 		DAILY: 'day pass',
 	};
 
+	const handleExportPdf = () => {
+		if (activeTab === 'active') {
+			exportTablePdf({
+				title: 'Membership Plans - Active',
+				filePrefix: 'membership-plans-active',
+				subtitle: `Total active plans: ${plans.length}`,
+				head: ['Plan Name', 'Status', 'Price', 'Duration', 'Description', 'Features'],
+				rows: plans.map((plan) => [
+					plan.name,
+					plan.status,
+					`PHP ${Number(plan.monthlyPrice || 0).toLocaleString()}`,
+					durationMap[plan.durationType] || plan.durationType || '-',
+					plan.description || '-',
+					(plan.features || []).join(', ') || '-',
+				]),
+			});
+			return;
+		}
+
+		exportTablePdf({
+			title: 'Membership Plans - Removed History',
+			filePrefix: 'membership-plans-removed',
+			subtitle: `Total removed plans: ${removedPlans.length}`,
+			head: ['Removed At', 'Plan', 'Price', 'Duration', 'Reason', 'Removed By'],
+			rows: removedPlans.map((log) => [
+				new Date(log.removedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
+				log.planName,
+				`PHP ${Number(log.planPrice || 0).toLocaleString()}`,
+				durationMap[log.planDurationType] || log.planDurationType,
+				log.reason,
+				log.removedBy,
+			]),
+		});
+	};
+
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
@@ -264,6 +300,10 @@ export function MembershipsPage() {
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
+					<Button onClick={handleExportPdf} className="btn-secondary">
+						<Download className="w-4 h-4" />
+						Export PDF
+					</Button>
 					{activeTab === 'active' && (
 						<Button onClick={handleCreatePlan}>
 							<Plus className="w-4 h-4" />

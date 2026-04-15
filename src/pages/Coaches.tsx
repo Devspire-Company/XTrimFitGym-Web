@@ -8,6 +8,7 @@ import {
 	Trash2,
 	UserCog,
 	X,
+	Download,
 	Copy,
 	Save,
 	Edit,
@@ -26,6 +27,7 @@ import { RoleType } from '@/graphql/generated/graphql';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfDay, startOfMonth } from 'date-fns';
+import { exportTablePdf } from '@/lib/pdfExport';
 
 interface Coach {
 	id: string;
@@ -216,6 +218,34 @@ export function CoachesPage() {
 		});
 	}, [apiCoaches, searchTerm, statusFilter]);
 
+	const handleExportPdf = () => {
+		exportTablePdf({
+			title: 'Coach Management',
+			filePrefix: 'coaches',
+			subtitle: `Total rows: ${filteredCoaches.length}`,
+			head: [
+				'Coach',
+				'Email',
+				'Phone',
+				'Specialization',
+				'Experience',
+				'Teaching Time',
+				'Clients',
+				'Status',
+			],
+			rows: filteredCoaches.map((coach) => [
+				coach.name,
+				coach.email,
+				coach.phone,
+				coach.specialization,
+				`${coach.yearsExperience} years`,
+				coach.teachingTime?.join(', ') || 'N/A',
+				`${coach.totalClients}/${coach.clientLimit > 0 ? coach.clientLimit : '∞'}`,
+				coach.status,
+			]),
+		});
+	};
+
 	// Show loading state
 	if (loading) {
 		return (
@@ -275,6 +305,10 @@ export function CoachesPage() {
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
+					<Button onClick={handleExportPdf} className="btn-secondary">
+						<Download className="w-4 h-4" />
+						Export PDF
+					</Button>
 					<Button onClick={handleAddCoach}>
 						<Plus className="w-4 h-4" />
 						Add New Coach

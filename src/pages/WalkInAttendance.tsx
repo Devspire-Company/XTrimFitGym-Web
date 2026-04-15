@@ -35,7 +35,9 @@ import {
 	X,
 	Pencil,
 	Users,
+	Download,
 } from 'lucide-react';
+import { exportTablePdf } from '@/lib/pdfExport';
 
 const ACCOUNTS_PAGE_SIZE = 25;
 
@@ -539,6 +541,25 @@ export function WalkInAttendancePage() {
 	const hasPrevAccounts = accountsPage > 0;
 	const hasNextAccounts = accountsOffset + accountRows.length < totalWalkInAccounts;
 
+	const handleExportPdf = () => {
+		exportTablePdf({
+			title: 'Walk-in Attendance Logs',
+			filePrefix: 'walk-in-attendance',
+			subtitle: `Log date: ${logDate} | Visible rows: ${logs.length} | Total records: ${totalCount}`,
+			head: ['Time In (Manila)', 'Payment', 'Name', 'Age', 'Gender', 'Contact', 'Email', 'Notes'],
+			rows: logs.map((row) => [
+				formatTimeManila(row.timedInAt),
+				`PHP ${Number(row.payment ?? 0).toLocaleString()}`,
+				formatWalkInName(row.walkInClient),
+				row.walkInClient.ageYears != null ? row.walkInClient.ageYears : '—',
+				genderLabel(row.walkInClient.gender),
+				row.walkInClient.phoneNumber ?? '—',
+				row.walkInClient.email ?? '—',
+				row.walkInClient.notes ?? '—',
+			]),
+		});
+	};
+
 	return (
 		<div className="p-6 md:p-10 max-w-[1400px] mx-auto space-y-8">
 			<div>
@@ -671,6 +692,14 @@ export function WalkInAttendancePage() {
 					>
 						<Search className="h-4 w-4" />
 						Returning walk-in
+					</button>
+					<button
+						type="button"
+						onClick={handleExportPdf}
+						className="inline-flex items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.05)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)]"
+					>
+						<Download className="h-4 w-4" />
+						Export PDF
 					</button>
 				</div>
 			</div>

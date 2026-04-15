@@ -726,6 +726,11 @@ export function ReportsPage() {
 		appendLocalExportLog('ANALYTICS_PDF', filename);
 	};
 
+	const exportAllPdf = async () => {
+		// "All" in downloadables maps to the full legal analytics bundle.
+		await exportAnalyticsPdf();
+	};
+
 	const exportRevenuePdf = async () => {
 		const doc = new jsPDF({ orientation: 'landscape' });
 		const now = new Date();
@@ -1031,6 +1036,17 @@ export function ReportsPage() {
 						className="w-[min(100vw-2rem,20rem)] rounded-xl border border-[rgba(255,255,255,0.12)] p-2 text-[var(--text-primary)] shadow-2xl ring-1 ring-black/25 !bg-[#16181f]"
 					>
 						<div className="flex flex-col gap-0.5">
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
+									void exportAllPdf();
+								}}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#fb923c]" aria-hidden />
+								<span>All (PDF, Legal)</span>
+							</button>
 							<button
 								type="button"
 								onClick={() => {

@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { X as XIcon, Clock, CheckCircle2, XCircle, Search } from 'lucide-react';
+import { X as XIcon, Clock, CheckCircle2, XCircle, Search, Download } from 'lucide-react';
 import { GET_ALL_SUBSCRIPTION_REQUESTS } from '@/graphql/operations/index';
 import type { GetAllSubscriptionRequestsQuery } from '@/graphql/generated/types';
+import { exportTablePdf } from '@/lib/pdfExport';
 
 export function SubscriptionRequestsPage() {
 	useEffect(() => {
@@ -73,6 +74,30 @@ export function SubscriptionRequestsPage() {
 	// Group filtered requests by status for statistics
 	const pendingRequests = filteredRequests.filter((r) => r.status === 'PENDING');
 	const approvedRequests = filteredRequests.filter((r) => r.status === 'APPROVED');
+
+	const handleExportPdf = () => {
+		exportTablePdf({
+			title: 'Subscription Requests',
+			filePrefix: 'subscription-requests',
+			subtitle: `Total rows: ${filteredRequests.length} | Filter: ${statusFilter}`,
+			head: ['Member', 'Email', 'Plan', 'Price', 'Status', 'Requested At', 'Processed By'],
+			rows: filteredRequests.map((request) => [
+				`${request.member?.firstName || ''} ${request.member?.lastName || ''}`.trim() || 'N/A',
+				request.member?.email || 'N/A',
+				request.membership?.name || 'N/A',
+				request.membership?.monthlyPrice != null
+					? `PHP ${Number(request.membership.monthlyPrice).toLocaleString()}`
+					: 'N/A',
+				request.status,
+				formatDate(request.requestedAt),
+				request.status === 'APPROVED' && request.approvedBy
+					? `${request.approvedBy.firstName} ${request.approvedBy.lastName}`
+					: request.status === 'REJECTED' && request.rejectedBy
+						? `${request.rejectedBy.firstName} ${request.rejectedBy.lastName}`
+						: '-',
+			]),
+		});
+	};
 
 	// Show loading state
 	if (loading) {
@@ -173,7 +198,7 @@ export function SubscriptionRequestsPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between">
+			<div className="flex items-center justify-between gap-3">
 				<div>
 					<h1 className="text-3xl font-bold flex items-center gap-2">
 						<Clock className="w-8 h-8" color="var(--primary-yellow)" />
@@ -183,6 +208,10 @@ export function SubscriptionRequestsPage() {
 						Manage all subscription requests from members ({filteredRequests.length} of {activeRequests.length} shown)
 					</p>
 				</div>
+				<Button onClick={handleExportPdf} className="btn-secondary">
+					<Download className="w-4 h-4" />
+					Export PDF
+				</Button>
 			</div>
 
 			{/* Search and Filter Bar */}

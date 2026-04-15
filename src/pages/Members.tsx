@@ -19,6 +19,7 @@ import {
 	FileText,
 	RotateCw,
 	CheckCircle2,
+	Download,
 } from 'lucide-react';
 import {
 	GET_USERS,
@@ -36,6 +37,7 @@ import { addToast } from '@/store/slices/uiSlice';
 import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
 import { AdjustSubscriptionDurationModal } from '@/components/modals/AdjustSubscriptionDurationModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { exportTablePdf } from '@/lib/pdfExport';
 
 interface Member {
 	id: string;
@@ -511,6 +513,24 @@ export function MembersPage() {
 		});
 	}, [apiMembers, searchTerm, statusFilter, membershipFilter]);
 
+	const handleExportPdf = () => {
+		exportTablePdf({
+			title: 'Member Management',
+			filePrefix: 'members',
+			subtitle: `Total rows: ${filteredMembers.length} | Status filter: ${statusFilter} | Membership filter: ${membershipFilter}`,
+			head: ['Member', 'Email', 'Phone', 'Membership', 'Status', 'Join Date', 'Expires'],
+			rows: filteredMembers.map((member) => [
+				member.name,
+				member.email,
+				member.phone,
+				member.membership,
+				member.status,
+				member.joinDate,
+				member.endDate || '—',
+			]),
+		});
+	};
+
 	const handleView = (member: Member) => {
 		setSelectedMember(member);
 		setIsViewModalOpen(true);
@@ -743,6 +763,10 @@ export function MembersPage() {
 						Manage all gym members, view details, and update information ({apiMembers.length} total, {filteredMembers.length} filtered)
 					</p>
 				</div>
+				<button onClick={handleExportPdf} className="btn-secondary inline-flex items-center gap-2">
+					<Download className="w-4 h-4" />
+					Export PDF
+				</button>
 			</div>
 
 			{/* Search and Filters */}
