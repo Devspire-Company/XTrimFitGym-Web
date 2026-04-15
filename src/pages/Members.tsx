@@ -74,6 +74,9 @@ interface Member {
 	subscriptionStartedAt?: string;
 }
 
+const normalizeFilterValue = (value: string | null | undefined): string =>
+	(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
 export function MembersPage() {
 	useEffect(() => {
 		document.title = 'Member Management - X-TRIM FIT GYM';
@@ -461,16 +464,40 @@ export function MembersPage() {
 		};
 	});
 
+	const membershipOptions = useMemo(() => {
+		const unique = new Set<string>();
+		apiMembers.forEach((member) => {
+			if (member.membership && member.membership.trim()) {
+				unique.add(member.membership.trim());
+			}
+		});
+		return Array.from(unique).sort((a, b) => a.localeCompare(b));
+	}, [apiMembers]);
+
+	useEffect(() => {
+		if (membershipFilter === 'all') return;
+		const exists = membershipOptions.some((plan) => plan === membershipFilter);
+		if (!exists) {
+			setMembershipFilter('all');
+		}
+	}, [membershipFilter, membershipOptions]);
+
 	const filteredMembers = useMemo(() => {
+		const normalizedSearch = normalizeFilterValue(searchTerm);
+		const normalizedStatusFilter = normalizeFilterValue(statusFilter);
+		const normalizedMembershipFilter = normalizeFilterValue(membershipFilter);
+
 		const filtered = apiMembers.filter((member) => {
-			const matchesSearch =
-				!searchTerm ||
-				member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				member.phone.includes(searchTerm);
-			const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
+			const searchable = normalizeFilterValue(
+				`${member.name} ${member.email} ${member.phone} ${member.membership} ${member.status} ${member.id}`,
+			);
+			const matchesSearch = !normalizedSearch || searchable.includes(normalizedSearch);
+			const matchesStatus =
+				statusFilter === 'all' ||
+				normalizeFilterValue(member.status) === normalizedStatusFilter;
 			const matchesMembership =
-				membershipFilter === 'all' || member.membership === membershipFilter;
+				membershipFilter === 'all' ||
+				normalizeFilterValue(member.membership) === normalizedMembershipFilter;
 
 			return matchesSearch && matchesStatus && matchesMembership;
 		});
@@ -750,9 +777,11 @@ export function MembersPage() {
 						className="px-4 py-2.5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
 					>
 						<option value="all">All Memberships</option>
-						<option value="Student">Student</option>
-						<option value="PROMO Student">PROMO Student</option>
-						<option value="Non student">Non student</option>
+						{membershipOptions.map((plan) => (
+							<option key={plan} value={plan}>
+								{plan}
+							</option>
+						))}
 					</select>
 				</div>
 			</div>
