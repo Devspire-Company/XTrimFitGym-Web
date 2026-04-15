@@ -38,6 +38,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAppSelector } from '@/store/hooks';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { collectAnalyticsExportSections } from '@/pages/reportsAnalyticsExport';
 
 type LocalExportLog = {
 	id: string;
@@ -333,7 +334,7 @@ export function ReportsPage() {
 			? reportLogsData?.getReportDownloadLogs ?? []
 			: localExportLogs;
 
-	const appendLocalExportLog = (reportType: ReportType, fileName: string) => {
+	const appendLocalExportLog = (reportType: ReportType | string, fileName: string) => {
 		const next: LocalExportLog = {
 			id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
 			reportType: String(reportType),
@@ -641,703 +642,83 @@ export function ReportsPage() {
 		};
 	}, [analytics]);
 
-	// CSV Export Function
-	const exportToCSV = () => {
-		const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-		const filename = `xtrimfitgym-analytics-${timestamp}.csv`;
+	const buildAnalyticsExportContext = () => ({
+		data,
+		analytics,
+		analyticsRangeData,
+		members,
+		membershipTypes,
+		coaches,
+		totalMembers,
+		activeMembers,
+		totalRevenue,
+		membershipSubscriptionRevenue,
+		walkInRevenueTotal,
+		activeSubscriptions,
+		newSubscriptions,
+		canceledSubscriptions,
+		expiredSubscriptions,
+		avgRevenuePerMember,
+		subscriptionRetentionRate,
+	});
 
-		// Helper function to escape CSV values
-		const escapeCSV = (value: any): string => {
-			if (value === null || value === undefined) return '';
-			const stringValue = String(value);
-			// If value contains comma, quote, or newline, wrap in quotes and escape quotes
-			if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-				return `"${stringValue.replace(/"/g, '""')}"`;
+	const exportAnalyticsPdf = async () => {
+		const sections = collectAnalyticsExportSections(buildAnalyticsExportContext());
+		const doc = new jsPDF({ unit: 'mm', format: 'legal', orientation: 'landscape' });
+		const now = new Date();
+		const filename = `xtrimfitgym-analytics-${now.toISOString().replace(/[:.]/g, '-').slice(0, 19)}.pdf`;
+		const summaryLine = `Full analytics export | ${sections.length} sections | Members: ${totalMembers} | Coaches: ${coaches.length} | Paper: US Legal landscape`;
+		const { startY, interReady } = await renderBrandedPdfHeader(
+			doc,
+			'Analytics Report',
+			now,
+			summaryLine,
+			exportedByLabel,
+		);
+
+		const margin = 14;
+		const pageW = doc.internal.pageSize.getWidth();
+		const pageH = doc.internal.pageSize.getHeight();
+		const tableWidth = pageW - 2 * margin;
+		let y = startY;
+		const fontFamily = interReady ? 'Inter' : 'helvetica';
+
+		for (const section of sections) {
+			const colCount = Math.max(1, section.head.length);
+			const fontSize = colCount > 14 ? 5.5 : colCount > 10 ? 6.5 : 7.5;
+
+			if (y > pageH - 36) {
+				doc.addPage();
+				y = margin;
 			}
-			return stringValue;
-		};
 
-		// Helper function to create CSV row
-		const createRow = (values: any[]): string => {
-			return values.map(escapeCSV).join(',') + '\n';
-		};
+			doc.setFont(fontFamily, 'bold');
+			doc.setFontSize(9);
+			doc.text(section.title.replace(/—/g, ' - '), margin, y);
+			y += 4;
 
-		// Helper function to format date
-		const formatDate = (dateString: string | null | undefined): string => {
-			if (!dateString) return 'N/A';
-			try {
-				return new Date(dateString).toLocaleDateString('en-US', {
-					year: 'numeric',
-					month: '2-digit',
-					day: '2-digit',
-					hour: '2-digit',
-					minute: '2-digit',
-				});
-			} catch {
-				return dateString;
-			}
-		};
-
-		// Helper function to calculate age from date of birth
-		const calculateAge = (dob: string | null | undefined): string => {
-			if (!dob) return 'N/A';
-			try {
-				const birthDate = new Date(dob);
-				const today = new Date();
-				let age = today.getFullYear() - birthDate.getFullYear();
-				const monthDiff = today.getMonth() - birthDate.getMonth();
-				if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-					age--;
-				}
-				return age.toString();
-			} catch {
-				return 'N/A';
-			}
-		};
-
-		let csvContent = '';
-
-		// 1. Summary Statistics
-		csvContent += '=== SUMMARY STATISTICS ===\n';
-		csvContent += createRow(['Metric', 'Value']);
-		csvContent += createRow(['Total Revenue', `₱${totalRevenue.toLocaleString()}`]);
-		csvContent += createRow([
-			'Membership Subscription Revenue',
-			`₱${membershipSubscriptionRevenue.toLocaleString()}`,
-		]);
-		csvContent += createRow(['Walk-in Fees (time-in)', `₱${walkInRevenueTotal.toLocaleString()}`]);
-		csvContent += createRow(['Total Members', totalMembers]);
-		csvContent += createRow(['Active Members', activeMembers]);
-		csvContent += createRow(['Inactive Members', totalMembers - activeMembers]);
-		csvContent += createRow(['Total Coaches', coaches.length]);
-		csvContent += createRow(['Active Subscriptions', activeSubscriptions]);
-		csvContent += createRow(['New Subscriptions', newSubscriptions]);
-		csvContent += createRow(['Canceled Subscriptions', canceledSubscriptions]);
-		csvContent += createRow(['Expired Subscriptions', expiredSubscriptions]);
-		csvContent += createRow([
-			'Average Subscription Revenue per Active Member',
-			`₱${avgRevenuePerMember.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-		]);
-		csvContent += createRow(['Subscription Retention Rate', `${subscriptionRetentionRate}%`]);
-		csvContent += createRow([
-			'Total Monthly Recurring Revenue',
-			`₱${(activeMembers * avgRevenuePerMember).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-		]);
-		csvContent += createRow([
-			'Member to Coach Ratio',
-			coaches.length > 0 ? (totalMembers / coaches.length).toFixed(2) : 'N/A',
-		]);
-		csvContent += '\n';
-
-		// 2. Detailed Member Information
-		csvContent += '=== DETAILED MEMBER INFORMATION ===\n';
-		csvContent += createRow([
-			'ID',
-			'Attendance ID',
-			'First Name',
-			'Middle Name',
-			'Last Name',
-			'Full Name',
-			'Email',
-			'Phone Number',
-			'Date of Birth',
-			'Age',
-			'Gender',
-			'Status',
-			'Membership Plan',
-			'Monthly Price',
-			'Subscription Start Date',
-			'Subscription End Date',
-			'Subscription Status',
-			'Price at Purchase',
-			'Join Date',
-			'Heard From',
-			'Physique Goal',
-			'Fitness Goal',
-			'Workout Time',
-			'Has Entered Details',
-			'Assigned Coaches Count',
-		]);
-
-		(data?.members || []).forEach((m: any) => {
-			const membershipTransaction = m.currentMembership;
-			const isActive = membershipTransaction?.status === 'ACTIVE';
-			const membershipDetails = m.membershipDetails || {};
-			const coachesCount = membershipDetails.coachesIds?.length || 0;
-
-			csvContent += createRow([
-				m.id,
-				m.attendanceId || 'N/A',
-				m.firstName || '',
-				m.middleName || '',
-				m.lastName || '',
-				`${m.firstName || ''} ${m.middleName || ''} ${m.lastName || ''}`.trim(),
-				m.email || 'N/A',
-				m.phoneNumber || 'N/A',
-				m.dateOfBirth ? formatDate(m.dateOfBirth) : 'N/A',
-				calculateAge(m.dateOfBirth),
-				m.gender || 'N/A',
-				isActive ? 'Active' : 'Inactive',
-				isActive ? membershipTransaction?.membership?.name || 'No Plan' : 'No Plan',
-				isActive
-					? `₱${(membershipTransaction?.membership?.monthlyPrice || 0).toLocaleString()}`
-					: 'N/A',
-				membershipTransaction?.startedAt ? formatDate(membershipTransaction.startedAt) : 'N/A',
-				membershipTransaction?.expiresAt ? formatDate(membershipTransaction.expiresAt) : 'N/A',
-				membershipTransaction?.status || 'N/A',
-				membershipTransaction?.priceAtPurchase
-					? `₱${membershipTransaction.priceAtPurchase.toLocaleString()}`
-					: 'N/A',
-				formatDate(m.createdAt),
-				m.heardFrom || 'N/A',
-				membershipDetails.physiqueGoalType || 'N/A',
-				membershipDetails.fitnessGoal || 'N/A',
-				membershipDetails.workOutTime || 'N/A',
-				membershipDetails.hasEnteredDetails ? 'Yes' : 'No',
-				coachesCount.toString(),
-			]);
-		});
-		csvContent += '\n';
-
-		// 3. Detailed Coach Information
-		csvContent += '=== DETAILED COACH INFORMATION ===\n';
-		csvContent += createRow([
-			'ID',
-			'First Name',
-			'Middle Name',
-			'Last Name',
-			'Full Name',
-			'Email',
-			'Phone Number',
-			'Date of Birth',
-			'Age',
-			'Gender',
-			'Specialization',
-			'All Specializations',
-			'Join Date',
-			'Heard From',
-		]);
-
-		(data?.coaches || []).forEach((c: any) => {
-			const coachDetails = c.coachDetails || {};
-			const specializations = coachDetails.specialization || [];
-
-			csvContent += createRow([
-				c.id,
-				c.firstName || '',
-				c.middleName || '',
-				c.lastName || '',
-				`${c.firstName || ''} ${c.middleName || ''} ${c.lastName || ''}`.trim(),
-				c.email || 'N/A',
-				c.phoneNumber || 'N/A',
-				c.dateOfBirth ? formatDate(c.dateOfBirth) : 'N/A',
-				calculateAge(c.dateOfBirth),
-				c.gender || 'N/A',
-				specializations[0] || 'General Fitness',
-				specializations.join('; ') || 'N/A',
-				formatDate(c.createdAt),
-				c.heardFrom || 'N/A',
-			]);
-		});
-		csvContent += '\n';
-
-		// 4. Membership Transaction Details
-		csvContent += '=== MEMBERSHIP TRANSACTION DETAILS ===\n';
-		csvContent += createRow([
-			'Transaction ID',
-			'Member ID',
-			'Member Name',
-			'Membership Plan ID',
-			'Membership Plan Name',
-			'Price at Purchase',
-			'Start Date',
-			'End Date',
-			'Status',
-			'Created At',
-			'Days Active',
-			'Days Remaining',
-		]);
-
-		(data?.members || []).forEach((m: any) => {
-			const membershipTransaction = m.currentMembership;
-			if (membershipTransaction) {
-				const startDate = membershipTransaction.startedAt
-					? new Date(membershipTransaction.startedAt)
-					: null;
-				const endDate = membershipTransaction.expiresAt
-					? new Date(membershipTransaction.expiresAt)
-					: null;
-				const now = new Date();
-
-				let daysActive = 'N/A';
-				let daysRemaining = 'N/A';
-
-				if (startDate) {
-					const diffTime = now.getTime() - startDate.getTime();
-					daysActive = Math.floor(diffTime / (1000 * 60 * 60 * 24)).toString();
-				}
-
-				if (endDate && membershipTransaction.status === 'ACTIVE') {
-					const diffTime = endDate.getTime() - now.getTime();
-					daysRemaining = Math.floor(diffTime / (1000 * 60 * 60 * 24)).toString();
-				}
-
-				csvContent += createRow([
-					membershipTransaction.id || 'N/A',
-					m.id,
-					`${m.firstName || ''} ${m.lastName || ''}`.trim(),
-					membershipTransaction.membershipId || 'N/A',
-					membershipTransaction.membership?.name || 'N/A',
-					membershipTransaction.priceAtPurchase
-						? `₱${membershipTransaction.priceAtPurchase.toLocaleString()}`
-						: 'N/A',
-					formatDate(membershipTransaction.startedAt),
-					formatDate(membershipTransaction.expiresAt),
-					membershipTransaction.status || 'N/A',
-					formatDate(membershipTransaction.createdAt),
-					daysActive,
-					daysRemaining,
-				]);
-			}
-		});
-		csvContent += '\n';
-
-		// 5. Revenue by Membership Type (Detailed)
-		if (analytics?.revenueByMembership && analytics.revenueByMembership.length > 0) {
-			csvContent += '=== REVENUE BY MEMBERSHIP TYPE (DETAILED) ===\n';
-			csvContent += createRow([
-				'Membership Plan',
-				'Total Revenue',
-				'Active Subscriptions',
-				'Average Revenue per Subscription',
-				'Percentage of Total Revenue',
-				'Monthly Recurring Revenue',
-			]);
-
-			const totalRevenueForCalc = analytics.revenueByMembership.reduce(
-				(sum: number, item: any) => sum + item.revenue,
-				0
-			);
-
-			analytics.revenueByMembership.forEach((item: any) => {
-				const avgRevenue = item.count > 0 ? item.revenue / item.count : 0;
-				const percentage =
-					totalRevenueForCalc > 0
-						? ((item.revenue / totalRevenueForCalc) * 100).toFixed(2)
-						: '0.00';
-				const mrr = item.count * avgRevenue;
-
-				csvContent += createRow([
-					item.membershipName,
-					`₱${item.revenue.toLocaleString()}`,
-					item.count,
-					`₱${avgRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-					`${percentage}%`,
-					`₱${mrr.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-				]);
-			});
-			csvContent += '\n';
-		}
-
-		// 6. Revenue by Period (Detailed)
-		if (analytics?.revenueByPeriod && analytics.revenueByPeriod.length > 0) {
-			csvContent += '=== REVENUE BY PERIOD (DETAILED) ===\n';
-			csvContent += createRow([
-				'Period',
-				'Day total',
-				'Membership (day)',
-				'Walk-in (day)',
-				'Walk-in count',
-				'% of period total',
-				'Growth (day total)',
-			]);
-
-			const totalPeriodRevenue = analytics.revenueByPeriod.reduce(
-				(sum: number, item: any) => sum + item.revenue,
-				0
-			);
-			let previousRevenue = 0;
-
-			analytics.revenueByPeriod.forEach((item: any, index: number) => {
-				const w = item.walkInRevenue ?? 0;
-				const sub = Math.max(0, (item.revenue ?? 0) - w);
-				const percentage =
-					totalPeriodRevenue > 0 ? ((item.revenue / totalPeriodRevenue) * 100).toFixed(2) : '0.00';
-				let growthRate = 'N/A';
-
-				if (index > 0 && previousRevenue > 0) {
-					const growth = ((item.revenue - previousRevenue) / previousRevenue) * 100;
-					growthRate = `${growth >= 0 ? '+' : ''}${growth.toFixed(2)}%`;
-				}
-
-				csvContent += createRow([
-					item.period,
-					`₱${item.revenue.toLocaleString()}`,
-					`₱${sub.toLocaleString()}`,
-					`₱${w.toLocaleString()}`,
-					item.walkInCount ?? 0,
-					`${percentage}%`,
-					growthRate,
-				]);
-
-				previousRevenue = item.revenue;
-			});
-			csvContent += '\n';
-		}
-
-		// 7. Membership Distribution (Detailed)
-		csvContent += '=== MEMBERSHIP DISTRIBUTION (DETAILED) ===\n';
-		csvContent += createRow([
-			'Membership Plan',
-			'Active Member Count',
-			'Inactive Member Count',
-			'Total Member Count',
-			'Percentage of Active Members',
-			'Percentage of Total Members',
-		]);
-
-		const activeMembersWithPlan = members.filter((m: any) => m.status === 'Active').length;
-
-		// Get inactive counts per plan
-		const inactiveByPlan: { [key: string]: number } = {};
-		members.forEach((m: any) => {
-			if (m.status === 'Inactive') {
-				inactiveByPlan[m.membership] = (inactiveByPlan[m.membership] || 0) + 1;
-			}
-		});
-
-		Object.entries(membershipTypes).forEach(([plan]: [string, unknown]) => {
-			const activeCount = members.filter(
-				(m: any) => m.membership === plan && m.status === 'Active'
-			).length;
-			const inactiveCount = inactiveByPlan[plan] || 0;
-			const totalCount = activeCount + inactiveCount;
-			const activePercentage =
-				activeMembersWithPlan > 0
-					? ((activeCount / activeMembersWithPlan) * 100).toFixed(2)
-					: '0.00';
-			const totalPercentage =
-				totalMembers > 0 ? ((totalCount / totalMembers) * 100).toFixed(2) : '0.00';
-
-			csvContent += createRow([
-				plan,
-				activeCount,
-				inactiveCount,
-				totalCount,
-				`${activePercentage}%`,
-				`${totalPercentage}%`,
-			]);
-		});
-		csvContent += '\n';
-
-		// 8. Revenue Trends (Last 30 Days - Detailed)
-		if (analyticsRangeData?.getAnalyticsRange && analyticsRangeData.getAnalyticsRange.length > 0) {
-			csvContent += '=== REVENUE TRENDS (LAST 30 DAYS - DETAILED) ===\n';
-			csvContent += createRow([
-				'Date',
-				'Total Revenue',
-				'Daily Growth',
-				'7-Day Average',
-				'30-Day Average',
-				'Cumulative Revenue',
-			]);
-
-			const rangeData = analyticsRangeData.getAnalyticsRange.slice(-30);
-			let cumulativeRevenue = 0;
-			let previousRevenue = 0;
-			const revenueArray: number[] = [];
-
-			rangeData.forEach((item: any, index: number) => {
-				const revenue = item.totalRevenue || 0;
-				cumulativeRevenue += revenue;
-				revenueArray.push(revenue);
-
-				let dailyGrowth = 'N/A';
-				if (index > 0 && previousRevenue > 0) {
-					const growth = ((revenue - previousRevenue) / previousRevenue) * 100;
-					dailyGrowth = `${growth >= 0 ? '+' : ''}${growth.toFixed(2)}%`;
-				}
-
-				let sevenDayAvg = 'N/A';
-				if (index >= 6) {
-					const last7Days = revenueArray.slice(-7);
-					const avg = last7Days.reduce((a, b) => a + b, 0) / 7;
-					sevenDayAvg = `₱${avg.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-				}
-
-				const thirtyDayAvg =
-					revenueArray.length > 0
-						? `₱${(revenueArray.reduce((a, b) => a + b, 0) / revenueArray.length).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-						: 'N/A';
-
-				csvContent += createRow([
-					formatDate(item.date),
-					`₱${revenue.toLocaleString()}`,
-					dailyGrowth,
-					sevenDayAvg,
-					thirtyDayAvg,
-					`₱${cumulativeRevenue.toLocaleString()}`,
-				]);
-
-				previousRevenue = revenue;
-			});
-			csvContent += '\n';
-		}
-
-		// 9. Member Growth (Last 6 Months - Detailed)
-		csvContent += '=== MEMBER GROWTH (LAST 6 MONTHS - DETAILED) ===\n';
-		csvContent += createRow([
-			'Month',
-			'Year',
-			'New Members',
-			'Active Members',
-			'Inactive Members',
-			'Growth Rate',
-			'Cumulative Total',
-		]);
-
-		const monthAbbr = [
-			'Jan',
-			'Feb',
-			'Mar',
-			'Apr',
-			'May',
-			'Jun',
-			'Jul',
-			'Aug',
-			'Sep',
-			'Oct',
-			'Nov',
-			'Dec',
-		];
-		let cumulativeTotal = 0;
-		let previousCount = 0;
-
-		for (let i = 5; i >= 0; i--) {
-			const date = new Date();
-			date.setMonth(date.getMonth() - i);
-			const month = date.getMonth();
-			const year = date.getFullYear();
-			const monthName = monthAbbr[month];
-
-			const newMembers = (data?.members || []).filter((m: any) => {
-				const joinDate = new Date(m.createdAt || m.joinDate);
-				return joinDate.getMonth() === month && joinDate.getFullYear() === year;
+			autoTable(doc, {
+				startY: y,
+				head: [section.head],
+				body: section.rows.map((row) => row.map((c) => String(c))),
+				styles: {
+					fontSize,
+					cellPadding: 0.9,
+					overflow: 'linebreak',
+					font: fontFamily,
+				},
+				headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20], font: fontFamily },
+				alternateRowStyles: { fillColor: [245, 245, 248] },
+				margin: { left: margin, right: margin },
+				tableWidth,
 			});
 
-			const activeInMonth = newMembers.filter((m: any) => {
-				const membershipTransaction = m.currentMembership;
-				return membershipTransaction?.status === 'ACTIVE';
-			}).length;
-
-			const inactiveInMonth = newMembers.length - activeInMonth;
-			cumulativeTotal += newMembers.length;
-
-			let growthRate = 'N/A';
-			if (i < 5 && previousCount > 0) {
-				const growth = ((newMembers.length - previousCount) / previousCount) * 100;
-				growthRate = `${growth >= 0 ? '+' : ''}${growth.toFixed(2)}%`;
-			}
-
-			csvContent += createRow([
-				monthName,
-				year.toString(),
-				newMembers.length,
-				activeInMonth,
-				inactiveInMonth,
-				growthRate,
-				cumulativeTotal,
-			]);
-
-			previousCount = newMembers.length;
+			const finalY = (doc as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+			y = (typeof finalY === 'number' ? finalY : y) + 10;
 		}
-		csvContent += '\n';
 
-		// 10. Subscription Status Breakdown
-		csvContent += '=== SUBSCRIPTION STATUS BREAKDOWN ===\n';
-		csvContent += createRow([
-			'Status',
-			'Count',
-			'Percentage',
-			'Total Revenue',
-			'Average Revenue per Subscription',
-		]);
-
-		const statusData = [
-			{ status: 'Active', count: activeSubscriptions, revenue: totalRevenue },
-			{ status: 'New', count: newSubscriptions, revenue: 0 },
-			{ status: 'Canceled', count: canceledSubscriptions, revenue: 0 },
-			{ status: 'Expired', count: expiredSubscriptions, revenue: 0 },
-		];
-
-		const totalSubscriptions =
-			activeSubscriptions + newSubscriptions + canceledSubscriptions + expiredSubscriptions;
-
-		statusData.forEach((item) => {
-			const percentage =
-				totalSubscriptions > 0 ? ((item.count / totalSubscriptions) * 100).toFixed(2) : '0.00';
-			const avgRevenue = item.count > 0 ? item.revenue / item.count : 0;
-
-			csvContent += createRow([
-				item.status,
-				item.count,
-				`${percentage}%`,
-				item.revenue > 0 ? `₱${item.revenue.toLocaleString()}` : 'N/A',
-				item.revenue > 0
-					? `₱${avgRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-					: 'N/A',
-			]);
-		});
-		csvContent += '\n';
-
-		// 11. Demographic Analysis
-		csvContent += '=== DEMOGRAPHIC ANALYSIS ===\n';
-
-		// Gender Distribution
-		csvContent += '--- Gender Distribution ---\n';
-		csvContent += createRow(['Gender', 'Count', 'Percentage']);
-		const genderCounts: { [key: string]: number } = {};
-		(data?.members || []).forEach((m: any) => {
-			const gender = m.gender || 'Not Specified';
-			genderCounts[gender] = (genderCounts[gender] || 0) + 1;
-		});
-		Object.entries(genderCounts).forEach(([gender, count]) => {
-			const percentage = totalMembers > 0 ? ((count / totalMembers) * 100).toFixed(2) : '0.00';
-			csvContent += createRow([gender, count, `${percentage}%`]);
-		});
-		csvContent += '\n';
-
-		// Age Groups
-		csvContent += '--- Age Groups ---\n';
-		csvContent += createRow(['Age Group', 'Count', 'Percentage']);
-		const ageGroups: { [key: string]: number } = {
-			'18-25': 0,
-			'26-35': 0,
-			'36-45': 0,
-			'46-55': 0,
-			'56+': 0,
-			'Not Specified': 0,
-		};
-
-		(data?.members || []).forEach((m: any) => {
-			if (m.dateOfBirth) {
-				const age = parseInt(calculateAge(m.dateOfBirth));
-				if (isNaN(age)) {
-					ageGroups['Not Specified']++;
-				} else if (age >= 18 && age <= 25) {
-					ageGroups['18-25']++;
-				} else if (age >= 26 && age <= 35) {
-					ageGroups['26-35']++;
-				} else if (age >= 36 && age <= 45) {
-					ageGroups['36-45']++;
-				} else if (age >= 46 && age <= 55) {
-					ageGroups['46-55']++;
-				} else if (age >= 56) {
-					ageGroups['56+']++;
-				} else {
-					ageGroups['Not Specified']++;
-				}
-			} else {
-				ageGroups['Not Specified']++;
-			}
-		});
-
-		Object.entries(ageGroups).forEach(([group, count]) => {
-			const percentage = totalMembers > 0 ? ((count / totalMembers) * 100).toFixed(2) : '0.00';
-			csvContent += createRow([group, count, `${percentage}%`]);
-		});
-		csvContent += '\n';
-
-		// Referral Sources
-		csvContent += '--- Referral Sources (How Members Heard About Us) ---\n';
-		csvContent += createRow(['Source', 'Count', 'Percentage']);
-		const referralSources: { [key: string]: number } = {};
-		(data?.members || []).forEach((m: any) => {
-			const source = m.heardFrom || 'Not Specified';
-			referralSources[source] = (referralSources[source] || 0) + 1;
-		});
-		Object.entries(referralSources).forEach(([source, count]) => {
-			const percentage = totalMembers > 0 ? ((count / totalMembers) * 100).toFixed(2) : '0.00';
-			csvContent += createRow([source, count, `${percentage}%`]);
-		});
-		csvContent += '\n';
-
-		// 12. Coach Specialization Analysis
-		csvContent += '=== COACH SPECIALIZATION ANALYSIS ===\n';
-		csvContent += createRow(['Specialization', 'Count', 'Percentage']);
-		const specializationCounts: { [key: string]: number } = {};
-
-		(data?.coaches || []).forEach((c: any) => {
-			const specializations = c.coachDetails?.specialization || [];
-			if (specializations.length === 0) {
-				specializationCounts['General Fitness'] =
-					(specializationCounts['General Fitness'] || 0) + 1;
-			} else {
-				specializations.forEach((spec: string) => {
-					specializationCounts[spec] = (specializationCounts[spec] || 0) + 1;
-				});
-			}
-		});
-
-		const totalSpecializations = Object.values(specializationCounts).reduce((a, b) => a + b, 0);
-		Object.entries(specializationCounts).forEach(([spec, count]) => {
-			const percentage =
-				totalSpecializations > 0 ? ((count / totalSpecializations) * 100).toFixed(2) : '0.00';
-			csvContent += createRow([spec, count, `${percentage}%`]);
-		});
-		csvContent += '\n';
-
-		// 13. Fitness Goals Analysis
-		csvContent += '=== FITNESS GOALS ANALYSIS ===\n';
-		csvContent += createRow(['Fitness Goal', 'Count', 'Percentage']);
-		const fitnessGoals: { [key: string]: number } = {};
-
-		(data?.members || []).forEach((m: any) => {
-			const goal = m.membershipDetails?.fitnessGoal || 'Not Specified';
-			fitnessGoals[goal] = (fitnessGoals[goal] || 0) + 1;
-		});
-
-		Object.entries(fitnessGoals).forEach(([goal, count]) => {
-			const percentage = totalMembers > 0 ? ((count / totalMembers) * 100).toFixed(2) : '0.00';
-			csvContent += createRow([goal, count, `${percentage}%`]);
-		});
-		csvContent += '\n';
-
-		// 14. Export Metadata
-		csvContent += '=== EXPORT METADATA ===\n';
-		csvContent += createRow([
-			'Export Date',
-			new Date().toLocaleString('en-US', {
-				year: 'numeric',
-				month: 'long',
-				day: 'numeric',
-				hour: '2-digit',
-				minute: '2-digit',
-				second: '2-digit',
-				timeZoneName: 'short',
-			}),
-		]);
-		csvContent += createRow(['Generated By', 'X-TRIM FIT GYM Analytics System']);
-		csvContent += createRow([
-			'Total Records Exported',
-			`${totalMembers} Members, ${coaches.length} Coaches, ${analyticsRangeData?.getAnalyticsRange?.length || 0} Daily Records`,
-		]);
-		csvContent += createRow([
-			'Data Range',
-			`From ${formatDate(analyticsRangeData?.getAnalyticsRange?.[0]?.date || new Date().toISOString())} to ${formatDate(analyticsRangeData?.getAnalyticsRange?.[analyticsRangeData.getAnalyticsRange.length - 1]?.date || new Date().toISOString())}`,
-		]);
-
-		// Create blob and download
-		const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-		const link = document.createElement('a');
-		const url = URL.createObjectURL(blob);
-		link.setAttribute('href', url);
-		link.setAttribute('download', filename);
-		link.style.visibility = 'hidden';
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
-		URL.revokeObjectURL(url);
+		doc.save(filename);
+		appendLocalExportLog('ANALYTICS_PDF', filename);
 	};
 
 	const exportRevenuePdf = async () => {
@@ -1649,12 +1030,12 @@ export function ReportsPage() {
 								type="button"
 								onClick={() => {
 									setDownloadablesOpen(false);
-									exportToCSV();
+									void exportAnalyticsPdf();
 								}}
 								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
 							>
-								<Download className="h-4 w-4 shrink-0 text-[#4ade80]" aria-hidden />
-								<span>Analytics (CSV)</span>
+								<Download className="h-4 w-4 shrink-0 text-[#fb923c]" aria-hidden />
+								<span>Analytics (PDF, Legal)</span>
 							</button>
 							<button
 								type="button"
