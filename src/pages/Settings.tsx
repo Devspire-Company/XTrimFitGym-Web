@@ -807,6 +807,7 @@ function AdminAccountsSection() {
 		firstName: '',
 		lastName: '',
 		email: '',
+		dateOfBirth: '',
 	});
 	const [createUserMutation] = useMutation(CREATE_USER);
 	const { data: adminsData, refetch } = useQuery(GET_USERS, {
@@ -823,6 +824,20 @@ function AdminAccountsSection() {
 
 		if (!user?.id) return;
 
+		if (!formData.dateOfBirth) {
+			dispatch(addToast({ type: 'error', message: 'Date of birth is required for admin accounts.' }));
+			return;
+		}
+		const dob = new Date(formData.dateOfBirth);
+		const now = new Date();
+		let age = now.getFullYear() - dob.getFullYear();
+		const md = now.getMonth() - dob.getMonth();
+		if (md < 0 || (md === 0 && now.getDate() < dob.getDate())) age -= 1;
+		if (age < 18) {
+			dispatch(addToast({ type: 'error', message: 'Admin accounts must be 18 years old and above.' }));
+			return;
+		}
+
 		try {
 			const result = await createUserMutation({
 				variables: {
@@ -830,6 +845,7 @@ function AdminAccountsSection() {
 						firstName: formData.firstName,
 						lastName: formData.lastName,
 						email: formData.email,
+						dateOfBirth: formData.dateOfBirth,
 						role: RoleType.Admin,
 					},
 				},
@@ -841,6 +857,7 @@ function AdminAccountsSection() {
 					firstName: '',
 					lastName: '',
 					email: '',
+					dateOfBirth: '',
 				});
 				setIsModalOpen(false);
 				refetch();
@@ -959,6 +976,20 @@ function AdminAccountsSection() {
 									value={formData.email}
 									onChange={handleInputChange}
 									required
+									className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
+								/>
+							</div>
+							<div className="form-group flex flex-col gap-2">
+								<label className="text-sm font-medium text-[var(--text-secondary)]">
+									Date of Birth *
+								</label>
+								<input
+									type="date"
+									name="dateOfBirth"
+									value={formData.dateOfBirth}
+									onChange={handleInputChange}
+									required
+									max={new Date().toISOString().split('T')[0]}
 									className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[var(--card-border)] rounded-lg text-[var(--text-primary)] text-[0.95rem] transition-[var(--transition)] focus:outline-none focus:bg-[rgba(255,255,255,0.08)] focus:border-[var(--primary-yellow)] focus:ring-[3px] focus:ring-[rgba(249,197,19,0.1)]"
 								/>
 							</div>

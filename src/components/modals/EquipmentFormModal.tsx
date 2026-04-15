@@ -125,6 +125,20 @@ export function EquipmentFormModal({
 									className="w-full"
 								/>
 							</div>
+							<div className="form-group">
+								<label>Added date</label>
+								<input
+									type="text"
+									value={
+										equipment?.createdAt
+											? new Date(equipment.createdAt).toLocaleString('en-PH', {
+													timeZone: 'Asia/Manila',
+												})
+											: 'Will be set automatically on create'
+									}
+									readOnly
+								/>
+							</div>
 							<div className="form-group" style={{ gridColumn: '1 / -1' }}>
 								<label htmlFor="description">Description</label>
 								<textarea
@@ -178,9 +192,6 @@ export function EquipmentFormModal({
 						</div>
 					</div>
 					<div className="modal-footer" style={{ flexShrink: 0 }}>
-						<button type="button" className="btn-secondary" onClick={onClose}>
-							Cancel
-						</button>
 						<button
 							type="submit"
 							className="btn-primary"

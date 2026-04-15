@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { appendLocalReportExportLog } from '@/lib/reportExportLogs';
 
 type ExportTablePdfArgs = {
 	title: string;
@@ -8,6 +9,15 @@ type ExportTablePdfArgs = {
 	rows: Array<Array<string | number | null | undefined>>;
 	subtitle?: string;
 	orientation?: 'portrait' | 'landscape';
+	reportType?: string;
+	filterSummary?: string;
+	user?: {
+		id?: string | null;
+		role?: string | null;
+		firstName?: string | null;
+		lastName?: string | null;
+		email?: string | null;
+	} | null;
 };
 
 const sanitizeCell = (value: string | number | null | undefined): string => {
@@ -22,6 +32,9 @@ export function exportTablePdf({
 	rows,
 	subtitle,
 	orientation = 'landscape',
+	reportType,
+	filterSummary,
+	user,
 }: ExportTablePdfArgs) {
 	const now = new Date();
 	const safeDate = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -52,4 +65,13 @@ export function exportTablePdf({
 	});
 
 	doc.save(fileName);
+	if (reportType) {
+		appendLocalReportExportLog({
+			reportType,
+			fileName,
+			filterSummary,
+			user,
+		});
+	}
+	return fileName;
 }

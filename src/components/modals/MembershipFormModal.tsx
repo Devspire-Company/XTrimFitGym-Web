@@ -15,7 +15,7 @@ export interface MembershipFormData {
 	monthlyPrice: number;
 	description: string;
 	features: string[];
-	status: 'Active' | 'Inactive' | 'Coming Soon';
+	status: 'Active' | 'Coming Soon';
 	durationType: 'Monthly' | 'Quarterly' | 'Yearly' | 'Daily';
 	monthDuration: number;
 }
@@ -92,13 +92,6 @@ export function MembershipFormModal({
 		onSubmit(data);
 	};
 
-	// Map API status values to form values
-	const statusMap: Record<string, string> = {
-		ACTIVE: 'Active',
-		INACTIVE: 'Inactive',
-		COMING_SOON: 'Coming Soon',
-	};
-
 	// Map API durationType values to form values
 	const durationMap: Record<string, string> = {
 		MONTHLY: 'Monthly',
@@ -107,7 +100,12 @@ export function MembershipFormModal({
 		DAILY: 'Daily',
 	};
 
-	const defaultStatus = membership?.status ? statusMap[membership.status] || 'Active' : 'Active';
+	const defaultStatus =
+		membership?.status === 'COMING_SOON'
+			? 'Coming Soon'
+			: membership?.status === 'ACTIVE'
+				? 'Active'
+				: 'Active';
 	const defaultDurationType = membership?.durationType
 		? durationMap[membership.durationType] || 'Monthly'
 		: 'Monthly';
@@ -205,7 +203,6 @@ export function MembershipFormModal({
 								<label htmlFor="status">Status *</label>
 								<select id="status" name="status" defaultValue={defaultStatus} required>
 									<option value="Active">Active</option>
-									<option value="Inactive">Inactive</option>
 									<option value="Coming Soon">Coming Soon</option>
 								</select>
 							</div>

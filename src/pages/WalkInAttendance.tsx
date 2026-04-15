@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { subDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -21,7 +21,7 @@ import { WalkInModalShell } from '@/components/modals/WalkInModalShell';
 
 type WalkInClientRow = SearchWalkInClientsQuery['searchWalkInClients'][number];
 type WalkInClientFields = WalkInClientRow;
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import {
 	UserPlus,
@@ -117,6 +117,8 @@ export function WalkInAttendancePage() {
 	}, []);
 
 	const dispatch = useAppDispatch();
+	const currentUser = useAppSelector((state) => state.auth.user);
+	const apolloClient = useApolloClient();
 	const [logDate, setLogDate] = useState(() => manilaTodayYmd());
 	const [todayYmd, setTodayYmd] = useState(manilaTodayYmd);
 	useEffect(() => {
@@ -541,13 +543,36 @@ export function WalkInAttendancePage() {
 	const hasPrevAccounts = accountsPage > 0;
 	const hasNextAccounts = accountsOffset + accountRows.length < totalWalkInAccounts;
 
-	const handleExportPdf = () => {
+	const handleExportPdf = async () => {
+		const firstPage = logsData?.walkInAttendanceLogs?.logs ?? [];
+		let exportRows = [...firstPage];
+		let exportTotal = logsData?.walkInAttendanceLogs?.totalCount ?? firstPage.length;
+		if (exportTotal > exportRows.length) {
+			const pageSize = 200;
+			for (let offset = exportRows.length; offset < exportTotal; offset += pageSize) {
+				const { data } = await apolloClient.query({
+					query: WALK_IN_ATTENDANCE_LOGS,
+					variables: {
+						filter: { date: logDate },
+						pagination: { limit: pageSize, offset },
+					},
+					fetchPolicy: 'network-only',
+				});
+				const pageRows = data?.walkInAttendanceLogs?.logs ?? [];
+				if (pageRows.length === 0) break;
+				exportRows = [...exportRows, ...pageRows];
+				exportTotal = data?.walkInAttendanceLogs?.totalCount ?? exportTotal;
+			}
+		}
 		exportTablePdf({
 			title: 'Walk-in Attendance Logs',
 			filePrefix: 'walk-in-attendance',
-			subtitle: `Log date: ${logDate} | Visible rows: ${logs.length} | Total records: ${totalCount}`,
+			reportType: 'WALKIN_ATTENDANCE',
+			user: currentUser,
+			filterSummary: `logDate=${logDate};records=${exportRows.length}`,
+			subtitle: `Log date: ${logDate} | Exported rows: ${exportRows.length} | Total records: ${exportTotal}`,
 			head: ['Time In (Manila)', 'Payment', 'Name', 'Age', 'Gender', 'Contact', 'Email', 'Notes'],
-			rows: logs.map((row) => [
+			rows: exportRows.map((row) => [
 				formatTimeManila(row.timedInAt),
 				`PHP ${Number(row.payment ?? 0).toLocaleString()}`,
 				formatWalkInName(row.walkInClient),
@@ -695,7 +720,7 @@ export function WalkInAttendancePage() {
 					</button>
 					<button
 						type="button"
-						onClick={handleExportPdf}
+						onClick={() => void handleExportPdf()}
 						className="btn-export-pdf"
 					>
 						<Download className="h-4 w-4" />

@@ -5,14 +5,11 @@ import {
 	Search,
 	Plus,
 	Eye,
-	Trash2,
 	UserCog,
 	X,
 	Download,
-	Copy,
 	Save,
 	Edit,
-	RefreshCw,
 	Users,
 	Calendar as CalendarIcon,
 	Activity,
@@ -20,7 +17,7 @@ import {
 	MapPin,
 } from 'lucide-react';
 import { GET_USERS, GET_COACH_SESSIONS, GET_COACH_SESSION_LOGS, DELETE_USER, CREATE_USER, UPDATE_USER, USERS_UPDATED } from '@/graphql/operations/index';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import type { CreateUserMutation, CreateUserMutationVariables } from '@/graphql/generated/types';
 import { RoleType } from '@/graphql/generated/graphql';
@@ -41,6 +38,8 @@ interface Coach {
 	allSpecializations?: string[]; // For editing - stores all specializations
 	yearsExperience: string;
 	status: string;
+	statusReason?: string;
+	statusUpdatedAt?: string;
 	avatar: string;
 	totalClients: number;
 	rating: number;
@@ -54,12 +53,92 @@ interface Coach {
 	clientLimit: number;
 }
 
+type CoachStatus = 'Active' | 'Inactive' | 'On Leave';
+type CoachStatusMeta = {
+	status: CoachStatus;
+	reason: string;
+	updatedAt: string;
+	updatedBy: string;
+};
+type RemovedCoachLog = {
+	id: string;
+	coachId: string;
+	coachName: string;
+	email: string;
+	phone: string;
+	reason: string;
+	removedAt: string;
+	removedBy: string;
+};
+
+const COACH_STATUS_KEY = 'xtrimfit-coach-status';
+const COACH_REMOVALS_KEY = 'xtrimfit-coach-removals';
+
+function readCoachStatusMeta(): Record<string, CoachStatusMeta> {
+	try {
+		const raw = localStorage.getItem(COACH_STATUS_KEY);
+		if (!raw) return {};
+		const parsed = JSON.parse(raw) as Record<string, CoachStatusMeta>;
+		return parsed && typeof parsed === 'object' ? parsed : {};
+	} catch {
+		return {};
+	}
+}
+
+function writeCoachStatusMeta(map: Record<string, CoachStatusMeta>) {
+	try {
+		localStorage.setItem(COACH_STATUS_KEY, JSON.stringify(map));
+	} catch {
+		// ignore storage errors
+	}
+}
+
+function readRemovedCoachLogs(): RemovedCoachLog[] {
+	try {
+		const raw = localStorage.getItem(COACH_REMOVALS_KEY);
+		if (!raw) return [];
+		const parsed = JSON.parse(raw) as RemovedCoachLog[];
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
+	}
+}
+
+function appendRemovedCoachLog(log: Omit<RemovedCoachLog, 'id'>): RemovedCoachLog[] {
+	const prev = readRemovedCoachLogs();
+	const next: RemovedCoachLog = {
+		id: `coach-remove-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+		...log,
+	};
+	const updated = [next, ...prev].slice(0, 300);
+	try {
+		localStorage.setItem(COACH_REMOVALS_KEY, JSON.stringify(updated));
+	} catch {
+		// ignore storage errors
+	}
+	return updated;
+}
+
+function isAtLeast18(dateOfBirth: string | undefined): boolean {
+	if (!dateOfBirth) return false;
+	const dob = new Date(dateOfBirth);
+	if (!Number.isFinite(dob.getTime())) return false;
+	const now = new Date();
+	let age = now.getFullYear() - dob.getFullYear();
+	const monthDiff = now.getMonth() - dob.getMonth();
+	if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+		age -= 1;
+	}
+	return age >= 18;
+}
+
 export function CoachesPage() {
 	useEffect(() => {
 		document.title = 'Coach Management - X-TRIM FIT GYM';
 	}, []);
 
 	const dispatch = useAppDispatch();
+	const currentUser = useAppSelector((state) => state.auth.user);
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState<string>('all');
 	const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
@@ -67,6 +146,14 @@ export function CoachesPage() {
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isAddCoachModalOpen, setIsAddCoachModalOpen] = useState(false);
 	const [isEditCoachModalOpen, setIsEditCoachModalOpen] = useState(false);
+	const [removeReason, setRemoveReason] = useState('');
+	const [removeReasonError, setRemoveReasonError] = useState('');
+	const [coachStatusMeta, setCoachStatusMeta] = useState<Record<string, CoachStatusMeta>>(() =>
+		typeof window === 'undefined' ? {} : readCoachStatusMeta()
+	);
+	const [removedCoachLogs, setRemovedCoachLogs] = useState<RemovedCoachLog[]>(() =>
+		typeof window === 'undefined' ? [] : readRemovedCoachLogs()
+	);
 
 	// Initial data fetch with query
 	const { data, loading, error } = useQuery(GET_USERS, {
@@ -85,6 +172,14 @@ export function CoachesPage() {
 
 	const [deleteUserMutation] = useMutation(DELETE_USER, {
 		onCompleted: () => {
+			if (selectedCoach?.id) {
+				setCoachStatusMeta((prev) => {
+					const next = { ...prev };
+					delete next[selectedCoach.id];
+					writeCoachStatusMeta(next);
+					return next;
+				});
+			}
 			dispatch(
 				addToast({
 					type: 'success',
@@ -148,15 +243,37 @@ export function CoachesPage() {
 
 	const handleDelete = (coach: Coach) => {
 		setSelectedCoach(coach);
+		setRemoveReason('');
+		setRemoveReasonError('');
 		setIsDeleteModalOpen(true);
 	};
 
 	const confirmDelete = async () => {
 		if (selectedCoach) {
+			if (!removeReason.trim()) {
+				setRemoveReasonError('Removal reason is required.');
+				return;
+			}
 			try {
+				const removedBy =
+					[currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ').trim() ||
+					currentUser?.email ||
+					'Admin';
+				const updatedLogs = appendRemovedCoachLog({
+					coachId: selectedCoach.id,
+					coachName: selectedCoach.name,
+					email: selectedCoach.email,
+					phone: selectedCoach.phone,
+					reason: removeReason.trim(),
+					removedAt: new Date().toISOString(),
+					removedBy,
+				});
+				setRemovedCoachLogs(updatedLogs);
 				await deleteUserMutation({
 					variables: { id: selectedCoach.id },
 				});
+				setRemoveReason('');
+				setRemoveReasonError('');
 			} catch (err) {
 				console.error('Error removing coach:', err);
 			}
@@ -165,6 +282,26 @@ export function CoachesPage() {
 
 	const handleAddCoach = () => {
 		setIsAddCoachModalOpen(true);
+	};
+
+	const setCoachStatus = (coachId: string, status: CoachStatus, reason: string) => {
+		const updatedBy =
+			[currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ').trim() ||
+			currentUser?.email ||
+			'Admin';
+		setCoachStatusMeta((prev) => {
+			const next = {
+				...prev,
+				[coachId]: {
+					status,
+					reason: reason.trim(),
+					updatedAt: new Date().toISOString(),
+					updatedBy,
+				},
+			};
+			writeCoachStatusMeta(next);
+			return next;
+		});
 	};
 
 	// Transform API data
@@ -177,6 +314,7 @@ export function CoachesPage() {
 				(s): s is string => s !== null && s !== undefined
 			);
 
+			const statusMeta = coachStatusMeta[c.id];
 			return {
 				id: c.id,
 				name: `${c.firstName} ${c.middleName ? c.middleName + ' ' : ''}${c.lastName}`,
@@ -188,7 +326,9 @@ export function CoachesPage() {
 				specialization,
 				allSpecializations, // Store all specializations for editing
 				yearsExperience,
-				status: 'Active',
+				status: statusMeta?.status || 'Active',
+				statusReason: statusMeta?.reason || '',
+				statusUpdatedAt: statusMeta?.updatedAt || '',
 				avatar: `${c.firstName?.[0] || ''}${c.lastName?.[0] || ''}`,
 				totalClients: c.coachDetails?.clientsIds?.length || 0,
 				rating: c.coachDetails?.ratings || 5.0,
@@ -219,11 +359,43 @@ export function CoachesPage() {
 	}, [apiCoaches, searchTerm, statusFilter]);
 
 	const handleExportPdf = () => {
+		const activeRows = filteredCoaches.map((coach) => [
+			'Active',
+			coach.name,
+			coach.email,
+			coach.phone,
+			coach.specialization,
+			`${coach.yearsExperience} years`,
+			coach.teachingTime?.join(', ') || 'N/A',
+			`${coach.totalClients}/${coach.clientLimit > 0 ? coach.clientLimit : '∞'}`,
+			coach.status,
+			coach.status === 'On Leave' ? coach.statusReason || 'No reason provided' : '—',
+			coach.statusUpdatedAt
+				? new Date(coach.statusUpdatedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
+				: '—',
+		]);
+		const removedRows = removedCoachLogs.map((log) => [
+			'Removed',
+			log.coachName,
+			log.email,
+			log.phone,
+			'—',
+			'—',
+			'—',
+			'—',
+			'Removed',
+			log.reason,
+			new Date(log.removedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
+		]);
 		exportTablePdf({
 			title: 'Coach Management',
 			filePrefix: 'coaches',
-			subtitle: `Total rows: ${filteredCoaches.length}`,
+			reportType: 'COACH_MANAGEMENT',
+			user: currentUser,
+			filterSummary: `status=${statusFilter};rows=${filteredCoaches.length}`,
+			subtitle: `Visible rows: ${filteredCoaches.length} | Removed history: ${removedCoachLogs.length}`,
 			head: [
+				'Record Type',
 				'Coach',
 				'Email',
 				'Phone',
@@ -232,17 +404,10 @@ export function CoachesPage() {
 				'Teaching Time',
 				'Clients',
 				'Status',
+				'Reason',
+				'Action Date',
 			],
-			rows: filteredCoaches.map((coach) => [
-				coach.name,
-				coach.email,
-				coach.phone,
-				coach.specialization,
-				`${coach.yearsExperience} years`,
-				coach.teachingTime?.join(', ') || 'N/A',
-				`${coach.totalClients}/${coach.clientLimit > 0 ? coach.clientLimit : '∞'}`,
-				coach.status,
-			]),
+			rows: [...activeRows, ...removedRows],
 		});
 	};
 
@@ -310,7 +475,6 @@ export function CoachesPage() {
 						Export PDF
 					</Button>
 					<Button onClick={handleAddCoach}>
-						<Plus className="w-4 h-4" />
 						Add New Coach
 					</Button>
 				</div>
@@ -436,21 +600,21 @@ export function CoachesPage() {
 												className="btn-small btn-view px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(59,130,246,0.15)] text-[#3B82F6] border border-[rgba(59,130,246,0.3)] hover:bg-[rgba(59,130,246,0.25)] transition-colors"
 												title="View Coach"
 											>
-												<Eye className="w-4 h-4" />
+												View
 											</button>
 											<button
 												onClick={() => handleEdit(coach)}
 												className="btn-small btn-edit px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)] hover:bg-[rgba(249,197,19,0.25)] transition-colors"
 												title="Edit Coach"
 											>
-												<Edit className="w-4 h-4" />
+												Edit
 											</button>
 											<button
 												onClick={() => handleDelete(coach)}
 												className="btn-small btn-delete px-3 py-1.5 rounded-lg text-xs font-semibold bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)] hover:bg-[rgba(239,68,68,0.25)] transition-colors"
 												title="Remove Coach"
 											>
-												<Trash2 className="w-4 h-4" />
+												Remove
 											</button>
 										</div>
 									</td>
@@ -567,6 +731,11 @@ export function CoachesPage() {
 								});
 
 								if (result.data?.updateUser) {
+									setCoachStatus(
+										selectedCoach.id,
+										formData.status,
+										formData.status === 'On Leave' ? formData.statusReason || '' : ''
+									);
 									dispatch(
 										addToast({
 											type: 'success',
@@ -596,10 +765,18 @@ export function CoachesPage() {
 					<RemoveConfirmModal
 						title="Remove Coach?"
 						message={`Are you sure you want to remove ${selectedCoach.name}? This action cannot be undone.`}
+						reason={removeReason}
+						reasonError={removeReasonError}
+						onReasonChange={(value) => {
+							setRemoveReason(value);
+							if (removeReasonError) setRemoveReasonError('');
+						}}
 						onConfirm={confirmDelete}
 						onCancel={() => {
 							setIsDeleteModalOpen(false);
 							setSelectedCoach(null);
+							setRemoveReason('');
+							setRemoveReasonError('');
 						}}
 					/>
 				)}
@@ -677,6 +854,12 @@ export function CoachesPage() {
 							});
 
 							if (result.data?.createUser) {
+								const createdCoachId = result.data.createUser.user.id;
+								setCoachStatus(
+									createdCoachId,
+									formData.status,
+									formData.status === 'On Leave' ? formData.statusReason || '' : ''
+								);
 								dispatch(
 									addToast({
 										type: 'success',
@@ -1234,12 +1417,6 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 					)}
 				</div>
 			</div>
-			<div className="modal-footer" style={{ flexShrink: 0 }}>
-				<button type="button" className="btn-secondary" onClick={onClose}>
-					<X className="w-4 h-4" />
-					Close
-				</button>
-			</div>
 		</div>
 	);
 }
@@ -1247,43 +1424,46 @@ function CoachViewModal({ coach, onClose }: { coach: Coach; onClose: () => void 
 function RemoveConfirmModal({
 	title,
 	message,
+	reason,
+	reasonError,
+	onReasonChange,
 	onConfirm,
 	onCancel,
 }: {
 	title: string;
 	message: string;
+	reason: string;
+	reasonError?: string;
+	onReasonChange: (value: string) => void;
 	onConfirm: () => void;
 	onCancel: () => void;
 }) {
 	return (
 		<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+			<div className="modal-header">
+				<h3 className="modal-title">{title}</h3>
+				<button className="modal-close" onClick={onCancel} aria-label="Close">
+					<X className="w-5 h-5" />
+				</button>
+			</div>
 			<div className="modal-body">
-				<div className="modal-delete-icon">
-					<Trash2 className="w-10 h-10" />
-				</div>
-				<h3 className="modal-delete-title">{title}</h3>
 				<p className="modal-delete-text">{message}</p>
+				<div className="mb-4 text-left">
+					<label className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
+						Reason for removal
+					</label>
+					<input
+						type="text"
+						value={reason}
+						onChange={(e) => onReasonChange(e.target.value)}
+						placeholder="Required for transparency"
+						className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2.5 text-[var(--text-primary)]"
+					/>
+					{reasonError ? (
+						<p className="mt-1 text-xs text-[#F87171]">{reasonError}</p>
+					) : null}
+				</div>
 				<div className="modal-delete-actions">
-					<button
-						type="button"
-						className="btn-secondary"
-						onClick={onCancel}
-						style={{
-							flex: 1,
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							gap: '0.5rem',
-							padding: '0.75rem 1.5rem',
-							borderRadius: '0.75rem',
-							fontWeight: '600',
-							transition: 'all 0.2s',
-							cursor: 'pointer',
-						}}
-					>
-						<X className="w-4 h-4" />
-						Cancel
-					</button>
 					<button
 						type="button"
 						className="btn-danger"
@@ -1301,7 +1481,6 @@ function RemoveConfirmModal({
 							cursor: 'pointer',
 						}}
 					>
-						<Trash2 className="w-4 h-4" />
 						Remove
 					</button>
 				</div>
@@ -1327,6 +1506,8 @@ function AddCoachModal({
 		yearsExperience?: string;
 		gender?: string;
 		dateOfBirth?: string;
+		status: CoachStatus;
+		statusReason?: string;
 		teachingDays?: string[];
 		teachingTime?: string;
 		clientLimit?: string;
@@ -1363,6 +1544,8 @@ function AddCoachModal({
 		yearsExperience: '',
 		gender: '',
 		dateOfBirth: '',
+		status: 'Active' as CoachStatus,
+		statusReason: '',
 		teachingDays: [] as string[],
 		teachingTimeStartHour: '9',
 		teachingTimeStartMinute: '00',
@@ -1378,6 +1561,14 @@ function AddCoachModal({
 		e.preventDefault();
 		setIsSubmitting(true);
 		try {
+			if (!isAtLeast18(formData.dateOfBirth)) {
+				dispatch(addToast({ type: 'error', message: 'Coach must be 18 years old or above.' }));
+				return;
+			}
+			if (formData.status === 'On Leave' && !formData.statusReason.trim()) {
+				dispatch(addToast({ type: 'error', message: 'Reason is required when status is On Leave.' }));
+				return;
+			}
 			// Format teaching time range (start - end) with AM/PM before submitting
 			const startTime = `${formData.teachingTimeStartHour}:${formData.teachingTimeStartMinute} ${formData.teachingTimeStartPeriod}`;
 			const endTime = `${formData.teachingTimeEndHour}:${formData.teachingTimeEndMinute} ${formData.teachingTimeEndPeriod}`;
@@ -1451,6 +1642,8 @@ function AddCoachModal({
 				yearsExperience: '',
 				gender: '',
 				dateOfBirth: '',
+				status: 'Active',
+				statusReason: '',
 				teachingDays: [],
 				teachingTimeStartHour: '9',
 				teachingTimeStartMinute: '00',
@@ -1545,6 +1738,7 @@ function AddCoachModal({
 								required
 								value={formData.firstName}
 								onChange={handleChange}
+								placeholder="Enter first name"
 							/>
 						</div>
 						<div className="form-group">
@@ -1555,6 +1749,7 @@ function AddCoachModal({
 								name="middleName"
 								value={formData.middleName}
 								onChange={handleChange}
+								placeholder="Enter middle name (optional)"
 							/>
 						</div>
 						<div className="form-group">
@@ -1568,6 +1763,7 @@ function AddCoachModal({
 								required
 								value={formData.lastName}
 								onChange={handleChange}
+								placeholder="Enter last name"
 							/>
 						</div>
 						<div className="form-group">
@@ -1583,6 +1779,7 @@ function AddCoachModal({
 									value={formData.email}
 									onChange={handleChange}
 									style={{ flex: 1 }}
+									placeholder="name@example.com"
 								/>
 								<button
 									type="button"
@@ -1604,7 +1801,7 @@ function AddCoachModal({
 									}}
 									title="Copy email"
 								>
-									<Copy className="w-4 h-4" />
+									Copy
 								</button>
 							</div>
 						</div>
@@ -1615,7 +1812,14 @@ function AddCoachModal({
 								id="phone"
 								name="phone"
 								value={formData.phone}
-								onChange={handleChange}
+								onChange={(e) =>
+									setFormData((prev) => ({
+										...prev,
+										phone: e.target.value.replace(/[^\d]/g, '').slice(0, 11),
+									}))
+								}
+								maxLength={11}
+								placeholder="09XXXXXXXXX"
 							/>
 						</div>
 						<div className="form-group">
@@ -1627,6 +1831,7 @@ function AddCoachModal({
 								min="0"
 								value={formData.yearsExperience}
 								onChange={handleChange}
+								placeholder="e.g. 2"
 							/>
 						</div>
 						<div className="form-group">
@@ -1664,6 +1869,27 @@ function AddCoachModal({
 								className="w-full"
 							/>
 						</div>
+						<div className="form-group">
+							<label htmlFor="status">Status</label>
+							<select id="status" name="status" value={formData.status} onChange={handleChange}>
+								<option value="Active">Active</option>
+								<option value="Inactive">Inactive</option>
+								<option value="On Leave">On Leave</option>
+							</select>
+						</div>
+						{formData.status === 'On Leave' ? (
+							<div className="form-group">
+								<label htmlFor="statusReason">On-leave reason</label>
+								<input
+									type="text"
+									id="statusReason"
+									name="statusReason"
+									value={formData.statusReason}
+									onChange={handleChange}
+									placeholder="Required reason"
+								/>
+							</div>
+						) : null}
 						<div className="form-group" style={{ gridColumn: '1 / -1' }}>
 							<label>Teaching Days</label>
 							<div
@@ -1707,12 +1933,7 @@ function AddCoachModal({
 											type="checkbox"
 											checked={formData.teachingDays.includes(day)}
 											onChange={() => handleDayChange(day)}
-											style={{
-												width: '18px',
-												height: '18px',
-												cursor: 'pointer',
-												accentColor: 'var(--primary-yellow)',
-											}}
+											className="h-5 w-5 rounded border-[var(--card-border)] accent-[var(--primary-yellow)]"
 										/>
 										<span
 											style={{
@@ -1925,12 +2146,7 @@ function AddCoachModal({
 											type="checkbox"
 											checked={formData.specializations.includes(spec)}
 											onChange={() => handleSpecializationChange(spec)}
-											style={{
-												width: '18px',
-												height: '18px',
-												cursor: 'pointer',
-												accentColor: 'var(--primary-yellow)',
-											}}
+											className="h-5 w-5 rounded border-[var(--card-border)] accent-[var(--primary-yellow)]"
 										/>
 										<span
 											style={{
@@ -1948,27 +2164,8 @@ function AddCoachModal({
 					</div>
 				</div>
 				<div className="modal-footer" style={{ flexShrink: 0 }}>
-					<button
-						type="button"
-						className="btn-secondary"
-						onClick={handleClose}
-						disabled={isSubmitting}
-					>
-						<X className="w-4 h-4" />
-						Cancel
-					</button>
 					<button type="submit" className="btn-primary" disabled={isSubmitting}>
-						{isSubmitting ? (
-							<>
-								<RefreshCw className="w-4 h-4 animate-spin" />
-								Creating...
-							</>
-						) : (
-							<>
-								<Save className="w-4 h-4" />
-								Create Coach Account
-							</>
-						)}
+						{isSubmitting ? 'Creating...' : 'Create Coach Account'}
 					</button>
 				</div>
 			</form>
@@ -1994,11 +2191,14 @@ function EditCoachModal({
 		yearsExperience?: string;
 		gender?: string;
 		dateOfBirth?: string;
+		status: CoachStatus;
+		statusReason?: string;
 		teachingDays?: string[];
 		teachingTime?: string;
 		clientLimit?: string;
 	}) => Promise<void>;
 }) {
+	const dispatch = useAppDispatch();
 	const availableSpecializations = [
 		'Weight loss',
 		'Muscle building',
@@ -2077,6 +2277,8 @@ function EditCoachModal({
 		yearsExperience: coach.yearsExperience || '',
 		gender: coach.gender !== 'N/A' ? coach.gender : '',
 		dateOfBirth: coach.dateOfBirth && coach.dateOfBirth !== 'N/A' ? coach.dateOfBirth : '',
+		status: (coach.status as CoachStatus) || 'Active',
+		statusReason: coach.statusReason || '',
 		teachingDays: coach.teachingDate || [],
 		teachingTimeStartHour: teachingTimeParsed.startHour,
 		teachingTimeStartMinute: teachingTimeParsed.startMinute,
@@ -2092,6 +2294,14 @@ function EditCoachModal({
 		e.preventDefault();
 		setIsSubmitting(true);
 		try {
+			if (!isAtLeast18(formData.dateOfBirth)) {
+				dispatch(addToast({ type: 'error', message: 'Coach must be 18 years old or above.' }));
+				return;
+			}
+			if (formData.status === 'On Leave' && !formData.statusReason.trim()) {
+				dispatch(addToast({ type: 'error', message: 'Reason is required when status is On Leave.' }));
+				return;
+			}
 			// Format teaching time range (start - end) with AM/PM before submitting
 			const startTime = `${formData.teachingTimeStartHour}:${formData.teachingTimeStartMinute} ${formData.teachingTimeStartPeriod}`;
 			const endTime = `${formData.teachingTimeEndHour}:${formData.teachingTimeEndMinute} ${formData.teachingTimeEndPeriod}`;
@@ -2212,7 +2422,14 @@ function EditCoachModal({
 								id="phone"
 								name="phone"
 								value={formData.phone}
-								onChange={handleChange}
+								onChange={(e) =>
+									setFormData((prev) => ({
+										...prev,
+										phone: e.target.value.replace(/[^\d]/g, '').slice(0, 11),
+									}))
+								}
+								maxLength={11}
+								placeholder="09XXXXXXXXX"
 							/>
 						</div>
 						<div className="form-group">
@@ -2261,6 +2478,27 @@ function EditCoachModal({
 								className="w-full"
 							/>
 						</div>
+						<div className="form-group">
+							<label htmlFor="status">Status</label>
+							<select id="status" name="status" value={formData.status} onChange={handleChange}>
+								<option value="Active">Active</option>
+								<option value="Inactive">Inactive</option>
+								<option value="On Leave">On Leave</option>
+							</select>
+						</div>
+						{formData.status === 'On Leave' ? (
+							<div className="form-group">
+								<label htmlFor="statusReason">On-leave reason</label>
+								<input
+									type="text"
+									id="statusReason"
+									name="statusReason"
+									value={formData.statusReason}
+									onChange={handleChange}
+									placeholder="Required reason"
+								/>
+							</div>
+						) : null}
 						<div className="form-group" style={{ gridColumn: '1 / -1' }}>
 							<label>Teaching Days</label>
 							<div
@@ -2304,12 +2542,7 @@ function EditCoachModal({
 											type="checkbox"
 											checked={formData.teachingDays.includes(day)}
 											onChange={() => handleDayChange(day)}
-											style={{
-												width: '18px',
-												height: '18px',
-												cursor: 'pointer',
-												accentColor: 'var(--primary-yellow)',
-											}}
+											className="h-5 w-5 rounded border-[var(--card-border)] accent-[var(--primary-yellow)]"
 										/>
 										<span
 											style={{
@@ -2522,12 +2755,7 @@ function EditCoachModal({
 											type="checkbox"
 											checked={formData.specializations.includes(spec)}
 											onChange={() => handleSpecializationChange(spec)}
-											style={{
-												width: '18px',
-												height: '18px',
-												cursor: 'pointer',
-												accentColor: 'var(--primary-yellow)',
-											}}
+											className="h-5 w-5 rounded border-[var(--card-border)] accent-[var(--primary-yellow)]"
 										/>
 										<span
 											style={{
@@ -2545,27 +2773,8 @@ function EditCoachModal({
 					</div>
 				</div>
 				<div className="modal-footer" style={{ flexShrink: 0 }}>
-					<button
-						type="button"
-						className="btn-secondary"
-						onClick={handleClose}
-						disabled={isSubmitting}
-					>
-						<X className="w-4 h-4" />
-						Cancel
-					</button>
 					<button type="submit" className="btn-primary" disabled={isSubmitting}>
-						{isSubmitting ? (
-							<>
-								<RefreshCw className="w-4 h-4 animate-spin" />
-								Updating...
-							</>
-						) : (
-							<>
-								<Save className="w-4 h-4" />
-								Update Coach Profile
-							</>
-						)}
+						{isSubmitting ? 'Updating...' : 'Update Coach Profile'}
 					</button>
 				</div>
 			</form>

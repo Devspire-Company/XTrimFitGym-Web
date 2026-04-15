@@ -5,6 +5,7 @@ import { X as XIcon, Clock, CheckCircle2, XCircle, Search, Download } from 'luci
 import { GET_ALL_SUBSCRIPTION_REQUESTS } from '@/graphql/operations/index';
 import type { GetAllSubscriptionRequestsQuery } from '@/graphql/generated/types';
 import { exportTablePdf } from '@/lib/pdfExport';
+import { useAppSelector } from '@/store/hooks';
 
 export function SubscriptionRequestsPage() {
 	useEffect(() => {
@@ -12,6 +13,7 @@ export function SubscriptionRequestsPage() {
 	}, []);
 
 	type SubscriptionRequestItem = GetAllSubscriptionRequestsQuery['getAllSubscriptionRequests'][number];
+	const currentUser = useAppSelector((state) => state.auth.user);
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -79,6 +81,9 @@ export function SubscriptionRequestsPage() {
 		exportTablePdf({
 			title: 'Subscription Requests',
 			filePrefix: 'subscription-requests',
+			reportType: 'SUBSCRIPTION_REQUESTS',
+			user: currentUser,
+			filterSummary: `status=${statusFilter};rows=${filteredRequests.length}`,
 			subtitle: `Total rows: ${filteredRequests.length} | Filter: ${statusFilter}`,
 			head: ['Member', 'Email', 'Plan', 'Price', 'Status', 'Requested At', 'Processed By'],
 			rows: filteredRequests.map((request) => [

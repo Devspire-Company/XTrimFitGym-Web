@@ -40,22 +40,11 @@ import { useAppSelector } from '@/store/hooks';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { collectAnalyticsExportSections } from '@/pages/reportsAnalyticsExport';
 import { readRemovedMembershipLogs, type RemovedMembershipLog } from '@/lib/membershipRemovalLogs';
-
-type LocalExportLog = {
-	id: string;
-	reportType: string;
-	fileName: string;
-	downloadedById: string;
-	downloadedByRole: string;
-	downloadedBy?: {
-		firstName?: string;
-		lastName?: string;
-		email?: string;
-	};
-	createdAt: string;
-};
-
-const REPORT_EXPORT_LOCAL_STORAGE_KEY = 'xtrimfit-report-export-logs';
+import {
+	appendLocalReportExportLog,
+	readLocalReportExportLogs,
+	type LocalReportExportLog,
+} from '@/lib/reportExportLogs';
 
 async function loadImageAsDataUrl(path: string): Promise<string | null> {
 	try {
@@ -211,20 +200,14 @@ export function ReportsPage() {
 		.trim() || currentUser?.email || 'System';
 	const [auditApiSupported, setAuditApiSupported] = useState(true);
 	const [downloadablesOpen, setDownloadablesOpen] = useState(false);
-	const [localExportLogs, setLocalExportLogs] = useState<LocalExportLog[]>([]);
+	const [localExportLogs, setLocalExportLogs] = useState<LocalReportExportLog[]>([]);
+	const [exportsPage, setExportsPage] = useState(0);
 	const [removedMembershipPlans] = useState<RemovedMembershipLog[]>(() =>
 		typeof window === 'undefined' ? [] : readRemovedMembershipLogs()
 	);
 
 	useEffect(() => {
-		try {
-			const raw = localStorage.getItem(REPORT_EXPORT_LOCAL_STORAGE_KEY);
-			if (!raw) return;
-			const parsed = JSON.parse(raw) as LocalExportLog[];
-			if (Array.isArray(parsed)) setLocalExportLogs(parsed);
-		} catch {
-			// Ignore malformed local history
-		}
+		setLocalExportLogs(readLocalReportExportLogs());
 	}, []);
 
 	// Initial data fetch with queries
@@ -333,34 +316,40 @@ export function ReportsPage() {
 	const error = analyticsError || analyticsRangeError || null;
 
 	const userExportLoading = membersLoading || coachesLoading || adminsLoading;
-	const recentReportLogs =
-		auditApiSupported && (reportLogsData?.getReportDownloadLogs?.length ?? 0) > 0
-			? reportLogsData?.getReportDownloadLogs ?? []
-			: localExportLogs;
+	const recentReportLogs = useMemo(() => {
+		const apiRows = auditApiSupported ? reportLogsData?.getReportDownloadLogs ?? [] : [];
+		const deduped = new Map<string, any>();
+		[...apiRows, ...localExportLogs].forEach((row: any) => {
+			const key = `${String(row.fileName || '')}|${String(row.reportType || '')}|${String(row.createdAt || '')}`;
+			if (!deduped.has(key)) deduped.set(key, row);
+		});
+		return Array.from(deduped.values()).sort(
+			(a: any, b: any) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()
+		);
+	}, [auditApiSupported, reportLogsData?.getReportDownloadLogs, localExportLogs]);
+	const exportsPageSize = 10;
+	const pagedReportLogs = useMemo(
+		() =>
+			recentReportLogs.slice(
+				exportsPage * exportsPageSize,
+				exportsPage * exportsPageSize + exportsPageSize
+			),
+		[recentReportLogs, exportsPage]
+	);
+	const totalExportPages = Math.max(1, Math.ceil(recentReportLogs.length / exportsPageSize));
+	useEffect(() => {
+		if (exportsPage > totalExportPages - 1) {
+			setExportsPage(Math.max(0, totalExportPages - 1));
+		}
+	}, [exportsPage, totalExportPages]);
 
 	const appendLocalExportLog = (reportType: ReportType | string, fileName: string) => {
-		const next: LocalExportLog = {
-			id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+		const updated = appendLocalReportExportLog({
 			reportType: String(reportType),
 			fileName,
-			downloadedById: currentUser?.id || 'unknown',
-			downloadedByRole: currentUser?.role || 'admin',
-			downloadedBy: {
-				firstName: currentUser?.firstName,
-				lastName: currentUser?.lastName,
-				email: currentUser?.email,
-			},
-			createdAt: new Date().toISOString(),
-		};
-		setLocalExportLogs((prev) => {
-			const updated = [next, ...prev].slice(0, 50);
-			try {
-				localStorage.setItem(REPORT_EXPORT_LOCAL_STORAGE_KEY, JSON.stringify(updated));
-			} catch {
-				// Ignore storage write failures
-			}
-			return updated;
+			user: currentUser,
 		});
+		setLocalExportLogs(updated);
 	};
 
 	// Update analytics range data when revenue subscription updates
@@ -1441,7 +1430,7 @@ export function ReportsPage() {
 									</td>
 								</tr>
 							) : (
-								recentReportLogs.map((row: any) => {
+								pagedReportLogs.map((row: any) => {
 									const asText = (value: unknown): string => {
 										if (typeof value === 'string') return value.trim();
 										if (typeof value === 'number') return String(value);
@@ -1538,6 +1527,33 @@ export function ReportsPage() {
 						</tbody>
 					</table>
 				</div>
+				{recentReportLogs.length > exportsPageSize ? (
+					<div className="mt-3 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+						<span>
+							Page {exportsPage + 1} of {totalExportPages}
+						</span>
+						<div className="flex items-center gap-2">
+							<button
+								type="button"
+								className="btn-secondary px-3 py-1.5 text-xs"
+								disabled={exportsPage === 0}
+								onClick={() => setExportsPage((prev) => Math.max(0, prev - 1))}
+							>
+								Previous
+							</button>
+							<button
+								type="button"
+								className="btn-secondary px-3 py-1.5 text-xs"
+								disabled={exportsPage >= totalExportPages - 1}
+								onClick={() =>
+									setExportsPage((prev) => Math.min(totalExportPages - 1, prev + 1))
+								}
+							>
+								Next
+							</button>
+						</div>
+					</div>
+				) : null}
 			</div>
 		</div>
 	);

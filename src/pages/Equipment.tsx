@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Archive, Dumbbell, Download, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Plus, Dumbbell, Download, AlertTriangle } from 'lucide-react';
 import { EquipmentFormModal, type EquipmentFormData } from '@/components/modals/EquipmentFormModal';
 import { EquipmentViewModal } from '@/components/modals/EquipmentViewModal';
 import { SuccessModal } from '@/components/modals/SuccessModal';
@@ -233,6 +233,7 @@ export function EquipmentPage() {
 	const [uploading, setUploading] = useState(false);
 	const [viewTab, setViewTab] = useState<'CURRENT' | 'ARCHIVED'>('CURRENT');
 	const [statusFilter, setStatusFilter] = useState<'ALL' | EquipmentStatus>('ALL');
+	const [searchTerm, setSearchTerm] = useState('');
 	const [useLegacyApi, setUseLegacyApi] = useState(
 		import.meta.env.VITE_ENABLE_MODERN_ARCHIVE_API !== 'true'
 	);
@@ -339,10 +340,25 @@ export function EquipmentPage() {
 		viewTab === 'ARCHIVED'
 			? normalizedList.filter((item) => item.isArchived === true)
 			: normalizedList.filter((item) => item.isArchived !== true);
-	const visibleList =
+	const normalizedSearch = searchTerm.trim().toLowerCase();
+	const statusFilteredList =
 		statusFilter === 'ALL'
 			? archiveFiltered
 			: archiveFiltered.filter((item) => item.status === statusFilter);
+	const visibleList = statusFilteredList
+		.filter((item) => {
+			if (!normalizedSearch) return true;
+			const searchable = [item.name, item.description, item.notes, statusLabel(item.status)]
+				.filter(Boolean)
+				.join(' ')
+				.toLowerCase();
+			return searchable.includes(normalizedSearch);
+		})
+		.sort((a, b) => {
+			const aTime = toEpoch(a.createdAt || a.updatedAt);
+			const bTime = toEpoch(b.createdAt || b.updatedAt);
+			return bTime - aTime;
+		});
 	const maintenanceSetAtByEquipmentId = useMemo(() => {
 		const map: Record<string, string> = {};
 		normalizedList.forEach((item) => {
@@ -623,6 +639,7 @@ export function EquipmentPage() {
 						imageUrl,
 						description: formData.description || undefined,
 						notes: formData.notes || undefined,
+						acquiredAt: formData.acquiredAt || undefined,
 						status: formData.status,
 					},
 				},
@@ -639,6 +656,7 @@ export function EquipmentPage() {
 						imageUrl,
 						description: formData.description || undefined,
 						notes: formData.notes || undefined,
+						acquiredAt: formData.acquiredAt || undefined,
 						status: formData.status,
 					},
 				},
@@ -951,6 +969,13 @@ export function EquipmentPage() {
 						<option value={EquipmentStatus.Damaged}>Damaged</option>
 						<option value={EquipmentStatus.Undermaintenance}>Under maintenance</option>
 					</select>
+					<input
+						type="text"
+						value={searchTerm}
+						onChange={(e) => setSearchTerm(e.target.value)}
+						placeholder="Search equipment..."
+						className="w-52 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--primary-yellow)] focus:outline-none"
+					/>
 					<Button onClick={handleCreate}>
 						<Plus className="w-4 h-4" />
 						Add Equipment
@@ -1048,7 +1073,6 @@ export function EquipmentPage() {
 										disabled={restoring}
 										className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.14)] px-4 text-sm font-semibold text-[#34D399] transition hover:bg-[rgba(16,185,129,0.2)] disabled:opacity-60"
 									>
-										<RotateCcw className="w-4 h-4" />
 										{restoring ? 'Restoring...' : 'Restore'}
 									</button>
 								) : (
@@ -1061,7 +1085,6 @@ export function EquipmentPage() {
 											}}
 											className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(249,197,19,0.35)] bg-[rgba(249,197,19,0.14)] px-4 text-sm font-semibold text-[var(--primary-yellow)] transition hover:bg-[rgba(249,197,19,0.22)]"
 										>
-											<Edit className="w-4 h-4" />
 											Edit
 										</button>
 										<button
@@ -1072,7 +1095,6 @@ export function EquipmentPage() {
 											}}
 											className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.14)] px-4 text-sm font-semibold text-[#F87171] transition hover:bg-[rgba(239,68,68,0.22)]"
 										>
-											<Archive className="w-4 h-4" />
 											Archive
 										</button>
 									</>

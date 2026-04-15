@@ -6,7 +6,6 @@ import {
 	Ban,
 	Users,
 	X,
-	CreditCard,
 	Loader2,
 	MoreVertical,
 	UserCog,
@@ -18,7 +17,6 @@ import {
 	Dumbbell,
 	FileText,
 	RotateCw,
-	CheckCircle2,
 	Download,
 } from 'lucide-react';
 import {
@@ -32,7 +30,7 @@ import {
 	GET_PENDING_SUBSCRIPTION_REQUESTS,
 } from '@/graphql/operations/index';
 import { RoleType } from '@/graphql/generated/graphql';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
 import { AdjustSubscriptionDurationModal } from '@/components/modals/AdjustSubscriptionDurationModal';
@@ -74,6 +72,8 @@ interface Member {
 	subscriptionDayDuration?: number | null;
 	/** Active transaction `startedAt` (ISO) for admin duration/start overrides. */
 	subscriptionStartedAt?: string;
+	disableReason?: string;
+	disabledAt?: string;
 }
 
 const normalizeFilterValue = (value: string | null | undefined): string =>
@@ -85,6 +85,7 @@ export function MembersPage() {
 	}, []);
 
 	const dispatch = useAppDispatch();
+	const currentUser = useAppSelector((state) => state.auth.user);
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState<string>('all');
 	const [membershipFilter, setMembershipFilter] = useState<string>('all');
@@ -463,6 +464,8 @@ export function MembersPage() {
 			subscriptionDayDuration,
 			subscriptionStartedAt:
 				typeof membershipTransaction?.startedAt === 'string' ? membershipTransaction.startedAt : undefined,
+			disableReason: typeof m.disableReason === 'string' ? m.disableReason : '',
+			disabledAt: typeof m.disabledAt === 'string' ? m.disabledAt : undefined,
 		};
 	});
 
@@ -518,13 +521,17 @@ export function MembersPage() {
 			title: 'Member Management',
 			filePrefix: 'members',
 			subtitle: `Total rows: ${filteredMembers.length} | Status filter: ${statusFilter} | Membership filter: ${membershipFilter}`,
-			head: ['Member', 'Email', 'Phone', 'Membership', 'Status', 'Join Date', 'Expires'],
+			reportType: 'MEMBER_MANAGEMENT',
+			user: currentUser,
+			filterSummary: `status=${statusFilter};membership=${membershipFilter}`,
+			head: ['Member', 'Email', 'Phone', 'Membership', 'Status', 'Disabled Reason', 'Join Date', 'Expires'],
 			rows: filteredMembers.map((member) => [
 				member.name,
 				member.email,
 				member.phone,
 				member.membership,
 				member.status,
+				member.status === 'Disabled' ? member.disableReason || 'No reason provided' : '—',
 				member.joinDate,
 				member.endDate || '—',
 			]),
@@ -979,7 +986,6 @@ export function MembersPage() {
 															closeMemberActionsMenu();
 														}}
 													>
-														<Eye className="h-4 w-4 shrink-0 text-[#60A5FA]" aria-hidden />
 														View details
 													</button>
 
@@ -1004,7 +1010,6 @@ export function MembersPage() {
 																	}
 																}}
 															>
-																<CheckCircle2 className="h-4 w-4 shrink-0 text-[#34D399]" aria-hidden />
 																Enable account
 															</button>
 														</>
@@ -1023,7 +1028,6 @@ export function MembersPage() {
 																	closeMemberActionsMenu();
 																}}
 															>
-																<RotateCw className="h-4 w-4 shrink-0 text-[var(--primary-yellow)]" aria-hidden />
 																Renew plan
 															</button>
 															<button
@@ -1035,7 +1039,6 @@ export function MembersPage() {
 																	closeMemberActionsMenu();
 																}}
 															>
-																<Calendar className="h-4 w-4 shrink-0 text-[#60A5FA]" aria-hidden />
 																Edit subscription length
 															</button>
 															<button
@@ -1047,7 +1050,6 @@ export function MembersPage() {
 																	closeMemberActionsMenu();
 																}}
 															>
-																<X className="h-4 w-4 shrink-0 text-[#F87171]" aria-hidden />
 																Unsubscribe
 															</button>
 														</>
@@ -1066,7 +1068,6 @@ export function MembersPage() {
 																	closeMemberActionsMenu();
 																}}
 															>
-																<CreditCard className="h-4 w-4 shrink-0 text-[#34D399]" aria-hidden />
 																Subscribe to plan
 															</button>
 														</>
@@ -1087,7 +1088,6 @@ export function MembersPage() {
 																	closeMemberActionsMenu();
 																}}
 															>
-																<Ban className="h-4 w-4 shrink-0 text-[#F87171]" aria-hidden />
 																Disable account
 															</button>
 														</>
@@ -1174,7 +1174,6 @@ export function MembersPage() {
 										cursor: 'pointer',
 									}}
 								>
-									<X className="w-4 h-4" />
 									Cancel
 								</button>
 								<button
@@ -1194,7 +1193,6 @@ export function MembersPage() {
 										cursor: 'pointer',
 									}}
 								>
-									<Ban className="w-4 h-4" />
 									Disable
 								</button>
 							</div>
@@ -1842,12 +1840,28 @@ function MemberViewModal({ member, onClose }: { member: Member; onClose: () => v
 								</div>
 							</div>
 						</div>
+						{member.status === 'Disabled' ? (
+							<div className="bg-[rgba(71,85,105,0.2)] border border-[rgba(148,163,184,0.35)] rounded-xl p-6">
+								<h3 className="font-semibold mb-3 text-[var(--text-primary)]">
+									Disabled Account Details
+								</h3>
+								<p className="text-sm text-[var(--text-secondary)]">
+									<span className="text-[var(--text-primary)] font-medium">Reason:</span>{' '}
+									{member.disableReason?.trim() || 'No reason provided'}
+								</p>
+								<p className="mt-1 text-sm text-[var(--text-secondary)]">
+									<span className="text-[var(--text-primary)] font-medium">Disabled at:</span>{' '}
+									{member.disabledAt
+										? new Date(member.disabledAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
+										: 'N/A'}
+								</p>
+							</div>
+						) : null}
 					</div>
 				)}
 			</div>
 			<div className="modal-footer">
 				<button type="button" className="btn-secondary" onClick={onClose}>
-					<X className="w-4 h-4" />
 					Close
 				</button>
 			</div>

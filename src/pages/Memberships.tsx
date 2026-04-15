@@ -140,7 +140,6 @@ export function MembershipsPage() {
 		// Map status from form format to API format
 		const statusMap: Record<string, MembershipStatus> = {
 			'Active': MembershipStatus.Active,
-			'Inactive': MembershipStatus.Inactive,
 			'Coming Soon': MembershipStatus.ComingSoon,
 		};
 
@@ -255,6 +254,9 @@ export function MembershipsPage() {
 			exportTablePdf({
 				title: 'Membership Plans - Active',
 				filePrefix: 'membership-plans-active',
+				reportType: 'MEMBERSHIP_MANAGEMENT',
+				user: currentUser,
+				filterSummary: 'tab=active',
 				subtitle: `Total active plans: ${plans.length}`,
 				head: ['Plan Name', 'Status', 'Price', 'Duration', 'Description', 'Features'],
 				rows: plans.map((plan) => [
@@ -272,6 +274,9 @@ export function MembershipsPage() {
 		exportTablePdf({
 			title: 'Membership Plans - Removed History',
 			filePrefix: 'membership-plans-removed',
+			reportType: 'MEMBERSHIP_REMOVED_HISTORY',
+			user: currentUser,
+			filterSummary: 'tab=removed',
 			subtitle: `Total removed plans: ${removedPlans.length}`,
 			head: ['Removed At', 'Plan', 'Price', 'Duration', 'Reason', 'Removed By'],
 			rows: removedPlans.map((log) => [
