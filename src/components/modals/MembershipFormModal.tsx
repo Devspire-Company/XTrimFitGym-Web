@@ -164,7 +164,7 @@ export function MembershipFormModal({
 										onChange={(e) => setPriceInput(e.target.value.replace(/[^\d]/g, ''))}
 										required
 										placeholder="e.g., 500"
-										className="pl-12"
+										className="pl-14"
 									/>
 								</div>
 							</div>
@@ -234,7 +234,7 @@ export function MembershipFormModal({
 									{featureInputs.map((feature, idx) => (
 										<div
 											key={`feature-${idx}`}
-											className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.02)] p-2"
+											className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-2xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.03)] p-2.5"
 										>
 											<input
 												type="text"
@@ -247,7 +247,7 @@ export function MembershipFormModal({
 												type="button"
 												onClick={() => removeFeatureInput(idx)}
 												disabled={featureInputs.length === 1}
-												className="rounded-lg border border-[var(--card-border)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:opacity-40"
+												className="rounded-xl border border-[var(--card-border)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:opacity-40"
 											>
 												Remove
 											</button>
@@ -256,7 +256,7 @@ export function MembershipFormModal({
 									<button
 										type="button"
 										onClick={addFeatureInput}
-										className="w-full rounded-xl border border-dashed border-[rgba(249,197,19,0.45)] bg-[rgba(249,197,19,0.08)] px-3 py-2.5 text-sm font-semibold text-[var(--primary-yellow)]"
+										className="w-full rounded-2xl border border-dashed border-[rgba(249,197,19,0.45)] bg-[rgba(249,197,19,0.08)] px-3 py-2.5 text-sm font-semibold text-[var(--primary-yellow)]"
 									>
 										+ Add feature
 									</button>

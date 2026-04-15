@@ -355,7 +355,7 @@ export function MembershipsPage() {
 								{plan.features?.map((feature, idx) => (
 									<li
 										key={idx}
-										className="flex items-center gap-3 text-sm text-[var(--text-secondary)] py-3 border-b border-[rgba(255,255,255,0.05)] last:border-0"
+										className="flex items-center gap-3 rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm text-[var(--text-secondary)]"
 									>
 										<Check className="text-[var(--primary-yellow)] w-4 h-4 flex-shrink-0" aria-hidden strokeWidth={3} />
 										<span>{feature}</span>
