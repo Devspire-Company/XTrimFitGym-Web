@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Archive, Dumbbell, Download, AlertTriangle, RotateCcw } from 'lucide-react';
@@ -19,6 +19,11 @@ import { uploadEquipmentImage } from '@/lib/uploadApi';
 import { EquipmentStatus, ReportType } from '@/graphql/generated/graphql';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import {
+	appendEquipmentActionLog,
+	readEquipmentActionLogs,
+	type EquipmentActionLog,
+} from '@/lib/equipmentActionLogs';
 
 const LEGACY_ARCHIVE_PREFIX = '__ARCHIVED__|';
 
@@ -160,6 +165,39 @@ function statusBadgeClass(s: EquipmentStatus): string {
 	}
 }
 
+function toStatusText(status: EquipmentStatus | string | null | undefined): string {
+	if (!status) return 'N/A';
+	switch (status) {
+		case EquipmentStatus.Available:
+			return 'Available';
+		case EquipmentStatus.Damaged:
+			return 'Damaged';
+		case EquipmentStatus.Undermaintenance:
+			return 'Under maintenance';
+		default:
+			return String(status);
+	}
+}
+
+function actionTypeText(actionType: EquipmentActionLog['actionType']): string {
+	switch (actionType) {
+		case 'SET_UNDER_MAINTENANCE':
+			return 'Set under maintenance';
+		case 'STATUS_CHANGED':
+			return 'Status changed';
+		case 'ARCHIVED':
+			return 'Archived';
+		case 'RESTORED':
+			return 'Restored';
+		case 'CREATED':
+			return 'Created';
+		case 'UPDATED':
+			return 'Updated';
+		default:
+			return actionType;
+	}
+}
+
 const ARCHIVE_REASON_OPTIONS = [
 	'Damaged beyond repair',
 	'Replaced by a new unit',
@@ -193,6 +231,31 @@ export function EquipmentPage() {
 		'Damaged beyond repair'
 	);
 	const [archiveReasonOther, setArchiveReasonOther] = useState('');
+	const [equipmentActionLogs, setEquipmentActionLogs] = useState<EquipmentActionLog[]>(() =>
+		typeof window === 'undefined' ? [] : readEquipmentActionLogs()
+	);
+	const pendingCreateActionRef = useRef<{ equipmentName: string; status: EquipmentStatus } | null>(null);
+	const pendingUpdateActionRef = useRef<{
+		equipmentId: string;
+		equipmentName: string;
+		fromStatus: EquipmentStatus;
+		toStatus: EquipmentStatus;
+	} | null>(null);
+	const pendingArchiveActionRef = useRef<{ equipmentId: string; equipmentName: string; reason: string } | null>(
+		null
+	);
+	const pendingRestoreActionRef = useRef<{ equipmentId: string; equipmentName: string } | null>(null);
+	const actorLabel =
+		[currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ').trim() ||
+		currentUser?.email ||
+		'Admin';
+	const recordEquipmentAction = (payload: Omit<EquipmentActionLog, 'id' | 'createdAt' | 'actionBy'>) => {
+		const updated = appendEquipmentActionLog({
+			...payload,
+			actionBy: actorLabel,
+		});
+		setEquipmentActionLogs(updated);
+	};
 	const appendLocalExportLog = (fileName: string) => {
 		try {
 			const key = 'xtrimfit-report-export-logs';
@@ -271,20 +334,105 @@ export function EquipmentPage() {
 		statusFilter === 'ALL'
 			? archiveFiltered
 			: archiveFiltered.filter((item) => item.status === statusFilter);
+	const maintenanceSetAtByEquipmentId = useMemo(() => {
+		const map: Record<string, string> = {};
+		normalizedList.forEach((item) => {
+			let latestIso = '';
+			const lifecycleLogs = Array.isArray(item.lifecycleLogs) ? item.lifecycleLogs : [];
+			lifecycleLogs.forEach((entry: any) => {
+				const changedAt = entry?.changedAt;
+				if (!changedAt) return;
+				if (entry?.status !== EquipmentStatus.Undermaintenance) return;
+				if (!latestIso || new Date(changedAt).getTime() > new Date(latestIso).getTime()) {
+					latestIso = changedAt;
+				}
+			});
+			equipmentActionLogs.forEach((entry) => {
+				if (entry.equipmentId !== item.id) return;
+				const underMaintenanceAction =
+					entry.actionType === 'SET_UNDER_MAINTENANCE' ||
+					entry.toStatus === EquipmentStatus.Undermaintenance;
+				if (!underMaintenanceAction) return;
+				if (!latestIso || new Date(entry.createdAt).getTime() > new Date(latestIso).getTime()) {
+					latestIso = entry.createdAt;
+				}
+			});
+			if (latestIso) {
+				map[item.id] = latestIso;
+			}
+		});
+		return map;
+	}, [normalizedList, equipmentActionLogs]);
 
 	const [createEquipment, { loading: creating }] = useMutation(CREATE_EQUIPMENT_LEGACY, {
-		onCompleted: () => {
+		onCompleted: (result) => {
+			const pending = pendingCreateActionRef.current;
+			if (pending) {
+				const createdEquipment = (result as any)?.createEquipment;
+				const createdId = createdEquipment?.id || '';
+				recordEquipmentAction({
+					equipmentId: createdId,
+					equipmentName: pending.equipmentName,
+					actionType: 'CREATED',
+					toStatus: pending.status,
+				});
+				if (pending.status === EquipmentStatus.Undermaintenance) {
+					recordEquipmentAction({
+						equipmentId: createdId,
+						equipmentName: pending.equipmentName,
+						actionType: 'SET_UNDER_MAINTENANCE',
+						toStatus: pending.status,
+						reason: 'Set during creation',
+					});
+				}
+				pendingCreateActionRef.current = null;
+			}
 			refreshEquipmentList().catch(() => {});
 			setSuccessMessage('Equipment created.');
 			setIsSuccessOpen(true);
 			setIsFormOpen(false);
 			dispatch(addToast({ type: 'success', message: 'Equipment created.' }));
 		},
-		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
+		onError: (e) => {
+			pendingCreateActionRef.current = null;
+			dispatch(addToast({ type: 'error', message: e.message }));
+		},
 	});
 
 	const [updateEquipment, { loading: updating }] = useMutation(UPDATE_EQUIPMENT_LEGACY, {
 		onCompleted: () => {
+			const pending = pendingUpdateActionRef.current;
+			if (pending) {
+				recordEquipmentAction({
+					equipmentId: pending.equipmentId,
+					equipmentName: pending.equipmentName,
+					actionType: 'UPDATED',
+					fromStatus: pending.fromStatus,
+					toStatus: pending.toStatus,
+				});
+				if (pending.fromStatus !== pending.toStatus) {
+					recordEquipmentAction({
+						equipmentId: pending.equipmentId,
+						equipmentName: pending.equipmentName,
+						actionType: 'STATUS_CHANGED',
+						fromStatus: pending.fromStatus,
+						toStatus: pending.toStatus,
+					});
+				}
+				if (
+					pending.fromStatus !== EquipmentStatus.Undermaintenance &&
+					pending.toStatus === EquipmentStatus.Undermaintenance
+				) {
+					recordEquipmentAction({
+						equipmentId: pending.equipmentId,
+						equipmentName: pending.equipmentName,
+						actionType: 'SET_UNDER_MAINTENANCE',
+						fromStatus: pending.fromStatus,
+						toStatus: pending.toStatus,
+					});
+				}
+				pendingUpdateActionRef.current = null;
+			}
 			refreshEquipmentList().catch(() => {});
 			setSuccessMessage('Equipment updated.');
 			setIsSuccessOpen(true);
@@ -292,18 +440,34 @@ export function EquipmentPage() {
 			setSelected(null);
 			dispatch(addToast({ type: 'success', message: 'Equipment updated.' }));
 		},
-		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
+		onError: (e) => {
+			pendingUpdateActionRef.current = null;
+			dispatch(addToast({ type: 'error', message: e.message }));
+		},
 	});
 	const [archiveEquipment, { loading: archiving }] = useMutation(ARCHIVE_EQUIPMENT, {
 		refetchQueries: [{ query: GET_EQUIPMENTS, variables: { includeArchived: true } }],
 		onCompleted: () => {
+			const pending = pendingArchiveActionRef.current;
+			if (pending) {
+				recordEquipmentAction({
+					equipmentId: pending.equipmentId,
+					equipmentName: pending.equipmentName,
+					actionType: 'ARCHIVED',
+					reason: pending.reason,
+				});
+				pendingArchiveActionRef.current = null;
+			}
 			setSuccessMessage('Equipment archived.');
 			setIsSuccessOpen(true);
 			setIsDeleteOpen(false);
 			setSelected(null);
 			dispatch(addToast({ type: 'success', message: 'Equipment archived.' }));
 		},
-		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
+		onError: (e) => {
+			pendingArchiveActionRef.current = null;
+			dispatch(addToast({ type: 'error', message: e.message }));
+		},
 	});
 	const [updateEquipmentLegacyMeta, { loading: updatingLegacyMeta }] = useMutation(
 		UPDATE_EQUIPMENT_LEGACY,
@@ -317,11 +481,23 @@ export function EquipmentPage() {
 	const [unarchiveEquipment, { loading: restoring }] = useMutation(UNARCHIVE_EQUIPMENT, {
 		refetchQueries: [{ query: GET_EQUIPMENTS, variables: { includeArchived: true } }],
 		onCompleted: () => {
+			const pending = pendingRestoreActionRef.current;
+			if (pending) {
+				recordEquipmentAction({
+					equipmentId: pending.equipmentId,
+					equipmentName: pending.equipmentName,
+					actionType: 'RESTORED',
+				});
+				pendingRestoreActionRef.current = null;
+			}
 			setSuccessMessage('Equipment restored to current list.');
 			setIsSuccessOpen(true);
 			dispatch(addToast({ type: 'success', message: 'Equipment restored.' }));
 		},
-		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
+		onError: (e) => {
+			pendingRestoreActionRef.current = null;
+			dispatch(addToast({ type: 'error', message: e.message }));
+		},
 	});
 	const [logReportDownload] = useMutation(LOG_REPORT_DOWNLOAD);
 
@@ -353,11 +529,17 @@ export function EquipmentPage() {
 					input: { notes: legacyMeta.cleanNotes ?? '' },
 				},
 			});
+			recordEquipmentAction({
+				equipmentId: item.id,
+				equipmentName: item.name,
+				actionType: 'RESTORED',
+			});
 			setSuccessMessage('Equipment restored to current list.');
 			setIsSuccessOpen(true);
 			dispatch(addToast({ type: 'success', message: 'Equipment restored.' }));
 			return;
 		}
+		pendingRestoreActionRef.current = { equipmentId: item.id, equipmentName: item.name };
 		await unarchiveEquipment({ variables: { id: item.id } });
 	};
 
@@ -379,6 +561,12 @@ export function EquipmentPage() {
 			return;
 		}
 		if (isEdit && selected) {
+			pendingUpdateActionRef.current = {
+				equipmentId: selected.id,
+				equipmentName: formData.name,
+				fromStatus: (selected.status as EquipmentStatus) ?? EquipmentStatus.Available,
+				toStatus: formData.status,
+			};
 			updateEquipment({
 				variables: {
 					id: selected.id,
@@ -392,6 +580,10 @@ export function EquipmentPage() {
 				},
 			});
 		} else {
+			pendingCreateActionRef.current = {
+				equipmentName: formData.name,
+				status: formData.status,
+			};
 			createEquipment({
 				variables: {
 					input: {
@@ -424,12 +616,23 @@ export function EquipmentPage() {
 						input: { notes: archivedNotes },
 					},
 				});
+				recordEquipmentAction({
+					equipmentId: selected.id,
+					equipmentName: selected.name,
+					actionType: 'ARCHIVED',
+					reason: finalReason,
+				});
 				setSuccessMessage('Equipment archived.');
 				setIsSuccessOpen(true);
 				setIsDeleteOpen(false);
 				setSelected(null);
 				dispatch(addToast({ type: 'success', message: 'Equipment archived.' }));
 			} else {
+				pendingArchiveActionRef.current = {
+					equipmentId: selected.id,
+					equipmentName: selected.name,
+					reason: finalReason,
+				};
 				await archiveEquipment({
 					variables: { id: selected.id, reason: finalReason },
 				});
@@ -454,6 +657,45 @@ export function EquipmentPage() {
 		const maintenanceCount = reportRows.filter(
 			(eq) => eq.status === EquipmentStatus.Undermaintenance
 		).length;
+		const timelineEntries: Array<{
+			equipmentName: string;
+			action: string;
+			fromStatus: string;
+			toStatus: string;
+			reason: string;
+			changedBy: string;
+			changedAt: string;
+		}> = [];
+		reportRows.forEach((eq) => {
+			const lifecycleLogs = Array.isArray(eq.lifecycleLogs) ? eq.lifecycleLogs : [];
+			lifecycleLogs.forEach((log: any) => {
+				timelineEntries.push({
+					equipmentName: eq.name || 'Unknown',
+					action: log?.action || 'Lifecycle update',
+					fromStatus: '-',
+					toStatus: toStatusText(log?.status as EquipmentStatus | undefined),
+					reason: log?.notes || '-',
+					changedBy: log?.changedById || '-',
+					changedAt: log?.changedAt || '',
+				});
+			});
+		});
+		equipmentActionLogs.forEach((log) => {
+			timelineEntries.push({
+				equipmentName: log.equipmentName || 'Unknown',
+				action: actionTypeText(log.actionType),
+				fromStatus: toStatusText(log.fromStatus),
+				toStatus: toStatusText(log.toStatus),
+				reason: log.reason || '-',
+				changedBy: log.actionBy || '-',
+				changedAt: log.createdAt,
+			});
+		});
+		timelineEntries.sort((a, b) => {
+			const timeA = new Date(a.changedAt || '').getTime();
+			const timeB = new Date(b.changedAt || '').getTime();
+			return (Number.isFinite(timeB) ? timeB : 0) - (Number.isFinite(timeA) ? timeA : 0);
+		});
 		const exportedByLabel = [currentUser?.firstName, currentUser?.lastName]
 			.filter(Boolean)
 			.join(' ')
@@ -515,6 +757,7 @@ export function EquipmentPage() {
 					'Condition',
 					'Record State',
 					'Added Date',
+					'Under maintenance since',
 					'Archived Date',
 					'Archive Reason',
 					'Acquired Date',
@@ -526,11 +769,32 @@ export function EquipmentPage() {
 				statusLabel(eq.status),
 				eq.isArchived ? 'Archived' : 'Current',
 				formatDateManila(eq.createdAt),
+				formatDateManila(maintenanceSetAtByEquipmentId[eq.id]),
 				formatDateManila(eq.archivedAt),
 				eq.archiveReason || '-',
 				formatDateManila(eq.acquiredAt),
 				eq.notes || '-',
 			]),
+			styles: { fontSize: 8 },
+			headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
+			alternateRowStyles: { fillColor: [245, 245, 248] },
+			margin: { left: 14, right: 14 },
+		});
+		autoTable(doc, {
+			startY: ((doc as any).lastAutoTable?.finalY ?? 52) + 8,
+			head: [['Equipment', 'Action', 'From status', 'To status', 'Reason/Notes', 'Changed by', 'Date']],
+			body:
+				timelineEntries.length > 0
+					? timelineEntries.map((entry) => [
+							entry.equipmentName,
+							entry.action,
+							entry.fromStatus,
+							entry.toStatus,
+							entry.reason,
+							entry.changedBy,
+							formatDateManila(entry.changedAt),
+					  ])
+					: [['-', 'No action history recorded yet', '-', '-', '-', '-', '-']],
 			styles: { fontSize: 8 },
 			headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
 			alternateRowStyles: { fillColor: [245, 245, 248] },
@@ -681,6 +945,12 @@ export function EquipmentPage() {
 											})
 										: 'N/A'}
 								</div>
+								{item.status === EquipmentStatus.Undermaintenance ? (
+									<div>
+										Under maintenance since:{' '}
+										{formatDateManila(maintenanceSetAtByEquipmentId[item.id])}
+									</div>
+								) : null}
 								{item.isArchived ? (
 									<>
 										<div>
