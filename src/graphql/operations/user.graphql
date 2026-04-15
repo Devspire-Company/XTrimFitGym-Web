@@ -90,6 +90,9 @@ query GetUsers($role: RoleType) {
 			userAgent
 			loginAt
 		}
+		isDisabled
+		disabledAt
+		disableReason
 		createdAt
 		updatedAt
 	}
@@ -173,6 +176,9 @@ query GetUser($id: ID!) {
 			userAgent
 			loginAt
 		}
+		isDisabled
+		disabledAt
+		disableReason
 		createdAt
 		updatedAt
 	}
@@ -405,6 +411,9 @@ subscription UsersUpdated($role: RoleType) {
 			userAgent
 			loginAt
 		}
+		isDisabled
+		disabledAt
+		disableReason
 		createdAt
 		updatedAt
 	}
