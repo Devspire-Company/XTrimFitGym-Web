@@ -191,10 +191,12 @@ export function AttendancePage() {
 	);
 
 	// Poll only when tab is visible so we don't refetch in background
-	const [pollIntervalMs, setPollIntervalMs] = useState(5000);
+	// Slightly slower than 5s to ease Render free-tier + Railway MySQL load; subscriptions still push updates.
+	const attendancePollMs = 7500;
+	const [pollIntervalMs, setPollIntervalMs] = useState(attendancePollMs);
 	useEffect(() => {
 		const handleVisibility = () => {
-			setPollIntervalMs(() => (document.hidden ? 0 : 5000));
+			setPollIntervalMs(() => (document.hidden ? 0 : attendancePollMs));
 		};
 		handleVisibility();
 		document.addEventListener('visibilitychange', handleVisibility);
