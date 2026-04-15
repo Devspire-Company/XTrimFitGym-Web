@@ -12,6 +12,7 @@ import {
 	LogOut,
 	Calendar,
 	PieChart,
+	UserRound,
 	Zap,
 } from 'lucide-react';
 import { GET_USERS, GET_REVENUE_SUMMARY, REVENUE_SUMMARY_UPDATED, USERS_UPDATED, GET_ATTENDANCE_RECORDS, ATTENDANCE_RECORD_ADDED, ATTENDANCE_UPDATED } from '@/graphql/operations/index';
@@ -378,6 +379,11 @@ export function DashboardPage() {
 	const membershipRev = analytics?.membershipSubscriptionRevenue ?? 0;
 	const walkInRev = analytics?.walkInRevenue ?? 0;
 	const activeSubscriptions = analytics?.activeSubscriptions || 0;
+	const walkInCheckInsTotal =
+		analytics?.revenueByPeriod?.reduce(
+			(sum: number, p: { walkInCount?: number | null }) => sum + (p.walkInCount ?? 0),
+			0,
+		) ?? 0;
 
 	// Recent members (last 3) - sort by join date
 	const recentMembers = [...members]
@@ -411,7 +417,7 @@ export function DashboardPage() {
 			</div>
 
 			{/* Stats Grid */}
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
 				<StatCard
 					icon={Users}
 					title="Total Members"
@@ -431,6 +437,17 @@ export function DashboardPage() {
 					title="Total revenue"
 					value={`₱${monthlyRevenue.toLocaleString()}`}
 					change="Membership + walk-in fees"
+					changeType="positive"
+				/>
+				<StatCard
+					icon={UserRound}
+					title="Walk-in fees"
+					value={`₱${Number(walkInRev).toLocaleString()}`}
+					change={
+						walkInCheckInsTotal > 0
+							? `${walkInCheckInsTotal} time-in${walkInCheckInsTotal === 1 ? '' : 's'} (tracked days)`
+							: 'Walk-in time-in revenue'
+					}
 					changeType="positive"
 				/>
 				<StatCard
