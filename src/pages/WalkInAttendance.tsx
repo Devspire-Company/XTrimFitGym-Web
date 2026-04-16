@@ -543,6 +543,63 @@ export function WalkInAttendancePage() {
 	const hasPrevAccounts = accountsPage > 0;
 	const hasNextAccounts = accountsOffset + accountRows.length < totalWalkInAccounts;
 
+	type ExportAccountRow = { client: WalkInClientRow; timeInCount: number | null };
+
+	const fetchAllWalkInAccounts = async (): Promise<ExportAccountRow[]> => {
+		const pageSize = 200;
+		if (useAccountsFallback) {
+			const stats = await apolloClient.query({
+				query: WALK_IN_STATS,
+				fetchPolicy: 'network-only',
+			});
+			const total = stats.data?.walkInStats?.totalWalkInAccounts ?? 0;
+			const rows: ExportAccountRow[] = [];
+			for (let offset = 0; offset < total; offset += pageSize) {
+				const { data } = await apolloClient.query({
+					query: SEARCH_WALK_IN_CLIENTS,
+					variables: { query: '', limit: pageSize, offset },
+					fetchPolicy: 'network-only',
+				});
+				const pageClients = data?.searchWalkInClients ?? [];
+				if (pageClients.length === 0) break;
+				rows.push(...pageClients.map((client: WalkInClientRow) => ({ client, timeInCount: null })));
+			}
+			return rows;
+		}
+
+		const first = await apolloClient.query({
+			query: WALK_IN_ACCOUNTS_OVERVIEW,
+			variables: { pagination: { limit: pageSize, offset: 0 } },
+			fetchPolicy: 'network-only',
+		});
+		let total = first.data?.walkInAccountsOverview?.totalWalkInAccounts ?? 0;
+		const rows: ExportAccountRow[] = (first.data?.walkInAccountsOverview?.rows ?? []).map(
+			(r: { client: WalkInClientRow; timeInCount: number }) => ({
+				client: r.client,
+				timeInCount: r.timeInCount,
+			}),
+		);
+
+		for (let offset = rows.length; offset < total; offset += pageSize) {
+			const { data } = await apolloClient.query({
+				query: WALK_IN_ACCOUNTS_OVERVIEW,
+				variables: { pagination: { limit: pageSize, offset } },
+				fetchPolicy: 'network-only',
+			});
+			const pageRows = data?.walkInAccountsOverview?.rows ?? [];
+			if (pageRows.length === 0) break;
+			rows.push(
+				...pageRows.map((r: { client: WalkInClientRow; timeInCount: number }) => ({
+					client: r.client,
+					timeInCount: r.timeInCount,
+				})),
+			);
+			total = data?.walkInAccountsOverview?.totalWalkInAccounts ?? total;
+		}
+
+		return rows;
+	};
+
 	const handleExportPdf = async () => {
 		const firstPage = logsData?.walkInAttendanceLogs?.logs ?? [];
 		let exportRows = [...firstPage];
@@ -564,24 +621,44 @@ export function WalkInAttendancePage() {
 				exportTotal = data?.walkInAttendanceLogs?.totalCount ?? exportTotal;
 			}
 		}
+		const allAccounts = await fetchAllWalkInAccounts();
+
 		exportTablePdf({
-			title: 'Walk-in Attendance Logs',
+			title: 'Walk-in Attendance & Accounts',
 			filePrefix: 'walk-in-attendance',
 			reportType: 'WALKIN_ATTENDANCE',
 			user: currentUser,
-			filterSummary: `logDate=${logDate};records=${exportRows.length}`,
-			subtitle: `Log date: ${logDate} | Exported rows: ${exportRows.length} | Total records: ${exportTotal}`,
-			head: ['Time In (Manila)', 'Payment', 'Name', 'Age', 'Gender', 'Contact', 'Email', 'Notes'],
-			rows: exportRows.map((row) => [
-				formatTimeManila(row.timedInAt),
-				`PHP ${Number(row.payment ?? 0).toLocaleString()}`,
-				formatWalkInName(row.walkInClient),
-				row.walkInClient.ageYears != null ? row.walkInClient.ageYears : '—',
-				genderLabel(row.walkInClient.gender),
-				row.walkInClient.phoneNumber ?? '—',
-				row.walkInClient.email ?? '—',
-				row.walkInClient.notes ?? '—',
-			]),
+			filterSummary: `logDate=${logDate};logRows=${exportRows.length};accounts=${allAccounts.length}`,
+			subtitle: `Log date: ${logDate} | Attendance rows: ${exportRows.length}/${exportTotal} | Accounts: ${allAccounts.length}`,
+			sections: [
+				{
+					title: 'Attendance logs',
+					head: ['Time In (Manila)', 'Payment', 'Name', 'Age', 'Gender', 'Contact', 'Email', 'Notes'],
+					rows: exportRows.map((row) => [
+						formatTimeManila(row.timedInAt),
+						`PHP ${Number(row.payment ?? 0).toLocaleString()}`,
+						formatWalkInName(row.walkInClient),
+						row.walkInClient.ageYears != null ? row.walkInClient.ageYears : '—',
+						genderLabel(row.walkInClient.gender),
+						row.walkInClient.phoneNumber ?? '—',
+						row.walkInClient.email ?? '—',
+						row.walkInClient.notes ?? '—',
+					]),
+				},
+				{
+					title: 'All walk-in accounts',
+					head: ['Name', 'Contact', 'Email', 'Age', 'Gender', 'Time-ins', 'Notes'],
+					rows: allAccounts.map((row) => [
+						formatWalkInName(row.client),
+						row.client.phoneNumber ?? '—',
+						row.client.email ?? '—',
+						row.client.ageYears != null ? row.client.ageYears : '—',
+						genderLabel(row.client.gender),
+						row.timeInCount == null ? '—' : row.timeInCount,
+						row.client.notes ?? '—',
+					]),
+				},
+			],
 		});
 	};
 

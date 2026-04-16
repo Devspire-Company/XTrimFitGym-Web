@@ -5,8 +5,13 @@ import { appendLocalReportExportLog } from '@/lib/reportExportLogs';
 type ExportTablePdfArgs = {
 	title: string;
 	filePrefix: string;
-	head: string[];
-	rows: Array<Array<string | number | null | undefined>>;
+	head?: string[];
+	rows?: Array<Array<string | number | null | undefined>>;
+	sections?: Array<{
+		title: string;
+		head: string[];
+		rows: Array<Array<string | number | null | undefined>>;
+	}>;
 	subtitle?: string;
 	orientation?: 'portrait' | 'landscape';
 	reportType?: string;
@@ -30,6 +35,7 @@ export function exportTablePdf({
 	filePrefix,
 	head,
 	rows,
+	sections,
 	subtitle,
 	orientation = 'landscape',
 	reportType,
@@ -54,14 +60,40 @@ export function exportTablePdf({
 		doc.text(subtitle, 14, 29);
 	}
 
-	autoTable(doc, {
-		startY: subtitle ? 34 : 28,
-		head: [head],
-		body: rows.map((row) => row.map((cell) => sanitizeCell(cell))),
-		styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
-		headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
-		alternateRowStyles: { fillColor: [245, 245, 248] },
-		margin: { left: 10, right: 10 },
+	const effectiveSections =
+		sections && sections.length > 0
+			? sections
+			: head && rows
+				? [{ title: '', head, rows }]
+				: [];
+
+	let nextStartY = subtitle ? 34 : 28;
+
+	effectiveSections.forEach((section, index) => {
+		if (section.title) {
+			doc.setFont('helvetica', 'bold');
+			doc.setFontSize(10);
+			doc.text(section.title, 14, nextStartY);
+			nextStartY += 4;
+		}
+
+		autoTable(doc, {
+			startY: nextStartY,
+			head: [section.head],
+			body: section.rows.map((row) => row.map((cell) => sanitizeCell(cell))),
+			styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+			headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
+			alternateRowStyles: { fillColor: [245, 245, 248] },
+			margin: { left: 10, right: 10 },
+		});
+
+		const finalY = (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY;
+		nextStartY = (finalY ?? nextStartY) + 8;
+
+		// Keep section headers clean on continuous multi-table exports.
+		if (index < effectiveSections.length - 1) {
+			doc.setFont('helvetica', 'normal');
+		}
 	});
 
 	doc.save(fileName);
