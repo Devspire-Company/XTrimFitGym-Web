@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useSubscription } from '@apollo/client';
+import { gql, useMutation, useQuery, useSubscription } from '@apollo/client';
 import {
 	Search,
 	Filter,
@@ -13,13 +13,36 @@ import {
 	GET_ATTENDANCE_RECORDS,
 	ATTENDANCE_RECORD_ADDED,
 	ATTENDANCE_UPDATED,
-	GET_USERS,
 	LOG_REPORT_DOWNLOAD,
 } from '@/graphql/operations/index';
 import { RoleType, ReportType } from '@/graphql/generated/graphql';
 import type { AttendanceRecord } from '@/graphql/generated/types';
+
+/** Roster fields only — avoids resolving facilityBiometricEnrollmentComplete for every coach/member (MySQL-heavy on admin Attendance). */
+const GET_USERS_ATTENDANCE_ROSTER = gql`
+	query GetUsersAttendanceRoster($role: RoleType, $includeDisabled: Boolean) {
+		getUsers(role: $role, includeDisabled: $includeDisabled) {
+			id
+			firstName
+			middleName
+			lastName
+			email
+			role
+			attendanceId
+		}
+	}
+`;
+
+type AttendanceRosterUser = {
+	id: string;
+	firstName?: string | null;
+	middleName?: string | null;
+	lastName?: string | null;
+	email?: string | null;
+	role?: string | null;
+	attendanceId?: number | null;
+};
 import { useAppSelector } from '@/store/hooks';
-import { useMutation } from '@apollo/client';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -235,14 +258,20 @@ export function AttendancePage() {
 		pollInterval: pollIntervalMs,
 	});
 
-	const { data: coachesUsersData } = useQuery(GET_USERS, {
-		variables: { role: RoleType.Coach },
-		fetchPolicy: 'cache-first',
-	});
-	const { data: membersUsersData } = useQuery(GET_USERS, {
-		variables: { role: RoleType.Member },
-		fetchPolicy: 'cache-first',
-	});
+	const { data: coachesUsersData } = useQuery<{ getUsers?: AttendanceRosterUser[] }>(
+		GET_USERS_ATTENDANCE_ROSTER,
+		{
+			variables: { role: RoleType.Coach },
+			fetchPolicy: 'cache-first',
+		}
+	);
+	const { data: membersUsersData } = useQuery<{ getUsers?: AttendanceRosterUser[] }>(
+		GET_USERS_ATTENDANCE_ROSTER,
+		{
+			variables: { role: RoleType.Member },
+			fetchPolicy: 'cache-first',
+		}
+	);
 
 	// Initial data fetch; poll so list updates automatically without pressing Refresh
 	const { data, loading, error, refetch } = useQuery(GET_ATTENDANCE_RECORDS, {
