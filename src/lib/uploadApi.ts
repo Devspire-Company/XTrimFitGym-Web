@@ -8,15 +8,17 @@ export function getUploadBaseUrl(): string {
 }
 
 const EQUIPMENT_FOLDER = 'XTrimFitGym/equipment';
+const WALKIN_WAIVER_FOLDER = 'XTrimFitGym/walkin-waivers';
 
-export async function uploadEquipmentImage(
+async function uploadImageToFolder(
 	file: File,
-	token: string | null
+	token: string | null,
+	folder: string
 ): Promise<string> {
 	const baseUrl = getUploadBaseUrl();
 	const formData = new FormData();
 	formData.append('image', file);
-	formData.append('folder', EQUIPMENT_FOLDER);
+	formData.append('folder', folder);
 	const headers: Record<string, string> = {};
 	if (token) headers['Authorization'] = `Bearer ${token}`;
 	const res = await fetch(`${baseUrl}/api/upload/image`, {
@@ -31,4 +33,18 @@ export async function uploadEquipmentImage(
 	const data = (await res.json()) as { url?: string };
 	if (!data?.url) throw new Error('No URL returned');
 	return data.url;
+}
+
+export async function uploadEquipmentImage(
+	file: File,
+	token: string | null
+): Promise<string> {
+	return uploadImageToFolder(file, token, EQUIPMENT_FOLDER);
+}
+
+export async function uploadWalkInWaiverImage(
+	file: File,
+	token: string | null
+): Promise<string> {
+	return uploadImageToFolder(file, token, WALKIN_WAIVER_FOLDER);
 }

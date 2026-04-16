@@ -38,6 +38,7 @@ import {
 	Download,
 } from 'lucide-react';
 import { exportTablePdf } from '@/lib/pdfExport';
+import { uploadWalkInWaiverImage } from '@/lib/uploadApi';
 
 const ACCOUNTS_PAGE_SIZE = 25;
 
@@ -111,6 +112,56 @@ function parseAgeYearsInput(raw: string): number | null {
 	return n;
 }
 
+const WAIVER_URL_MARKER = '__waiver_url:';
+const WAIVER_TYPE_MARKER = '__waiver_type:';
+type WaiverKind = 'minor' | 'adult';
+
+function parseWaiverMeta(rawNotes?: string | null): {
+	visibleNotes: string;
+	waiverUrl: string;
+	waiverType: WaiverKind | null;
+} {
+	if (!rawNotes) {
+		return { visibleNotes: '', waiverUrl: '', waiverType: null };
+	}
+	const lines = rawNotes.split('\n');
+	let waiverUrl = '';
+	let waiverType: WaiverKind | null = null;
+	const visibleLines: string[] = [];
+
+	for (const line of lines) {
+		const trimmed = line.trim();
+		if (trimmed.startsWith(WAIVER_URL_MARKER)) {
+			waiverUrl = trimmed.slice(WAIVER_URL_MARKER.length).trim();
+			continue;
+		}
+		if (trimmed.startsWith(WAIVER_TYPE_MARKER)) {
+			const parsed = trimmed.slice(WAIVER_TYPE_MARKER.length).trim().toLowerCase();
+			if (parsed === 'minor' || parsed === 'adult') {
+				waiverType = parsed;
+			}
+			continue;
+		}
+		visibleLines.push(line);
+	}
+
+	return {
+		visibleNotes: visibleLines.join('\n').trim(),
+		waiverUrl,
+		waiverType,
+	};
+}
+
+function buildNotesWithWaiver(
+	visibleNotes: string,
+	waiverUrl: string,
+	waiverType: WaiverKind
+): string {
+	const normalizedNotes = visibleNotes.trim();
+	const metadata = `${WAIVER_URL_MARKER}${waiverUrl}\n${WAIVER_TYPE_MARKER}${waiverType}`;
+	return normalizedNotes ? `${normalizedNotes}\n\n${metadata}` : metadata;
+}
+
 export function WalkInAttendancePage() {
 	useEffect(() => {
 		document.title = 'Walk-in Attendance - X-TRIM FIT GYM';
@@ -118,6 +169,7 @@ export function WalkInAttendancePage() {
 
 	const dispatch = useAppDispatch();
 	const currentUser = useAppSelector((state) => state.auth.user);
+	const authToken = useAppSelector((state) => state.auth.token);
 	const apolloClient = useApolloClient();
 	const [logDate, setLogDate] = useState(() => manilaTodayYmd());
 	const [todayYmd, setTodayYmd] = useState(manilaTodayYmd);
@@ -170,6 +222,10 @@ export function WalkInAttendancePage() {
 	const [editEmail, setEditEmail] = useState('');
 	const [editGender, setEditGender] = useState<WalkInGender>(WalkInGender.Male);
 	const [editNotes, setEditNotes] = useState('');
+	const [editWaiverUrl, setEditWaiverUrl] = useState('');
+	const [editWaiverKind, setEditWaiverKind] = useState<WaiverKind | null>(null);
+	const [editWaiverFile, setEditWaiverFile] = useState<File | null>(null);
+	const [uploadingWaiver, setUploadingWaiver] = useState(false);
 	const [ageYears, setAgeYears] = useState('');
 	const [minorWaiverAck, setMinorWaiverAck] = useState(false);
 	const [minorGuardianName, setMinorGuardianName] = useState('');
@@ -342,14 +398,18 @@ export function WalkInAttendancePage() {
 	});
 
 	const openEditWalkIn = useCallback((c: WalkInClientFields) => {
+		const noteMeta = parseWaiverMeta(c.notes);
 		setEditClientId(c.id);
 		setEditFirstName(c.firstName);
 		setEditMiddleName(c.middleName ?? '');
 		setEditLastName(c.lastName);
-		setEditPhone(c.phoneNumber ?? '');
+		setEditPhone((c.phoneNumber ?? '').replace(/\D/g, '').slice(0, 11));
 		setEditEmail(c.email ?? '');
 		setEditGender(c.gender);
-		setEditNotes(c.notes ?? '');
+		setEditNotes(noteMeta.visibleNotes);
+		setEditWaiverUrl(noteMeta.waiverUrl);
+		setEditWaiverKind(noteMeta.waiverType);
+		setEditWaiverFile(null);
 		setEditAgeYears(c.ageYears != null ? String(c.ageYears) : '');
 		const isMinor = typeof c.ageYears === 'number' && c.ageYears < 18;
 		const hasWaiver = Boolean(c.minorWaiverAcceptedAt && c.minorWaiverGuardianName?.trim());
@@ -389,6 +449,30 @@ export function WalkInAttendancePage() {
 		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
 	});
 
+	const handleUploadWaiver = useCallback(async () => {
+		if (!editWaiverFile) {
+			dispatch(addToast({ type: 'error', message: 'Choose an image file first.' }));
+			return;
+		}
+		const isImage = editWaiverFile.type.startsWith('image/');
+		if (!isImage) {
+			dispatch(addToast({ type: 'error', message: 'Waiver must be an image file.' }));
+			return;
+		}
+
+		setUploadingWaiver(true);
+		try {
+			const url = await uploadWalkInWaiverImage(editWaiverFile, authToken ?? null);
+			setEditWaiverUrl(url);
+			setEditWaiverKind(parsedEditAge !== null && parsedEditAge < 18 ? 'minor' : 'adult');
+			dispatch(addToast({ type: 'success', message: 'Waiver uploaded successfully.' }));
+		} catch (err) {
+			dispatch(addToast({ type: 'error', message: (err as Error).message || 'Upload failed.' }));
+		} finally {
+			setUploadingWaiver(false);
+		}
+	}, [authToken, dispatch, editWaiverFile, parsedEditAge]);
+
 	const handleSubmitEdit = useCallback(
 		(e: React.FormEvent) => {
 			e.preventDefault();
@@ -399,6 +483,34 @@ export function WalkInAttendancePage() {
 			const ageParsed = parseAgeYearsInput(editAgeYears);
 			if (ageParsed === null) {
 				dispatch(addToast({ type: 'error', message: 'Enter a valid age (0–120 whole years).' }));
+				return;
+			}
+			if (ageParsed < 10) {
+				dispatch(addToast({ type: 'error', message: 'Walk-in profiles must be at least 10 years old.' }));
+				return;
+			}
+
+			const waiverType: WaiverKind = ageParsed < 18 ? 'minor' : 'adult';
+			if (!editWaiverUrl.trim()) {
+				dispatch(
+					addToast({
+						type: 'error',
+						message: 'Upload the signed waiver image before saving this profile.',
+					}),
+				);
+				return;
+			}
+
+			if (editWaiverKind && editWaiverKind !== waiverType) {
+				dispatch(
+					addToast({
+						type: 'error',
+						message:
+							waiverType === 'minor'
+								? 'Please upload a minor waiver image for guests under 18.'
+								: 'Please upload an adult waiver image for guests 18 and above.',
+					}),
+				);
 				return;
 			}
 			if (ageParsed < 18) {
@@ -413,6 +525,12 @@ export function WalkInAttendancePage() {
 					return;
 				}
 			}
+			const cleanedPhone = editPhone.replace(/\D/g, '').slice(0, 11);
+			if (cleanedPhone && cleanedPhone.length !== 11) {
+				dispatch(addToast({ type: 'error', message: 'Contact number must be exactly 11 digits.' }));
+				return;
+			}
+			const composedNotes = buildNotesWithWaiver(editNotes, editWaiverUrl.trim(), waiverType);
 			updateWalkInClient({
 				variables: {
 					walkInClientId: editClientId,
@@ -420,10 +538,10 @@ export function WalkInAttendancePage() {
 						firstName: editFirstName.trim(),
 						middleName: editMiddleName.trim() || undefined,
 						lastName: editLastName.trim(),
-						phoneNumber: editPhone.trim() || undefined,
+						phoneNumber: cleanedPhone || undefined,
 						email: editEmail.trim() || undefined,
 						gender: editGender,
-						notes: editNotes.trim() || undefined,
+						notes: composedNotes,
 						ageYears: ageParsed,
 						...(ageParsed < 18
 							? {
@@ -448,6 +566,9 @@ export function WalkInAttendancePage() {
 			editAgeYears,
 			editMinorWaiverAck,
 			editMinorGuardianName,
+			editWaiverKind,
+			editWaiverUrl,
+			editPhone,
 			updateWalkInClient,
 		]
 	);
@@ -642,7 +763,7 @@ export function WalkInAttendancePage() {
 						genderLabel(row.walkInClient.gender),
 						row.walkInClient.phoneNumber ?? '—',
 						row.walkInClient.email ?? '—',
-						row.walkInClient.notes ?? '—',
+						parseWaiverMeta(row.walkInClient.notes).visibleNotes || '—',
 					]),
 				},
 				{
@@ -655,7 +776,7 @@ export function WalkInAttendancePage() {
 						row.client.ageYears != null ? row.client.ageYears : '—',
 						genderLabel(row.client.gender),
 						row.timeInCount == null ? '—' : row.timeInCount,
-						row.client.notes ?? '—',
+						parseWaiverMeta(row.client.notes).visibleNotes || '—',
 					]),
 				},
 			],
@@ -872,7 +993,7 @@ export function WalkInAttendancePage() {
 											{row.walkInClient.email ?? '—'}
 										</td>
 										<td className="px-4 py-3 text-[var(--text-secondary)] max-w-[220px]">
-											{row.walkInClient.notes ?? '—'}
+											{parseWaiverMeta(row.walkInClient.notes).visibleNotes || '—'}
 										</td>
 										<td className="px-4 py-3 text-right">
 											<Button
@@ -1049,7 +1170,7 @@ export function WalkInAttendancePage() {
 													{row.walkInClient.email ?? '—'}
 												</td>
 												<td className="px-4 py-3 text-[var(--text-secondary)] max-w-[240px]">
-													{row.walkInClient.notes ?? '—'}
+													{parseWaiverMeta(row.walkInClient.notes).visibleNotes || '—'}
 												</td>
 											</tr>
 										))
@@ -1235,6 +1356,7 @@ export function WalkInAttendancePage() {
 								First name <span className="text-red-400">*</span>
 							</label>
 							<input
+								aria-label="Walk-in first name"
 								required
 								value={firstName}
 								onChange={(e) => setFirstName(e.target.value)}
@@ -1246,6 +1368,7 @@ export function WalkInAttendancePage() {
 								Middle name
 							</label>
 							<input
+								aria-label="Walk-in middle name"
 								value={middleName}
 								onChange={(e) => setMiddleName(e.target.value)}
 								className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm"
@@ -1256,6 +1379,7 @@ export function WalkInAttendancePage() {
 								Last name <span className="text-red-400">*</span>
 							</label>
 							<input
+								aria-label="Walk-in last name"
 								required
 								value={lastName}
 								onChange={(e) => setLastName(e.target.value)}
@@ -1267,6 +1391,7 @@ export function WalkInAttendancePage() {
 								Contact number
 							</label>
 							<input
+								aria-label="Walk-in contact number"
 								value={phone}
 								onChange={(e) => setPhone(e.target.value)}
 								className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm"
@@ -1278,6 +1403,7 @@ export function WalkInAttendancePage() {
 							</label>
 							<input
 								type="email"
+								aria-label="Walk-in email"
 								value={email}
 								onChange={(e) => setEmail(e.target.value)}
 								className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm"
@@ -1522,6 +1648,7 @@ export function WalkInAttendancePage() {
 								First name <span className="text-red-400">*</span>
 							</label>
 							<input
+								aria-label="Edit walk-in first name"
 								required
 								value={editFirstName}
 								onChange={(e) => setEditFirstName(e.target.value)}
@@ -1533,6 +1660,7 @@ export function WalkInAttendancePage() {
 								Middle name
 							</label>
 							<input
+								aria-label="Edit walk-in middle name"
 								value={editMiddleName}
 								onChange={(e) => setEditMiddleName(e.target.value)}
 								className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm"
@@ -1543,6 +1671,7 @@ export function WalkInAttendancePage() {
 								Last name <span className="text-red-400">*</span>
 							</label>
 							<input
+								aria-label="Edit walk-in last name"
 								required
 								value={editLastName}
 								onChange={(e) => setEditLastName(e.target.value)}
@@ -1555,9 +1684,12 @@ export function WalkInAttendancePage() {
 							</label>
 							<input
 								value={editPhone}
-								onChange={(e) => setEditPhone(e.target.value)}
+								onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+								maxLength={11}
+								placeholder="09XXXXXXXXX"
 								className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm"
 							/>
+							<p className="mt-1 text-xs text-[var(--text-secondary)]">Exactly 11 digits</p>
 						</div>
 						<div>
 							<label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
@@ -1565,6 +1697,7 @@ export function WalkInAttendancePage() {
 							</label>
 							<input
 								type="email"
+								aria-label="Edit walk-in email"
 								value={editEmail}
 								onChange={(e) => setEditEmail(e.target.value)}
 								className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--card-border)] text-[var(--text-primary)] text-sm"
@@ -1601,6 +1734,46 @@ export function WalkInAttendancePage() {
 								onChange={(e) => setEditAgeYears(e.target.value)}
 								className="w-full max-w-[200px] rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 font-['Inter',sans-serif] text-sm tabular-nums text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(249,197,19,0.12)]"
 							/>
+						</div>
+						<div className="sm:col-span-2 space-y-3 rounded-xl border border-[rgba(249,197,19,0.28)] bg-[rgba(249,197,19,0.07)] p-4">
+							<p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+								Upload the signed{' '}
+								<strong className="text-[var(--text-primary)]">
+									{parsedEditAge !== null && parsedEditAge < 18 ? 'minor waiver' : 'client waiver'}
+								</strong>{' '}
+								for this profile.
+							</p>
+							<input
+								type="file"
+								accept="image/*"
+								aria-label="Upload signed waiver image"
+								onChange={(e) => setEditWaiverFile(e.target.files?.[0] ?? null)}
+								className="w-full rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-[var(--text-primary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--primary-yellow)] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-[#1a1a1a]"
+							/>
+							<div className="flex flex-wrap items-center gap-2">
+								<Button
+									type="button"
+									variant="outline"
+									className="btn-secondary gap-2"
+									onClick={() => void handleUploadWaiver()}
+									disabled={!editWaiverFile || uploadingWaiver}
+								>
+									{uploadingWaiver ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+									{uploadingWaiver ? 'Uploading...' : 'Upload waiver image'}
+								</Button>
+								{editWaiverUrl ? (
+									<a
+										href={editWaiverUrl}
+										target="_blank"
+										rel="noreferrer"
+										className="text-sm text-[var(--primary-yellow)] underline underline-offset-2"
+									>
+										View uploaded waiver
+									</a>
+								) : (
+									<span className="text-xs text-[var(--text-secondary)]">No waiver uploaded yet</span>
+								)}
+							</div>
 						</div>
 						{showEditMinorBlock && (
 							<div className="sm:col-span-2 space-y-3 rounded-xl border border-[rgba(249,197,19,0.28)] bg-[rgba(249,197,19,0.07)] p-4">
