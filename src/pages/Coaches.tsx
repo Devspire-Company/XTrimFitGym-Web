@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import { Button } from '@/components/ui/button';
+import type { LucideIcon } from 'lucide-react';
 import {
 	Search,
 	Plus,
@@ -15,6 +16,14 @@ import {
 	Activity,
 	Clock,
 	MapPin,
+	Check,
+	Flame,
+	Dumbbell,
+	Weight,
+	Gauge,
+	StretchVertical,
+	Stethoscope,
+	Trophy,
 } from 'lucide-react';
 import { GET_USERS, GET_COACH_SESSIONS, GET_COACH_SESSION_LOGS, DELETE_USER, CREATE_USER, UPDATE_USER, USERS_UPDATED } from '@/graphql/operations/index';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -25,6 +34,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfDay, startOfMonth } from 'date-fns';
 import { exportTablePdf } from '@/lib/pdfExport';
+import { cn } from '@/lib/utils';
 
 interface Coach {
 	id: string;
@@ -130,6 +140,84 @@ function isAtLeast18(dateOfBirth: string | undefined): boolean {
 		age -= 1;
 	}
 	return age >= 18;
+}
+
+/** Allowed coach specialization values (must stay aligned with API schema). */
+const COACH_SPECIALIZATION_OPTIONS: readonly { id: string; label: string; Icon: LucideIcon }[] = [
+	{ id: 'Weight loss', label: 'Weight loss', Icon: Flame },
+	{ id: 'Muscle building', label: 'Muscle building', Icon: Dumbbell },
+	{ id: 'General fitness', label: 'General fitness', Icon: Activity },
+	{ id: 'Strength training', label: 'Strength training', Icon: Weight },
+	{ id: 'Endurance', label: 'Endurance', Icon: Gauge },
+	{ id: 'Flexibility', label: 'Flexibility', Icon: StretchVertical },
+	{ id: 'Rehabilitation', label: 'Rehabilitation', Icon: Stethoscope },
+	{ id: 'Athletic Performance', label: 'Athletic Performance', Icon: Trophy },
+];
+
+const COACH_SPECIALIZATION_ALLOWED = COACH_SPECIALIZATION_OPTIONS.map((o) => o.id);
+
+function CoachSpecializationPicker({
+	selected,
+	onToggle,
+}: {
+	selected: string[];
+	onToggle: (value: string) => void;
+}) {
+	return (
+		<div>
+			<div className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+				{COACH_SPECIALIZATION_OPTIONS.map(({ id, label, Icon }) => {
+					const isSelected = selected.includes(id);
+					return (
+						<button
+							key={id}
+							type="button"
+							onClick={() => onToggle(id)}
+							aria-pressed={isSelected ? 'true' : 'false'}
+							className={cn(
+								'group flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-all duration-200',
+								'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card-bg)]',
+								isSelected
+									? 'border-[rgba(249,197,19,0.45)] bg-[rgba(249,197,19,0.12)] shadow-[inset_0_0_0_1px_rgba(249,197,19,0.08)]'
+									: 'border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.14)] hover:bg-[rgba(255,255,255,0.06)]'
+							)}
+						>
+							<span
+								className={cn(
+									'flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors',
+									isSelected
+										? 'border-[rgba(249,197,19,0.45)] bg-[rgba(249,197,19,0.14)] text-[var(--primary-yellow)]'
+										: 'border-[rgba(255,255,255,0.1)] bg-[rgba(0,0,0,0.22)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'
+								)}
+								aria-hidden
+							>
+								<Icon className="size-5" strokeWidth={1.75} />
+							</span>
+							<span className="min-w-0 flex-1 pt-0.5">
+								<span className="block text-sm font-semibold leading-snug text-balance text-[var(--text-primary)]">
+									{label}
+								</span>
+							</span>
+							<span
+								className={cn(
+									'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border transition-colors',
+									isSelected
+										? 'border-[rgba(249,197,19,0.55)] bg-[var(--primary-yellow)] text-[#1a1a1a]'
+										: 'border-[rgba(255,255,255,0.08)] bg-transparent'
+								)}
+								aria-hidden
+							>
+								{isSelected ? <Check className="size-3.5" strokeWidth={3} /> : null}
+							</span>
+						</button>
+					);
+				})}
+			</div>
+			<small className="mt-2 block text-xs leading-relaxed text-[var(--text-secondary)]">
+				Select every focus this coach supports. Multiple selections are allowed.
+			</small>
+		</div>
+	);
 }
 
 export function CoachesPage() {
@@ -662,23 +750,11 @@ export function CoachesPage() {
 						}}
 						onSubmit={async (formData) => {
 							try {
-								// Valid specialization enum values from API schema
-								const validSpecializations = [
-									'Weight loss',
-									'Muscle building',
-									'General fitness',
-									'Strength training',
-									'Endurance',
-									'Flexibility',
-									'Rehabilitation',
-									'Athletic Performance',
-								];
-
 								// Filter to only include valid enum values
 								const validSpecializationsList =
 									formData.specializations && formData.specializations.length > 0
 										? formData.specializations.filter((spec: string) =>
-												validSpecializations.includes(spec)
+												COACH_SPECIALIZATION_ALLOWED.includes(spec)
 											)
 										: [];
 
@@ -796,22 +872,12 @@ export function CoachesPage() {
 					}}
 					onSubmit={async (formData) => {
 						try {
-							// Valid specialization enum values from API schema
-							const validSpecializations = [
-								'Weight loss',
-								'Muscle building',
-								'General fitness',
-								'Strength training',
-								'Endurance',
-								'Flexibility',
-								'Rehabilitation',
-								'Athletic Performance',
-							];
-
 							// Filter to only include valid enum values
 							const validSpecializationsList =
 								formData.specializations && formData.specializations.length > 0
-									? formData.specializations.filter((spec) => validSpecializations.includes(spec))
+									? formData.specializations.filter((spec) =>
+											COACH_SPECIALIZATION_ALLOWED.includes(spec)
+										)
 									: [];
 
 							// Format teaching time as array with start and end times
@@ -1514,16 +1580,6 @@ function AddCoachModal({
 	}) => Promise<void>;
 }) {
 	const dispatch = useAppDispatch();
-	const availableSpecializations = [
-		'Weight loss',
-		'Muscle building',
-		'General fitness',
-		'Strength training',
-		'Endurance',
-		'Flexibility',
-		'Rehabilitation',
-		'Athletic Performance',
-	];
 	const availableDays = [
 		'Monday',
 		'Tuesday',
@@ -2104,62 +2160,16 @@ function AddCoachModal({
 							</small>
 						</div>
 						<div className="form-group" style={{ gridColumn: '1 / -1' }}>
-							<label>Specializations</label>
-							<div
-								style={{
-									display: 'grid',
-									gridTemplateColumns: 'repeat(2, 1fr)',
-									gap: '0.75rem',
-									marginTop: '0.5rem',
-								}}
-							>
-								{availableSpecializations.map((spec) => (
-									<label
-										key={spec}
-										style={{
-											display: 'flex',
-											alignItems: 'center',
-											gap: '0.5rem',
-											padding: '0.75rem',
-											background: formData.specializations.includes(spec)
-												? 'rgba(249, 197, 19, 0.1)'
-												: 'rgba(255, 255, 255, 0.05)',
-											border: formData.specializations.includes(spec)
-												? '1px solid rgba(249, 197, 19, 0.3)'
-												: '1px solid rgba(255, 255, 255, 0.1)',
-											borderRadius: '8px',
-											cursor: 'pointer',
-											transition: 'all 0.3s ease',
-										}}
-										onMouseEnter={(e) => {
-											if (!formData.specializations.includes(spec)) {
-												e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-											}
-										}}
-										onMouseLeave={(e) => {
-											if (!formData.specializations.includes(spec)) {
-												e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-											}
-										}}
-									>
-										<input
-											type="checkbox"
-											checked={formData.specializations.includes(spec)}
-											onChange={() => handleSpecializationChange(spec)}
-											className="h-5 w-5 rounded border-[var(--card-border)] accent-[var(--primary-yellow)]"
-										/>
-										<span
-											style={{
-												color: 'var(--text-primary)',
-												fontSize: '0.9rem',
-												userSelect: 'none',
-											}}
-										>
-											{spec}
-										</span>
-									</label>
-								))}
+							<div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+								<label>Specializations</label>
+								<span className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+									Multi-select
+								</span>
 							</div>
+							<CoachSpecializationPicker
+								selected={formData.specializations}
+								onToggle={handleSpecializationChange}
+							/>
 						</div>
 					</div>
 				</div>
@@ -2199,16 +2209,6 @@ function EditCoachModal({
 	}) => Promise<void>;
 }) {
 	const dispatch = useAppDispatch();
-	const availableSpecializations = [
-		'Weight loss',
-		'Muscle building',
-		'General fitness',
-		'Strength training',
-		'Endurance',
-		'Flexibility',
-		'Rehabilitation',
-		'Athletic Performance',
-	];
 	const availableDays = [
 		'Monday',
 		'Tuesday',
@@ -2713,62 +2713,16 @@ function EditCoachModal({
 							</small>
 						</div>
 						<div className="form-group" style={{ gridColumn: '1 / -1' }}>
-							<label>Specializations</label>
-							<div
-								style={{
-									display: 'grid',
-									gridTemplateColumns: 'repeat(2, 1fr)',
-									gap: '0.75rem',
-									marginTop: '0.5rem',
-								}}
-							>
-								{availableSpecializations.map((spec) => (
-									<label
-										key={spec}
-										style={{
-											display: 'flex',
-											alignItems: 'center',
-											gap: '0.5rem',
-											padding: '0.75rem',
-											background: formData.specializations.includes(spec)
-												? 'rgba(249, 197, 19, 0.1)'
-												: 'rgba(255, 255, 255, 0.05)',
-											border: formData.specializations.includes(spec)
-												? '1px solid rgba(249, 197, 19, 0.3)'
-												: '1px solid rgba(255, 255, 255, 0.1)',
-											borderRadius: '8px',
-											cursor: 'pointer',
-											transition: 'all 0.3s ease',
-										}}
-										onMouseEnter={(e) => {
-											if (!formData.specializations.includes(spec)) {
-												e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-											}
-										}}
-										onMouseLeave={(e) => {
-											if (!formData.specializations.includes(spec)) {
-												e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-											}
-										}}
-									>
-										<input
-											type="checkbox"
-											checked={formData.specializations.includes(spec)}
-											onChange={() => handleSpecializationChange(spec)}
-											className="h-5 w-5 rounded border-[var(--card-border)] accent-[var(--primary-yellow)]"
-										/>
-										<span
-											style={{
-												color: 'var(--text-primary)',
-												fontSize: '0.9rem',
-												userSelect: 'none',
-											}}
-										>
-											{spec}
-										</span>
-									</label>
-								))}
+							<div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+								<label>Specializations</label>
+								<span className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+									Multi-select
+								</span>
 							</div>
+							<CoachSpecializationPicker
+								selected={formData.specializations}
+								onToggle={handleSpecializationChange}
+							/>
 						</div>
 					</div>
 				</div>
