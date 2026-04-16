@@ -98,6 +98,28 @@ function formatDateToYmd(date: Date): string {
 	return `${year}-${month}-${day}`;
 }
 
+function normalizePersonName(value: string | null | undefined): string {
+	return (value || '')
+		.toLowerCase()
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+function buildUserNameCandidates(
+	user: { firstName?: string | null; middleName?: string | null; lastName?: string | null } | null | undefined
+): string[] {
+	if (!user) return [];
+	const first = (user.firstName || '').trim();
+	const middle = (user.middleName || '').trim();
+	const last = (user.lastName || '').trim();
+	const candidates = [
+		[first, last].filter(Boolean).join(' '),
+		[first, middle, last].filter(Boolean).join(' '),
+		[last, first].filter(Boolean).join(', '),
+	];
+	return candidates.map(normalizePersonName).filter(Boolean);
+}
+
 async function tryRegisterInterFont(doc: jsPDF): Promise<boolean> {
 	try {
 		const regularUrl =
@@ -384,6 +406,26 @@ export function AttendancePage() {
 		return s;
 	}, [membersUsersData]);
 
+	const coachNameCandidates = useMemo(() => {
+		const s = new Set<string>();
+		const list = coachesUsersData?.getUsers;
+		if (!list) return s;
+		for (const u of list) {
+			for (const name of buildUserNameCandidates(u)) s.add(name);
+		}
+		return s;
+	}, [coachesUsersData]);
+
+	const memberNameCandidates = useMemo(() => {
+		const s = new Set<string>();
+		const list = membersUsersData?.getUsers;
+		if (!list) return s;
+		for (const u of list) {
+			for (const name of buildUserNameCandidates(u)) s.add(name);
+		}
+		return s;
+	}, [membersUsersData]);
+
 	const summarizedRecords = useMemo(() => {
 		type AttendanceEvent = {
 			authDateTime: string;
@@ -476,19 +518,23 @@ export function AttendancePage() {
 	}, [filteredRecords]);
 
 	const { coachRecords, clientRecords } = useMemo(() => {
-		const categorize = (cardNo: string): 'coach' | 'client' | 'other' => {
-			if (cardNo && coachAttendanceIds.has(cardNo)) return 'coach';
-			if (cardNo && memberAttendanceIds.has(cardNo)) return 'client';
+		const categorize = (row: { cardNo: string; personName: string }): 'coach' | 'client' | 'other' => {
+			const normalizedName = normalizePersonName(row.personName);
+			// Priority: coach match first so coach scans never fall into clients.
+			if (row.cardNo && coachAttendanceIds.has(row.cardNo)) return 'coach';
+			if (normalizedName && coachNameCandidates.has(normalizedName)) return 'coach';
+			if (row.cardNo && memberAttendanceIds.has(row.cardNo)) return 'client';
+			if (normalizedName && memberNameCandidates.has(normalizedName)) return 'client';
 			return 'other';
 		};
 		const coach = [];
 		const client = [];
 		for (const row of summarizedRecords) {
-			if (categorize(row.cardNo) === 'coach') coach.push(row);
+			if (categorize(row) === 'coach') coach.push(row);
 			else client.push(row);
 		}
 		return { coachRecords: coach, clientRecords: client };
-	}, [summarizedRecords, coachAttendanceIds, memberAttendanceIds]);
+	}, [summarizedRecords, coachAttendanceIds, memberAttendanceIds, coachNameCandidates, memberNameCandidates]);
 	const showCoachSection = roleFilter !== 'client';
 	const showClientSection = roleFilter !== 'coach';
 
