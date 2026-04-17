@@ -7,6 +7,9 @@ import {
 	DEV_COACH_SIGN_IN_MUTATION,
 	REQUEST_DEV_COACH_SIGN_IN_CODE_MUTATION,
 } from '@/graphql/mutations';
+import { useAppDispatch } from '@/store/hooks';
+import { setUser } from '@/store/slices/userSlice';
+import { convertGraphQLUser } from '@/utils/graphql-utils';
 import {
 	isSessionAlreadyActiveError,
 	setActiveIgnoringSessionConflict,
@@ -43,6 +46,7 @@ type EmailCodeFactor = { strategy: string; emailAddressId?: string };
 
 const Login = () => {
 	const router = useRouter();
+	const dispatch = useAppDispatch();
 	const { isLoaded, signIn, setActive } = useSignIn();
 	const { getToken } = useAuth();
 	const { startSSOFlow } = useSSO();
@@ -238,12 +242,17 @@ const Login = () => {
 					},
 				});
 				const token = result.data?.devCoachSignIn?.token;
+				const coachUser = result.data?.devCoachSignIn?.user;
 				if (!token) {
 					throw new Error('Could not complete fallback sign-in. Try again.');
 				}
+				if (!coachUser) {
+					throw new Error('Could not load coach profile. Try again.');
+				}
 				await storage.setItem('auth_token', token);
+				dispatch(setUser(convertGraphQLUser(coachUser)));
 				await setAuthFlowIntent('login');
-				replaceToAppRoot();
+				router.replace('/(coach)/dashboard');
 				return;
 			}
 

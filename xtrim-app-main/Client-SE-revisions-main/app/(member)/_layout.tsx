@@ -8,8 +8,8 @@ import {
 } from '@/contexts/MemberMembershipModalContext';
 import { memberHasActiveGymMembership } from '@/utils/memberMembership';
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, useRouter, useSegments } from 'expo-router';
+import React, { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,6 +18,8 @@ const MemberLayoutContent = () => {
 	const { user } = useAuth();
 	const hasMembership = memberHasActiveGymMembership(user);
 	const { openMembershipRequired } = useMemberMembershipModal();
+	const router = useRouter();
+	const segments = useSegments();
 
 	const tabbarHeight =
 		Platform.OS === 'android'
@@ -32,6 +34,18 @@ const MemberLayoutContent = () => {
 			}
 		},
 	};
+
+	useEffect(() => {
+		if (hasMembership) return;
+		const currentLeaf = segments[segments.length - 1];
+		const isMembershipLockedTab =
+			currentLeaf === 'dashboard' ||
+			currentLeaf === 'schedule' ||
+			currentLeaf === 'progress';
+		if (!isMembershipLockedTab) return;
+		openMembershipRequired();
+		router.replace('/(member)/workouts');
+	}, [hasMembership, segments, openMembershipRequired, router]);
 
 	return (
 		<View style={{ flex: 1 }}>

@@ -58,6 +58,7 @@ const STALE_PENDING_SEC = 7 * 24 * 60 * 60;
 export function SubscriptionRequestNotification() {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [isMinimized, setIsMinimized] = useState(false);
+	const [approvingIds, setApprovingIds] = useState<string[]>([]);
 	const dispatch = useAppDispatch();
 
 	const { data, loading, error, refetch } = useQuery<{
@@ -112,6 +113,8 @@ export function SubscriptionRequestNotification() {
 	}, [data?.getPendingSubscriptionRequests]);
 
 	const handleApprove = async (requestId: string) => {
+		if (approvingIds.includes(requestId)) return;
+		setApprovingIds((prev) => [...prev, requestId]);
 		try {
 			await approveRequest({
 				variables: {
@@ -120,6 +123,8 @@ export function SubscriptionRequestNotification() {
 			});
 		} catch {
 			// Error handled in onError
+		} finally {
+			setApprovingIds((prev) => prev.filter((id) => id !== requestId));
 		}
 	};
 
@@ -273,14 +278,24 @@ export function SubscriptionRequestNotification() {
 												</div>
 
 												<div className="flex gap-2">
+													{(() => {
+														const isApproving = approvingIds.includes(request.id);
+														return (
 													<button
 														type="button"
 														onClick={() => handleApprove(request.id)}
-														className="w-full flex items-center justify-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+														disabled={isApproving}
+														className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+															isApproving
+																? 'bg-green-500/10 text-green-300 cursor-not-allowed opacity-70'
+																: 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+														}`}
 													>
 														<Check className="w-4 h-4" />
-														Approve
+														{isApproving ? 'Approving...' : 'Approve'}
 													</button>
+														);
+													})()}
 												</div>
 											</div>
 										);

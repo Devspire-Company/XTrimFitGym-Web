@@ -1,6 +1,6 @@
 import { PremiumLoadingContent } from '@/components/AuthProcessingScreen';
+import ConfirmModal from '@/components/ConfirmModal';
 import FixedView from '@/components/FixedView';
-import GradientButton from '@/components/GradientButton';
 import { PostOnboardingWelcomeModal } from '@/components/PostOnboardingWelcomeModal';
 import TabHeader from '@/components/TabHeader';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,6 +37,8 @@ import {
 } from 'react-native';
 
 type OnboardingWelcomeKind = 'active' | 'counter' | 'limited';
+const MINOR_ONBOARDING_NOTICE_MESSAGE =
+	"We've detected that you are under 18 years old, please proceed to the gym's counter with your parent to fill out the waiver form";
 
 const MemberDashboard = () => {
 	const { user } = useAuth();
@@ -57,6 +59,8 @@ const MemberDashboard = () => {
 	const [postOnboardingWelcomeKind, setPostOnboardingWelcomeKind] = useState<
 		OnboardingWelcomeKind | undefined
 	>(() => welcomeKind);
+	const [minorOnboardingNoticeVisible, setMinorOnboardingNoticeVisible] =
+		useState(false);
 
 	useEffect(() => {
 		if (welcomeKind) {
@@ -82,6 +86,23 @@ const MemberDashboard = () => {
 			cancelled = true;
 		};
 	}, [welcomeKind]);
+
+	useEffect(() => {
+		let cancelled = false;
+		void (async () => {
+			try {
+				const value = await storage.getItem('onboarding_minor_notice');
+				if (cancelled || value !== 'true') return;
+				setMinorOnboardingNoticeVisible(true);
+				await storage.removeItem('onboarding_minor_notice');
+			} catch {
+				/* noop */
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	const dismissPostOnboardingWelcome = () => {
 		setPostOnboardingWelcomeVisible(false);
@@ -615,9 +636,20 @@ const MemberDashboard = () => {
 			{postOnboardingWelcomeKind ? (
 				<PostOnboardingWelcomeModal
 					visible={postOnboardingWelcomeVisible}
+					kind={postOnboardingWelcomeKind}
 					onDismiss={dismissPostOnboardingWelcome}
 				/>
 			) : null}
+			<ConfirmModal
+				visible={minorOnboardingNoticeVisible && !postOnboardingWelcomeVisible}
+				title='Important reminder'
+				message={MINOR_ONBOARDING_NOTICE_MESSAGE}
+				variant='danger'
+				confirmLabel='OK'
+				onConfirm={() => setMinorOnboardingNoticeVisible(false)}
+				onCancel={() => setMinorOnboardingNoticeVisible(false)}
+				hideCancel
+			/>
 		</FixedView>
 	);
 };

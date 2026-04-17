@@ -125,10 +125,15 @@ const First = () => {
 					/>
 
 					{dateOfBirth && !errors.dateOfBirth && isMinorAt(dateOfBirth) ? (
-						<Text className='text-text-secondary text-sm -mt-2'>
-							Members under 18 should ask the clerk for the printed waiver with parent or
-							guardian signature.
-						</Text>
+						<View className='-mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3'>
+							<Text className='text-red-400 text-xs font-semibold mb-1 uppercase tracking-wide'>
+								Reminder
+							</Text>
+							<Text className='text-red-300 text-sm leading-5'>
+								Members under 18 should ask the clerk for the printed waiver with parent or
+								guardian signature.
+							</Text>
+						</View>
 					) : null}
 
 					<Select

@@ -6,13 +6,21 @@ import { Modal, StyleSheet, Text, View } from 'react-native';
 
 const POST_ONBOARDING_WELCOME_MESSAGE =
 	"Your account is ready—jump in and explore the app. Schedules, workouts, progress, and more are waiting for you. Glad you're here!";
+const LIMITED_WELCOME_REMINDER =
+	" Reminder: you're only in free access mode, please avail a membership plan to access other features.";
 
 type Props = {
 	visible: boolean;
 	onDismiss: () => void;
+	kind?: 'active' | 'counter' | 'limited';
 };
 
-export function PostOnboardingWelcomeModal({ visible, onDismiss }: Props) {
+export function PostOnboardingWelcomeModal({ visible, onDismiss, kind }: Props) {
+	const welcomeMessage =
+		kind === 'limited'
+			? `${POST_ONBOARDING_WELCOME_MESSAGE}${LIMITED_WELCOME_REMINDER}`
+			: POST_ONBOARDING_WELCOME_MESSAGE;
+
 	return (
 		<Modal
 			visible={visible}
@@ -36,7 +44,7 @@ export function PostOnboardingWelcomeModal({ visible, onDismiss }: Props) {
 							Welcome aboard!
 						</Text>
 						<Text className='text-text-secondary text-base text-center leading-6 mb-8'>
-							{POST_ONBOARDING_WELCOME_MESSAGE}
+							{welcomeMessage}
 						</Text>
 						<GradientButton onPress={onDismiss}>Let&apos;s go</GradientButton>
 					</View>

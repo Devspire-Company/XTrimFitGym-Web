@@ -7,6 +7,7 @@ import { normalizePhysiqueGoalTypeForApi } from '@/constants/onboarding-options'
 import { SYNC_MY_WALK_IN_PROFILE_MUTATION, UPDATE_USER_MUTATION } from '@/graphql/mutations';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setUser } from '@/store/slices/userSlice';
+import { AGE_OF_MAJORITY, getAgeYears, MIN_APP_AGE } from '@/utils/age-waiver';
 import { convertGraphQLUser } from '@/utils/graphql-utils';
 import { memberHasActiveGymMembership } from '@/utils/memberMembership';
 import { storage } from '@/utils/storage';
@@ -28,12 +29,23 @@ const toIsoIfValid = (date?: Date): string | undefined => {
 	}
 };
 
+const setMinorOnboardingNoticeFlag = async (dateOfBirth?: Date) => {
+	const age = dateOfBirth ? getAgeYears(dateOfBirth) : Number.NaN;
+	const isMinorRegistrant =
+		Number.isFinite(age) && age >= MIN_APP_AGE && age < AGE_OF_MAJORITY;
+	if (isMinorRegistrant) {
+		await storage.setItem('onboarding_minor_notice', 'true');
+		return;
+	}
+	await storage.removeItem('onboarding_minor_notice');
+};
+
 const Fourth = () => {
 	const router = useRouter();
 	const apolloClient = useApolloClient();
 	const dispatch = useAppDispatch();
 	const user = useAppSelector((state) => state.user.user);
-	const { data, updateData, clearData } = useOnboarding();
+	const { data, clearData } = useOnboarding();
 
 	const isPreMembershipFlow = !data.membershipIntent;
 
@@ -79,11 +91,20 @@ const Fourth = () => {
 
 			dispatch(setUser(updatedUser));
 			if (isPreMembershipFlow) {
-				updateData({
-					agreedToTermsAndConditions,
-					termsWaiverCompletedPreMembership: true,
-				});
-				router.replace('/(auth)/(onboarding)/third');
+				void storage.setItem('onboarding_welcome', 'limited');
+				void setMinorOnboardingNoticeFlag(data.dateOfBirth);
+				if (
+					updatedUser?.role === 'member' &&
+					!memberHasActiveGymMembership(updatedUser)
+				) {
+					void apolloClient
+						.mutate({ mutation: SYNC_MY_WALK_IN_PROFILE_MUTATION })
+						.catch(() => {
+							/* non-fatal; MemberWalkInBanner will retry */
+						});
+				}
+				clearData();
+				router.replace('/(member)/workouts');
 				return;
 			}
 			const intent = data.membershipIntent;
@@ -94,6 +115,7 @@ const Fourth = () => {
 					: intent === 'avail_counter'
 						? 'counter'
 						: 'active';
+			void setMinorOnboardingNoticeFlag(data.dateOfBirth);
 			// sana naman wag kana magloko
 			// sana naman wag kana magloko
 			void storage.setItem('onboarding_welcome', welcome);
@@ -156,7 +178,7 @@ const Fourth = () => {
 							),
 							fitnessGoal: data.fitnessGoal || [],
 							workOutTime: data.workOutTime || [],
-							hasEnteredDetails: isPreMembershipFlow ? false : true,
+							hasEnteredDetails: true,
 						},
 					},
 				},

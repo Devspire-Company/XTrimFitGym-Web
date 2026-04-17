@@ -38,8 +38,9 @@ export function MemberMeSyncAndWelcome() {
 	const needsBiometric = memberNeedsFacilityBiometric(user);
 	const skipMe = !user?.id || user.role !== 'member';
 
-	const shouldPollMe =
-		!skipMe && (!hasMembership || (hasMembership && needsBiometric));
+	// Keep polling for member accounts so admin-side membership changes
+	// (approve/cancel/unsubscribe) are reflected in the app promptly.
+	const shouldPollMe = !skipMe;
 
 	const { data, refetch } = useMeQuery({
 		skip: skipMe,
