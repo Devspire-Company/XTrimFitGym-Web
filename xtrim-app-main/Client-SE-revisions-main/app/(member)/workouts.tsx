@@ -101,7 +101,6 @@ const MemberWorkouts = () => {
 	const [isTimerRunning, setIsTimerRunning] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [timerDuration, setTimerDuration] = useState(DEFAULT_TIMER_SECONDS);
-	/** True after Start until Reset or the round finishes at 0 — blocks changing preset while paused. */
 	const [durationPickerLocked, setDurationPickerLocked] = useState(false);
 	const [hasCompletedCurrentRound, setHasCompletedCurrentRound] =
 		useState(false);
@@ -113,8 +112,6 @@ const MemberWorkouts = () => {
 	const canFetch = useMemo(() => !!apiKey, [apiKey]);
 
 	const playSound = useCallback(async (type: 'start' | 'end') => {
-		// TODO: Once expo-av is installed, implement real audio playback.
-		// This placeholder keeps the logic in-place without adding a hard dependency.
 		return Promise.resolve();
 	}, []);
 
@@ -196,7 +193,6 @@ const MemberWorkouts = () => {
 			setAllExercises(data);
 			return data;
 		} catch {
-			// If this fails, fall back to current category data only
 			return exercises;
 		} finally {
 			setIsGlobalSearchLoading(false);
@@ -238,7 +234,6 @@ const MemberWorkouts = () => {
 				const normalizedCategories = categoriesData.map((c) => c.toLowerCase());
 				setCategories(normalizedCategories);
 
-				// Start with all workouts by default so we always hit a valid endpoint
 				setSelectedCategory(ALL_CATEGORY);
 				await fetchExercisesByCategory(ALL_CATEGORY);
 			} catch (err: any) {
@@ -757,7 +752,6 @@ const styles = StyleSheet.create({
 		width: '100%',
 		alignSelf: 'stretch',
 	},
-	/** Full width so horizontal chips are not squeezed (was clipping e.g. “Cardio” → “Cardi”). */
 	categoriesList: {
 		width: '100%',
 		flexGrow: 0,
@@ -778,7 +772,6 @@ const styles = StyleSheet.create({
 		flexShrink: 0,
 		flexGrow: 0,
 	},
-	/** Slightly wider than default so “Cardio” reads fully; tighter than before. */
 	categoryChipCardio: {
 		minWidth: 80,
 		paddingHorizontal: 14,

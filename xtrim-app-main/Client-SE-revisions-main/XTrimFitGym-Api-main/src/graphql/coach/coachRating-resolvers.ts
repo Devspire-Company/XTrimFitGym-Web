@@ -13,7 +13,7 @@ function normalizeCoachRatingComment(raw: unknown): string {
 	const s = typeof raw === 'string' ? raw.trim() : '';
 	if (s.length < MIN_COACH_RATING_COMMENT_LEN) {
 		throw new Error(
-			`Please add a written comment of at least ${MIN_COACH_RATING_COMMENT_LEN} characters about your session.`,
+			`Please explain why you chose this rating (at least ${MIN_COACH_RATING_COMMENT_LEN} characters)—what your coach did well or what should improve.`,
 		);
 	}
 	return s;
@@ -258,7 +258,9 @@ export default {
 			}).lean();
 
 			if (existingRating) {
-				throw new Error('A rating already exists for this session');
+				throw new Error(
+					'You already submitted a coach rating for this session. Open Progress or Session logs to view your stars and feedback—you cannot rate the same session twice.',
+				);
 			}
 
 			const rating = new CoachRating({

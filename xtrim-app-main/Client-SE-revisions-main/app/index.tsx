@@ -3,30 +3,24 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMeQuery } from '@/graphql/generated/types';
 import { clearUser, setUser } from '@/store/slices/userSlice';
 import { convertGraphQLUser } from '@/utils/graphql-utils';
-import { clearAuthFlowIntent, getAuthFlowIntent, setAuthFlowIntent } from '@/utils/auth-flow';
+import { clearAuthFlowIntent, getAuthFlowIntent } from '@/utils/auth-flow';
 import { storage } from '@/utils/storage';
 import { NetworkStatus } from '@apollo/client';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {
-	ActivityIndicator,
-	Text,
-	TouchableOpacity,
-	View,
-} from 'react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 
 const SLOW_SYNC_HINT_MS = 12_000;
 
 export default function Index() {
-	const router = useRouter();
 	const dispatch = useDispatch();
 	const reduxUser = useSelector((s: { user: { user: unknown } }) => s.user.user) as
 		| import('@/graphql/generated/types').User
 		| null;
 	const { onboardingStatus } = useAuth();
-	const { isLoaded: clerkLoaded, isSignedIn, signOut: clerkSignOut } = useClerkAuth();
+	const { isLoaded: clerkLoaded, isSignedIn } = useClerkAuth();
 
 	const [showSlowSyncHint, setShowSlowSyncHint] = useState(false);
 	const [profileHydrateError, setProfileHydrateError] = useState<string | null>(null);
@@ -221,55 +215,7 @@ export default function Index() {
 					</FixedView>
 				);
 			}
-			if (meNullAuthFlow === 'signup') {
-				return <Redirect href='/(auth)/complete-registration' />;
-			}
-			return (
-				<FixedView className='flex-1 bg-bg-darker'>
-					<View className='flex-1 justify-center items-center px-6'>
-						<Text className='text-base text-text-primary text-center font-semibold'>
-							No gym profile for this sign-in
-						</Text>
-						<Text className='mt-3 text-sm text-text-secondary text-center leading-5'>
-							You signed in, but there is no member profile linked to this account yet. If you
-							meant to create a new account, use Sign up instead. Otherwise try again later or
-							contact support.
-						</Text>
-						<TouchableOpacity
-							onPress={() => {
-								void (async () => {
-									await setAuthFlowIntent('signup');
-									router.replace('/(auth)/complete-registration');
-								})();
-							}}
-							className='mt-6 py-3 px-6 rounded-xl bg-bg-primary border border-[#F9C513]/50'
-							style={{ borderWidth: 0.5 }}
-						>
-							<Text className='text-text-primary font-semibold text-center'>
-								Continue profile setup
-							</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							onPress={() => {
-								void (async () => {
-									try {
-										await clerkSignOut();
-									} catch {
-										/* noop */
-									}
-									await storage.removeItem('auth_token');
-									await clearAuthFlowIntent();
-									dispatch(clearUser());
-								})();
-							}}
-							className='mt-8 py-3 px-6 rounded-xl bg-[#F9C513]/20 border border-[#F9C513]'
-							style={{ borderWidth: 0.5 }}
-						>
-							<Text className='text-[#F9C513] font-semibold text-center'>Sign out</Text>
-						</TouchableOpacity>
-					</View>
-				</FixedView>
-			);
+			return <Redirect href='/(auth)/complete-registration' />;
 		}
 		return (
 			<FixedView className='flex-1 bg-bg-darker'>

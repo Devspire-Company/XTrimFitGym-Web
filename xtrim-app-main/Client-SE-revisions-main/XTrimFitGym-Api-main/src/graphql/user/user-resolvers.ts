@@ -12,6 +12,7 @@ import {
 	provisionClerkUserForAdmin,
 	provisionClerkUserForCoach,
 } from '../../lib/clerk-provision.js';
+import { syncFacilityBiometricEnrollmentFromAttendance } from '../../services/syncFacilityBiometricFromAttendance.js';
 
 // Helper function to convert Mongoose document to GraphQL User type
 const mapUserToGraphQL = (
@@ -103,6 +104,27 @@ function buildNormalizedEmailQuery(email: string) {
 	};
 }
 
+function maskEmailForLog(email: string): string {
+	const normalized = normalizeEmail(email);
+	const [local = '', domain = ''] = normalized.split('@');
+	if (!local || !domain) return '(invalid email)';
+	const visible = local.slice(0, 2);
+	return `${visible}${'*'.repeat(Math.max(local.length - visible.length, 1))}@${domain}`;
+}
+
+function clerkPrimaryEmailDetails(cu: any): {
+	email: string | null;
+	verificationStatus: string | null;
+} {
+	const primary = cu?.emailAddresses?.find((e: any) => e.id === cu?.primaryEmailAddressId);
+	const fallback = cu?.emailAddresses?.[0];
+	const picked = primary ?? fallback;
+	return {
+		email: picked?.emailAddress ?? null,
+		verificationStatus: picked?.verification?.status ?? null,
+	};
+}
+
 function sensitiveMemberWaiverField(
 	parent: { id?: string },
 	context: { auth?: { user?: { id: string; role: string } | null } },
@@ -137,7 +159,10 @@ const userResolvers: Resolvers = {
 		me: async (_, __, context) => {
 			const userId = context.auth.user?.id;
 			if (!userId) return null;
-			const user = await User.findById(userId).lean();
+			let user = await User.findById(userId).lean();
+			if (!user) return null;
+			await syncFacilityBiometricEnrollmentFromAttendance(user as any);
+			user = await User.findById(userId).lean();
 			if (!user) return null;
 			return mapUserToGraphQL(user as any);
 		},
@@ -193,6 +218,9 @@ const userResolvers: Resolvers = {
 
 			await user.save();
 
+			await syncFacilityBiometricEnrollmentFromAttendance(user.toObject() as any);
+			const userAfterBio = await User.findById(user._id).lean();
+
 			// Generate token
 			const token = jwt.sign(
 				{
@@ -208,9 +236,9 @@ const userResolvers: Resolvers = {
 				role: user.role,
 			});
 
-			const userObj = user.toObject();
+			const userObj = (userAfterBio ?? user.toObject()) as any;
 			return {
-				user: mapUserToGraphQL(userObj as any),
+				user: mapUserToGraphQL(userObj),
 				token, // Return token for React Native (cookies may not work)
 			};
 		},
@@ -237,6 +265,16 @@ const userResolvers: Resolvers = {
 			const userRole = context.auth.user?.role;
 			const clerkSub = context.auth.clerkSub;
 			const normalizedInputEmail = normalizeEmail(email);
+			console.log(
+				'[API] createUser request:',
+				JSON.stringify({
+					role,
+					email: maskEmailForLog(normalizedInputEmail),
+					hasClerkSub: !!clerkSub,
+					requesterRole: userRole ?? null,
+					requesterId: userId ?? null,
+				})
+			);
 
 			if (role === 'admin' || role === 'coach') {
 				if (!userId || userRole !== 'admin') {
@@ -260,9 +298,15 @@ const userResolvers: Resolvers = {
 					}
 					const clerk = createClerkClient({ secretKey: secret });
 					const cu = await clerk.users.getUser(clerkSub);
-					const clerkEmail =
-						cu.emailAddresses.find((e) => e.id === cu.primaryEmailAddressId)?.emailAddress ??
-						cu.emailAddresses[0]?.emailAddress;
+					const { email: clerkEmail, verificationStatus } = clerkPrimaryEmailDetails(cu);
+					console.log(
+						'[API] createUser existing-member Clerk verification:',
+						JSON.stringify({
+							clerkSub: clerkSub.slice(0, 8) + '…',
+							email: clerkEmail ? maskEmailForLog(clerkEmail) : null,
+							verificationStatus: verificationStatus ?? 'unknown',
+						})
+					);
 					if (!clerkEmail) {
 						throw new Error('Your Clerk account has no verified email.');
 					}
@@ -336,9 +380,15 @@ const userResolvers: Resolvers = {
 				}
 				const clerk = createClerkClient({ secretKey: secret });
 				const cu = await clerk.users.getUser(clerkSub);
-				const clerkEmail =
-					cu.emailAddresses.find((e) => e.id === cu.primaryEmailAddressId)?.emailAddress ??
-					cu.emailAddresses[0]?.emailAddress;
+				const { email: clerkEmail, verificationStatus } = clerkPrimaryEmailDetails(cu);
+				console.log(
+					'[API] createUser new-member Clerk verification:',
+					JSON.stringify({
+						clerkSub: clerkSub.slice(0, 8) + '…',
+						email: clerkEmail ? maskEmailForLog(clerkEmail) : null,
+						verificationStatus: verificationStatus ?? 'unknown',
+					})
+				);
 				if (!clerkEmail) {
 					throw new Error('Your Clerk account has no verified email.');
 				}

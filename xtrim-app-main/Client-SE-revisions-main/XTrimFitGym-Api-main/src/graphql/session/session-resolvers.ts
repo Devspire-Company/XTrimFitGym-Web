@@ -7,11 +7,15 @@ import mongoose from 'mongoose';
 
 type Context = IAuthContext;
 
+/** Populated onto Session for goal-linked UI (e.g. complete session weight vs start) + Goal resolver fast path. */
+const GOAL_SELECT_FOR_SESSION =
+	'title goalType currentWeight targetWeight description targetDate status client_id coach_id createdAt updatedAt';
+
 const sessionPopulatePaths = [
 	{ path: 'coach_id', select: 'firstName lastName email' },
 	{ path: 'clients_ids', select: 'firstName lastName email' },
 	{ path: 'enrollments.client_id', select: 'firstName lastName email' },
-	{ path: 'goalId', select: 'title goalType currentWeight targetWeight' },
+	{ path: 'goalId', select: GOAL_SELECT_FOR_SESSION },
 ] as const;
 
 async function fetchSessionDocument(sessionId: string) {
@@ -167,15 +171,28 @@ const mapSessionToGraphQL = (session: any) => {
 	let goal: any = null;
 	if (session.goalId) {
 		if (session.goalId._id || session.goalId.title || session.goalId.goalType) {
-			// Populated object - map it properly
-			goalId = session.goalId._id
-				? session.goalId._id.toString()
-				: session.goalId.id || String(session.goalId);
-			// Map the goal object with proper structure for GraphQL
+			// Populated object - keep fields needed for Session.goal resolver + client weight comparison UI
+			const gw = session.goalId;
+			goalId = gw._id ? gw._id.toString() : gw.id || String(gw);
 			goal = {
-				id: goalId,
-				title: session.goalId.title || '',
-				goalType: session.goalId.goalType || '',
+				_id: gw._id,
+				client_id: gw.client_id,
+				coach_id: gw.coach_id,
+				title: gw.title || '',
+				goalType: gw.goalType || '',
+				description: gw.description ?? null,
+				currentWeight:
+					gw.currentWeight !== undefined && gw.currentWeight !== null
+						? Number(gw.currentWeight)
+						: null,
+				targetWeight:
+					gw.targetWeight !== undefined && gw.targetWeight !== null
+						? Number(gw.targetWeight)
+						: null,
+				targetDate: gw.targetDate ?? null,
+				status: gw.status || 'active',
+				createdAt: gw.createdAt ?? null,
+				updatedAt: gw.updatedAt ?? null,
 			};
 		} else if (session.goalId instanceof mongoose.Types.ObjectId) {
 			// ObjectId instance - not populated
@@ -370,7 +387,7 @@ export default {
 					path: 'enrollments.client_id',
 					select: 'firstName lastName email',
 				})
-				.populate('goalId', 'title goalType')
+				.populate('goalId', GOAL_SELECT_FOR_SESSION)
 				.sort({ date: 1, startTime: 1 })
 				.lean();
 
@@ -433,7 +450,7 @@ export default {
 					path: 'enrollments.client_id',
 					select: 'firstName lastName email',
 				})
-				.populate('goalId', 'title goalType')
+				.populate('goalId', GOAL_SELECT_FOR_SESSION)
 				.sort({ date: 1, startTime: 1 })
 				.lean();
 
@@ -535,7 +552,7 @@ export default {
 					path: 'enrollments.client_id',
 					select: 'firstName lastName email',
 				})
-				.populate('goalId', 'title goalType')
+				.populate('goalId', GOAL_SELECT_FOR_SESSION)
 				.sort({ date: 1, startTime: 1 })
 				.lean();
 
@@ -556,7 +573,7 @@ export default {
 					path: 'enrollments.client_id',
 					select: 'firstName lastName email',
 				})
-				.populate('goalId', 'title goalType')
+				.populate('goalId', GOAL_SELECT_FOR_SESSION)
 				.lean();
 
 			if (!session) {
@@ -604,7 +621,7 @@ export default {
 				isTemplate: true,
 			})
 				.populate('coach_id', 'firstName lastName')
-				.populate('goalId', 'title goalType')
+				.populate('goalId', GOAL_SELECT_FOR_SESSION)
 				.sort({ createdAt: -1 })
 				.lean();
 
@@ -938,7 +955,7 @@ export default {
 					path: 'enrollments.client_id',
 					select: 'firstName lastName email',
 				})
-				.populate('goalId', 'title goalType')
+				.populate('goalId', GOAL_SELECT_FOR_SESSION)
 				.lean();
 
 			return mapSessionToGraphQL(populatedSession);
@@ -1905,9 +1922,9 @@ export default {
 					coachId: coachId,
 					goalType: goal.goalType,
 					title: goal.title,
-					description: goal.description || null,
-					targetWeight: goal.targetWeight || null,
-					currentWeight: goal.currentWeight || null,
+					description: goal.description ?? null,
+					targetWeight: goal.targetWeight ?? null,
+					currentWeight: goal.currentWeight ?? null,
 					targetDate: goal.targetDate?.toISOString() || null,
 					status: goal.status || 'active',
 					createdAt: goal.createdAt?.toISOString() || null,
@@ -1959,9 +1976,9 @@ export default {
 					coachId: coachId,
 					goalType: goal.goalType,
 					title: goal.title,
-					description: goal.description || null,
-					targetWeight: goal.targetWeight || null,
-					currentWeight: goal.currentWeight || null,
+					description: goal.description ?? null,
+					targetWeight: goal.targetWeight ?? null,
+					currentWeight: goal.currentWeight ?? null,
 					targetDate: goal.targetDate?.toISOString() || null,
 					status: goal.status || 'active',
 					createdAt: goal.createdAt?.toISOString() || null,

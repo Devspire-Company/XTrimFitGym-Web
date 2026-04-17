@@ -11,7 +11,7 @@ import { CREATE_USER_MUTATION } from '@/graphql/mutations';
 import { getPostRegistrationHref } from '@/lib/post-auth-navigation';
 import { useAppDispatch } from '@/store/hooks';
 import { setUser } from '@/store/slices/userSlice';
-import { AUTH_FLOW_STORAGE_KEY, clearAuthFlowIntent } from '@/utils/auth-flow';
+import { clearAuthFlowIntent } from '@/utils/auth-flow';
 import { convertGraphQLUser } from '@/utils/graphql-utils';
 import { storage } from '@/utils/storage';
 import { useAuth, useUser } from '@clerk/clerk-expo';
@@ -27,7 +27,6 @@ import {
 	View,
 } from 'react-native';
 
-/** Finishes Mongo member row when Clerk is signed in but `me` is null. */
 export default function CompleteRegistration() {
 	const router = useRouter();
 	const dispatch = useAppDispatch();
@@ -54,20 +53,6 @@ export default function CompleteRegistration() {
 		CreateUserMutation,
 		CreateUserMutationVariables
 	>(CREATE_USER_MUTATION);
-
-	useEffect(() => {
-		let cancelled = false;
-		void (async () => {
-			const flow = await storage.getItem(AUTH_FLOW_STORAGE_KEY);
-			if (cancelled) return;
-			if (flow !== 'signup') {
-				router.replace('/(auth)/login');
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [router]);
 
 	useEffect(() => {
 		if (!clerkUser) return;
@@ -146,12 +131,13 @@ export default function CompleteRegistration() {
 	return (
 		<FixedView className='flex-1 bg-bg-darker'>
 			<KeyboardAvoidingView
-				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 				className='flex-1'
 			>
 				<ScrollView
-					contentContainerClassName='flex-grow justify-center px-5 py-8'
+					contentContainerClassName='flex-grow px-5 pt-8 pb-28'
 					keyboardShouldPersistTaps='handled'
+					keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
 				>
 					<View className='items-center mb-6'>
 						<Image
@@ -223,7 +209,6 @@ export default function CompleteRegistration() {
 								try {
 									await signOut();
 								} catch {
-									// Continue redirect flow even if Clerk sign-out fails.
 								}
 							}
 							router.replace('/(auth)/login');
@@ -241,7 +226,6 @@ export default function CompleteRegistration() {
 								try {
 									await signOut();
 								} catch {
-									// Continue redirect flow even if Clerk sign-out fails.
 								}
 							}
 							router.replace('/(auth)/login');

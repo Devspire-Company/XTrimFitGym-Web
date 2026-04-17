@@ -36,11 +36,10 @@ import {
 } from '@/utils/waiver-minor-identity';
 import { minorNeedsGuardianWaiver } from '@/utils/age-waiver';
 import * as ImageManipulator from 'expo-image-manipulator';
-import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 
-// Note: UpdateUserMutation types may need to be regenerated
-// Using any for now until GraphQL codegen is run
 type UpdateUserMutation = any;
 type UpdateUserMutationVariables = any;
 
@@ -56,7 +55,6 @@ const MemberProfile = () => {
 		return match?.label ?? v;
 	}, [user?.membershipDetails?.physiqueGoalType]);
 
-	/** Legacy DB value "General" is no longer offered; keep it selectable only while still selected so users can migrate. */
 	const bodyTypeSelectOptions = useMemo(() => {
 		if (physiqueGoalType === 'General') {
 			return [{ label: 'General', value: 'General' }, ...bodyTypeOptions];
@@ -146,6 +144,8 @@ const MemberProfile = () => {
 	const [showGuardianIdCamera, setShowGuardianIdCamera] = useState(false);
 	const [idPhotoUploading, setIdPhotoUploading] = useState(false);
 	const [minorWaiverPrintedName, setMinorWaiverPrintedName] = useState('');
+	const [profileSigScrollLocked, setProfileSigScrollLocked] = useState(false);
+	const minorWaiverNameRef = useRef<TextInput>(null);
 	const [minorMemberWaiverSigUri, setMinorMemberWaiverSigUri] = useState('');
 	const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
 
@@ -168,7 +168,6 @@ const MemberProfile = () => {
 	>(UPDATE_USER_MUTATION, {
 		onCompleted: (data) => {
 			if (data.updateUser) {
-				// Convert GraphQL User to Redux User format and update entire user object
 				const updatedUser = convertGraphQLUser(data.updateUser);
 				dispatch(setUser(updatedUser));
 				setIsEditing(false);
@@ -179,7 +178,6 @@ const MemberProfile = () => {
 					message: 'Profile updated successfully!',
 					variant: 'success',
 				});
-				// Clear password fields
 				setPassword('');
 				setCurrentPassword('');
 			}
@@ -401,7 +399,6 @@ const MemberProfile = () => {
 	const handleSave = () => {
 		if (!validateForm() || !user?.id) return;
 
-		// Build membershipDetails object, preserving existing fields
 		const membershipDetailsInput: any = {
 			// Update editable fields
 			physiqueGoalType: normalizePhysiqueGoalTypeForApi(physiqueGoalType),
@@ -410,10 +407,9 @@ const MemberProfile = () => {
 					? [`${workOutTimeStart.getHours()}-${workOutTimeEnd.getHours()}`]
 					: user?.membershipDetails?.workOutTime || [],
 			fitnessGoal: fitnessGoal,
-			hasEnteredDetails: user?.membershipDetails?.hasEnteredDetails ?? true, // Preserve onboarding status
+			hasEnteredDetails: user?.membershipDetails?.hasEnteredDetails ?? true,
 		};
 
-		// Only include membershipId and coachesIds if they exist (preserve them)
 		if (user?.membershipDetails?.membershipId) {
 			membershipDetailsInput.membershipId = user.membershipDetails.membershipId;
 		}
@@ -492,10 +488,14 @@ const MemberProfile = () => {
 	return (
 		<FixedView className='flex-1 bg-bg-darker'>
 			<TabHeader showCoachIcon={false} />
-			<ScrollView
+			<GHScrollView
 				className='flex-1'
 				contentContainerClassName='p-5'
 				showsVerticalScrollIndicator={false}
+				keyboardShouldPersistTaps='never'
+				keyboardDismissMode='on-drag'
+				nestedScrollEnabled
+				scrollEnabled={!profileSigScrollLocked}
 			>
 				<View className='flex-row items-center justify-between mb-6 pb-4 border-b border-[#F9C513]/20'>
 					<View>
@@ -559,6 +559,7 @@ const MemberProfile = () => {
 							legal name and sign first; then a parent or legal guardian completes their section.
 						</Text>
 						<Input
+							ref={minorWaiverNameRef}
 							label='Minor member — full legal name (must match this account)'
 							placeholder={`${user?.firstName || ''} ${user?.middleName || ''} ${user?.lastName || ''}`
 								.replace(/\s+/g, ' ')
@@ -570,9 +571,27 @@ const MemberProfile = () => {
 							}}
 							editable={!guardianWaiverLoading}
 							autoCapitalize='words'
+							returnKeyType='done'
+							blurOnSubmit
+							onSubmitEditing={() => {
+								void Keyboard.dismiss();
+								minorWaiverNameRef.current?.blur();
+							}}
 							error={guardianErrors.minorMemberPrintedName}
 						/>
-						<View className='mt-4'>
+						<TouchableOpacity
+							activeOpacity={0.7}
+							onPress={() => {
+								void Keyboard.dismiss();
+								minorWaiverNameRef.current?.blur();
+							}}
+							className='mt-1 mb-2 self-start'
+						>
+							<Text className='text-[#F9C513] text-sm font-semibold'>
+								Done typing your name? Tap here to hide the keyboard, then sign below.
+							</Text>
+						</TouchableOpacity>
+						<View className='mt-4' style={{ zIndex: 1, elevation: 6 }}>
 							<WaiverSignaturePad
 								label='Minor member signature'
 								hint='You (the minor) sign here. A parent/guardian completes the rest below.'
@@ -581,6 +600,7 @@ const MemberProfile = () => {
 									setMinorMemberWaiverSigUri(v);
 									setGuardianErrors((e) => ({ ...e, minorMemberSignature: undefined }));
 								}}
+								onDrawingChange={setProfileSigScrollLocked}
 								disabled={guardianWaiverLoading}
 								height={190}
 							/>
@@ -606,6 +626,7 @@ const MemberProfile = () => {
 											setGuardianSignature(v);
 											setGuardianErrors((e) => ({ ...e, guardianSignature: undefined }));
 										}}
+										onDrawingChange={setProfileSigScrollLocked}
 										disabled={guardianWaiverLoading}
 										height={200}
 									/>
@@ -1013,7 +1034,7 @@ const MemberProfile = () => {
 						)}
 					</>
 				)}
-			</ScrollView>
+			</GHScrollView>
 			<CameraCapture
 				visible={showGuardianIdCamera}
 				onClose={() => setShowGuardianIdCamera(false)}

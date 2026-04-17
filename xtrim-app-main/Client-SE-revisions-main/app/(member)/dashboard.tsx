@@ -128,7 +128,6 @@ const MemberDashboard = () => {
 			fetchPolicy: 'cache-and-network',
 		});
 
-	// Refetch data when screen is mounted
 	useEffect(() => {
 		refetchSessions();
 		if (user?.id) {
@@ -163,7 +162,6 @@ const MemberDashboard = () => {
 	const activeGoals = goalsData?.getGoals || [];
 	const currentMembership = membershipData?.getCurrentMembership;
 
-	// Calculate completed sessions this month
 	const completedThisMonth = useMemo(() => {
 		const allSessionsList = allSessionsData?.getClientSessions || [];
 		const now = new Date();

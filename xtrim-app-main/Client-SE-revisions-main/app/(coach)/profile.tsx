@@ -24,8 +24,6 @@ import {
 	View,
 } from 'react-native';
 
-// Note: UpdateUserMutation types may need to be regenerated
-// Using any for now until GraphQL codegen is run
 type UpdateUserMutation = any;
 type UpdateUserMutationVariables = any;
 
@@ -112,7 +110,6 @@ const CoachProfile = () => {
 			endDate.setHours(18, 0, 0, 0);
 			return { start: startDate, end: endDate };
 		}
-		// If it's stored as time range string like "8-18"
 		const timeRange = timeStr[0];
 		if (timeRange && timeRange.includes('-') && !timeRange.includes(' ')) {
 			const [start, end] = timeRange.split('-');
@@ -160,7 +157,6 @@ const CoachProfile = () => {
 	>(UPDATE_USER_MUTATION, {
 		onCompleted: (data) => {
 			if (data.updateUser) {
-				// Convert GraphQL User to Redux User format and update entire user object
 				const updatedUser = convertGraphQLUser(data.updateUser);
 				dispatch(setUser(updatedUser));
 				setIsEditing(false);
@@ -251,32 +247,24 @@ const CoachProfile = () => {
 	const handleSave = () => {
 		if (!validateForm() || !user?.id) return;
 
-		// Build coachDetails object with all fields being edited
-		// Send all fields so backend can properly update them
 		const coachDetailsInput: any = {};
 
-		// Always send specialization (required field, validated in form)
 		coachDetailsInput.specialization = specializations;
 
-		// Send yearsOfExperience if it has a value, otherwise send undefined to preserve existing
 		if (yearsOfExperience && yearsOfExperience.trim()) {
 			coachDetailsInput.yearsOfExperience = parseInt(yearsOfExperience);
 		}
 
-		// Send moreDetails - allow clearing it by sending empty string
 		coachDetailsInput.moreDetails = moreDetails.trim() || undefined;
 
-		// Send teachingDate - allow clearing by sending empty array
 		coachDetailsInput.teachingDate = teachingDates;
 
-		// Send teachingTime if both start and end are set
 		if (teachingTimeStart && teachingTimeEnd) {
 			coachDetailsInput.teachingTime = [
 				`${teachingTimeStart.getHours()}-${teachingTimeEnd.getHours()}`,
 			];
 		}
 
-		// Send clientLimit if it has a value
 		if (clientLimit && clientLimit.trim()) {
 			coachDetailsInput.clientLimit = parseInt(clientLimit);
 		}

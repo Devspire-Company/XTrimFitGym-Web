@@ -126,8 +126,8 @@ const First = () => {
 
 					{dateOfBirth && !errors.dateOfBirth && isMinorAt(dateOfBirth) ? (
 						<Text className='text-text-secondary text-sm -mt-2'>
-							Members under 18 need a parent or guardian to sign the liability waiver in the
-							final onboarding step.
+							Members under 18 should ask the clerk for the printed waiver with parent or
+							guardian signature.
 						</Text>
 					) : null}
 

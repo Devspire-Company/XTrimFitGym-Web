@@ -1,4 +1,5 @@
 import ConfirmModal from '@/components/ConfirmModal';
+import DatePicker from '@/components/DatePicker';
 import FixedView from '@/components/FixedView';
 import GradientButton from '@/components/GradientButton';
 import Input from '@/components/Input';
@@ -15,6 +16,7 @@ import {
 } from '@/graphql/generated/types';
 import {
 	CREATE_GOAL_MUTATION,
+	CREATE_COACH_RATING_MUTATION,
 	DELETE_GOAL_MUTATION,
 } from '@/graphql/mutations';
 import { normalizePhysiqueGoalTypeForApi } from '@/constants/onboarding-options';
@@ -40,12 +42,14 @@ import {
 	RefreshControl,
 	ScrollView,
 	Text,
+	TextInput,
 	TouchableOpacity,
 	View,
 } from 'react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 const menuWidth = 180;
+const MIN_COACH_RATING_COMMENT_LENGTH = 25;
 
 function formatKgDisplay(value: number | null | undefined): string | null {
 	if (value == null) return null;
@@ -83,7 +87,6 @@ const goalTypeOptions = [
 	{ label: 'Rehabilitation', value: 'REHABILITATION' },
 ];
 
-/** Add calendar months without jumping past month-end (e.g. Jan 31 + 1 → Feb 28/29). */
 function addCalendarMonths(from: Date, monthsToAdd: number): Date {
 	const base = new Date(
 		from.getFullYear(),
@@ -98,7 +101,6 @@ function addCalendarMonths(from: Date, monthsToAdd: number): Date {
 	return base;
 }
 
-/** Baseline months from goal type — longest selected wins. */
 function monthsBaselineForGoalTypes(types: string[]): number {
 	const monthsForType = (type: string) => {
 		switch (type) {
@@ -137,10 +139,6 @@ function parseBodyKind(physiqueRaw: string | undefined | null): BodyKind {
 	return 'general';
 }
 
-/**
- * Extra time from genetics vs “average” for weight-focused goals.
- * Endomorphs often need longer cuts; ectomorphs longer lean bulks; mesomorphs slightly shorter.
- */
 function bodyTypeMonthsMultiplier(body: BodyKind, types: string[]): number {
 	const wl = types.includes('WEIGHT_LOSS');
 	const mb = types.includes('MUSCLE_BUILDING');
@@ -156,9 +154,6 @@ function bodyTypeMonthsMultiplier(body: BodyKind, types: string[]): number {
 	return 1;
 }
 
-/**
- * Months implied by kg change at sustainable paces (~1.25 kg/mo loss, ~0.55 kg/mo lean gain).
- */
 function monthsFromWeightDelta(types: string[], currentStr: string, targetStr: string): number | null {
 	const c = parseFloat(currentStr.replace(/,/g, '.'));
 	const t = parseFloat(targetStr.replace(/,/g, '.'));
@@ -181,10 +176,6 @@ function monthsFromWeightDelta(types: string[], currentStr: string, targetStr: s
 	return Math.min(Math.max(need, 2), 36);
 }
 
-/**
- * Target timeline: max(goal-type baseline, weight-based estimate) × body-type multiplier,
- * then clamped to a sensible range (caller still clamps to 5y cap).
- */
 function computeGoalTargetMonths(params: {
 	goalTypes: string[];
 	physiqueGoalType: string | undefined | null;
@@ -241,11 +232,15 @@ const MemberProgress = () => {
 	const [targetWeight, setTargetWeight] = useState('');
 	const [currentWeight, setCurrentWeight] = useState('');
 	const [targetDate, setTargetDate] = useState<Date | undefined>();
+	const [targetDateIsCustom, setTargetDateIsCustom] = useState(false);
+	const prevGoalTypesKeyRef = useRef('');
 	const [errors, setErrors] = useState<Record<string, string>>({});
 	const [selectedSession, setSelectedSession] = useState<any>(null);
-	/** When opening a completed workout from Recent Sessions, includes weight / goal context */
 	const [selectedSessionLog, setSelectedSessionLog] = useState<any>(null);
 	const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+	const [pendingCoachRating, setPendingCoachRating] = useState(0);
+	const [pendingCoachComment, setPendingCoachComment] = useState('');
+	const [pendingCoachCommentError, setPendingCoachCommentError] = useState('');
 	const [goalMenuOpen, setGoalMenuOpen] = useState<any>(null);
 	const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
 	const [goalToDelete, setGoalToDelete] = useState<any>(null);
@@ -265,7 +260,6 @@ const MemberProgress = () => {
 		[apiKey]
 	);
 
-	// Parse workoutType JSON string to get exercises
 	const parseWorkoutExercises = useCallback((workoutType: string | null | undefined): WorkoutExercise[] => {
 		if (!workoutType) return [];
 		try {
@@ -297,7 +291,6 @@ const MemberProgress = () => {
 		skip: !user?.id,
 	});
 
-	// Refetch data when screen is mounted
 	useEffect(() => {
 		if (user?.id) {
 			refetchGoals();
@@ -328,7 +321,6 @@ const MemberProgress = () => {
 		skip: !selectedGoal || !showWeightChart || !user?.id,
 	});
 
-	// Query progress ratings for the selected goal
 	const { data: ratingsData } = useQuery<any>(
 		GET_PROGRESS_RATINGS_QUERY,
 		{
@@ -344,7 +336,7 @@ const MemberProgress = () => {
 	const sessionLogIdForCoachRating =
 		showWorkoutModal && selectedSessionLog?.id ? selectedSessionLog.id : '';
 
-	const { data: sessionLogCoachRatingData } = useQuery<any>(
+	const { data: sessionLogCoachRatingData, refetch: refetchSessionLogCoachRating } = useQuery<any>(
 		GET_COACH_RATING_BY_SESSION_LOG_QUERY,
 		{
 			variables: { sessionLogId: sessionLogIdForCoachRating },
@@ -371,7 +363,6 @@ const MemberProgress = () => {
 		fetchPolicy: 'cache-and-network',
 	});
 
-	// Query upcoming sessions to show workouts
 	const { data: sessionsData, refetch: refetchSessions } = useQuery(
 		GET_CLIENT_SESSIONS_QUERY,
 		{
@@ -381,7 +372,6 @@ const MemberProgress = () => {
 		}
 	);
 
-	// Query recent session logs to show completed workouts
 	const { data: sessionLogsData, refetch: refetchSessionLogs } = useQuery(
 		GET_SESSION_LOGS_QUERY,
 		{
@@ -391,7 +381,6 @@ const MemberProgress = () => {
 		}
 	);
 
-	// Get sessions with workouts
 	const sessionsWithWorkouts = useMemo(() => {
 		const upcoming = (sessionsData?.getClientSessions || []).filter((s: any) => {
 			const exercises = parseWorkoutExercises(s.workoutType);
@@ -414,9 +403,15 @@ const MemberProgress = () => {
 
 	const memberCoachRatingForLog = useMemo(() => {
 		const r = sessionLogCoachRatingData?.getCoachRatingBySessionLog;
-		if (!r || !selectedSessionLog?.id) return null;
-		return r.sessionLogId === selectedSessionLog.id ? r : null;
-	}, [sessionLogCoachRatingData, selectedSessionLog?.id]);
+		if (!r) return null;
+		return r;
+	}, [sessionLogCoachRatingData]);
+
+	useEffect(() => {
+		setPendingCoachRating(0);
+		setPendingCoachComment('');
+		setPendingCoachCommentError('');
+	}, [selectedSessionLog?.id]);
 
 	const mySessionRatingsList = useMemo(
 		() => myCoachRatingsForGoal?.getMyCoachRatingsForGoal || [],
@@ -448,6 +443,38 @@ const MemberProgress = () => {
 		},
 	});
 
+	const [createCoachRating, { loading: creatingCoachRating }] = useMutation(
+		CREATE_COACH_RATING_MUTATION,
+		{
+			onCompleted: async () => {
+				setPendingCoachRating(0);
+				setPendingCoachComment('');
+				setPendingCoachCommentError('');
+				await Promise.all([refetchSessionLogCoachRating(), refetchSessionLogs()]);
+				setAlertModal({
+					visible: true,
+					title: 'Success',
+					message: 'Thanks for your feedback.',
+					variant: 'success',
+				});
+			},
+			onError: async (error) => {
+				const msg = error.message || 'Failed to submit feedback.';
+				if (msg.toLowerCase().includes('already submitted')) {
+					await refetchSessionLogCoachRating();
+					setAlertModal({
+						visible: true,
+						title: 'Already rated',
+						message: 'You already rated this session. You can review it only.',
+						variant: 'neutral',
+					});
+					return;
+				}
+				setAlertModal({ visible: true, title: 'Error', message: msg, variant: 'danger' });
+			},
+		}
+	);
+
 	const resetForm = () => {
 		setTitle('');
 		setSelectedGoalTypes([]);
@@ -455,6 +482,8 @@ const MemberProgress = () => {
 		setTargetWeight('');
 		setCurrentWeight('');
 		setTargetDate(undefined);
+		setTargetDateIsCustom(false);
+		prevGoalTypesKeyRef.current = '';
 		setErrors({});
 	};
 
@@ -472,7 +501,6 @@ const MemberProgress = () => {
 				: 'Target date is required';
 		}
 
-		// Weight fields are required only for weight-related goal types
 		if (isWeightRelated) {
 			if (!currentWeight.trim()) {
 				newErrors.currentWeight =
@@ -512,7 +540,6 @@ const MemberProgress = () => {
 			targetDate: targetDate?.toISOString(),
 		};
 
-		// Only include weight fields for weight-related goals
 		const isWeightRelated = selectedGoalTypes.some(
 			(type) => type === 'WEIGHT_LOSS' || type === 'MUSCLE_BUILDING',
 		);
@@ -523,6 +550,79 @@ const MemberProgress = () => {
 
 		createGoal({ variables: { input } });
 	};
+
+	const submitCoachRatingForSelectedLog = useCallback(() => {
+		if (!selectedSessionLog?.id) {
+			setAlertModal({
+				visible: true,
+				title: 'Error',
+				message: 'Missing session information.',
+				variant: 'danger',
+			});
+			return;
+		}
+
+		const selectedCoachIdCandidates = [
+			selectedSessionLog.coachId,
+			selectedSessionLog.coach?.id,
+			selectedSessionLog.coach?._id,
+			selectedSessionLog.session?.coachId,
+			selectedSessionLog.session?.coach?.id,
+			selectedSessionLog.session?.coach?._id,
+		]
+			.map((v) => (v == null ? '' : String(v).trim()))
+			.filter((v) => v.length > 0);
+		const selectedCoachId = selectedCoachIdCandidates[0] || '';
+		if (!selectedCoachId) {
+			setAlertModal({
+				visible: true,
+				title: 'Error',
+				message: 'Coach not found for this session.',
+				variant: 'danger',
+			});
+			return;
+		}
+
+		if (pendingCoachRating === 0) {
+			setAlertModal({
+				visible: true,
+				title: 'Stars required',
+				message: 'Please tap 1-5 stars before submitting.',
+				variant: 'neutral',
+			});
+			return;
+		}
+
+		const trimmed = pendingCoachComment.trim();
+		if (trimmed.length < MIN_COACH_RATING_COMMENT_LENGTH) {
+			setPendingCoachCommentError(
+				`Please write at least ${MIN_COACH_RATING_COMMENT_LENGTH} characters.`
+			);
+			setAlertModal({
+				visible: true,
+				title: 'Feedback required',
+				message: `Tell us why (at least ${MIN_COACH_RATING_COMMENT_LENGTH} characters).`,
+				variant: 'neutral',
+			});
+			return;
+		}
+
+		createCoachRating({
+			variables: {
+				input: {
+					coachId: selectedCoachId,
+					sessionLogId: selectedSessionLog.id,
+					rating: pendingCoachRating,
+					comment: trimmed,
+				},
+			},
+		});
+	}, [
+		createCoachRating,
+		pendingCoachComment,
+		pendingCoachRating,
+		selectedSessionLog,
+	]);
 
 	const goals = goalsData?.getGoals || [];
 	const progressPoints = progressData?.getWeightProgressChart || [];
@@ -552,7 +652,58 @@ const MemberProgress = () => {
 		isWeightRelatedGoalPick &&
 		!bothWeightsValidForEstimate;
 
-	// Auto target date: non–weight goals immediately; weight goals only after both weights valid
+	const goalTypesKey = useMemo(
+		() => [...selectedGoalTypes].sort().join(','),
+		[selectedGoalTypes],
+	);
+
+	useEffect(() => {
+		const prev = prevGoalTypesKeyRef.current;
+		if (prev !== goalTypesKey) {
+			if (prev !== '') {
+				setTargetDateIsCustom(false);
+			}
+			prevGoalTypesKeyRef.current = goalTypesKey;
+		}
+	}, [goalTypesKey]);
+
+	const minGoalTargetDate = useMemo(() => {
+		const t = new Date();
+		return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+	}, []);
+
+	const computeSuggestedTargetDate = useCallback((): Date | undefined => {
+		if (selectedGoalTypes.length === 0) return undefined;
+		const isWr = selectedGoalTypes.some(
+			(t) => t === 'WEIGHT_LOSS' || t === 'MUSCLE_BUILDING',
+		);
+		if (isWr) {
+			const c = parseFloat(currentWeight.trim().replace(/,/g, '.'));
+			const tw = parseFloat(targetWeight.trim().replace(/,/g, '.'));
+			if (!Number.isFinite(c) || !Number.isFinite(tw) || c <= 0 || tw <= 0) return undefined;
+		}
+		const today = new Date();
+		const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+		const maxMonths = computeGoalTargetMonths({
+			goalTypes: selectedGoalTypes,
+			physiqueGoalType: user?.membershipDetails?.physiqueGoalType,
+			currentWeight,
+			targetWeight,
+		});
+		if (!maxMonths) return undefined;
+		let recommended = addCalendarMonths(start, maxMonths);
+		if (recommended.getTime() > goalTargetDateMaximum.getTime()) {
+			recommended = new Date(goalTargetDateMaximum);
+		}
+		return recommended;
+	}, [
+		selectedGoalTypes,
+		currentWeight,
+		targetWeight,
+		user?.membershipDetails?.physiqueGoalType,
+		goalTargetDateMaximum,
+	]);
+
 	useEffect(() => {
 		if (selectedGoalTypes.length === 0) {
 			setTargetDate(undefined);
@@ -565,25 +716,14 @@ const MemberProgress = () => {
 			return;
 		}
 
-		const today = new Date();
-		const start = new Date(
-			today.getFullYear(),
-			today.getMonth(),
-			today.getDate(),
-		);
-
-		const maxMonths = computeGoalTargetMonths({
-			goalTypes: selectedGoalTypes,
-			physiqueGoalType: user?.membershipDetails?.physiqueGoalType,
-			currentWeight,
-			targetWeight,
-		});
-		if (!maxMonths) return;
-
-		let recommended = addCalendarMonths(start, maxMonths);
-		if (recommended.getTime() > goalTargetDateMaximum.getTime()) {
-			recommended = new Date(goalTargetDateMaximum);
+		if (targetDateIsCustom) {
+			setErrors((prev) => ({ ...prev, targetDate: '' }));
+			return;
 		}
+
+		const recommended = computeSuggestedTargetDate();
+		if (!recommended) return;
+
 		setTargetDate(recommended);
 		setErrors((prev) => ({ ...prev, targetDate: '' }));
 	}, [
@@ -594,9 +734,10 @@ const MemberProgress = () => {
 		goalTargetDateMaximum,
 		isWeightRelatedGoalPick,
 		bothWeightsValidForEstimate,
+		targetDateIsCustom,
+		computeSuggestedTargetDate,
 	]);
 
-	// Simple weight chart visualization
 	const renderWeightChart = () => {
 		if (progressPoints.length === 0) {
 			return (
@@ -1003,9 +1144,7 @@ const MemberProgress = () => {
 									</Text>
 								) : (
 									<Text className='text-text-secondary text-[11px] mt-1'>
-										Weight loss / muscle building: after you enter both weights,
-										your target date is calculated. Other goal types get a date as
-										soon as you pick them (uses profile body type).
+										Suggested date from your picks and profile; tap the date field to change it.
 									</Text>
 								)}
 							</View>
@@ -1060,51 +1199,68 @@ const MemberProgress = () => {
 								</>
 							)}
 
-							<View className='mb-4'>
-								<Text className='text-text-secondary text-sm font-medium mb-2'>
-									Target date *
-								</Text>
-								<View
-									className={`rounded-lg p-4 border bg-input ${
-										errors.targetDate ? 'border-red-500' : 'border-input'
-									}`}
-								>
-									<Text
-										className={`text-base ${
-											showTargetDateEstimating || !targetDate
-												? 'text-placeholder'
-												: 'text-text-primary'
-										}`}
-									>
-										{selectedGoalTypes.length === 0
-											? 'Select at least one goal type'
-											: showTargetDateEstimating
-												? 'Estimating...'
-												: targetDate
-													? targetDate.toLocaleDateString('en-US', {
-															weekday: 'long',
-															year: 'numeric',
-															month: 'long',
-															day: 'numeric',
-														})
-													: '—'}
+							{selectedGoalTypes.length === 0 ? (
+								<View className='mb-4'>
+									<Text className='text-text-secondary text-sm font-medium mb-2'>
+										Target date *
+									</Text>
+									<View className='rounded-lg p-4 border border-input bg-input'>
+										<Text className='text-base text-placeholder'>
+											Select at least one goal type first
+										</Text>
+									</View>
+								</View>
+							) : showTargetDateEstimating ? (
+								<View className='mb-4'>
+									<Text className='text-text-secondary text-sm font-medium mb-2'>
+										Target date *
+									</Text>
+									<View className='rounded-lg p-4 border border-input bg-input'>
+										<Text className='text-base text-placeholder'>Estimating…</Text>
+									</View>
+									<Text className='text-text-secondary text-[11px] mt-1'>
+										Enter both weights (kg) to see a suggested date—then you can adjust it.
 									</Text>
 								</View>
-								{errors.targetDate ? (
-									<Text className='text-red-500 text-sm mt-1'>{errors.targetDate}</Text>
-								) : showTargetDateEstimating ? (
+							) : (
+								<View className='mb-4'>
+									<DatePicker
+										label='Target date *'
+										sheetTitle='When do you want to achieve this?'
+										value={targetDate}
+										onChange={(date) => {
+											setTargetDate(date);
+											setTargetDateIsCustom(true);
+											setErrors((prev) => ({ ...prev, targetDate: '' }));
+										}}
+										placeholder='Tap to choose your target date'
+										error={errors.targetDate}
+										minimumDate={minGoalTargetDate}
+										maximumDate={goalTargetDateMaximum}
+									/>
+									{targetDateIsCustom ? (
+										<TouchableOpacity
+											onPress={() => {
+												const suggested = computeSuggestedTargetDate();
+												if (suggested) {
+													setTargetDate(suggested);
+													setTargetDateIsCustom(false);
+												}
+											}}
+											className='mt-2 self-start'
+											activeOpacity={0.7}
+										>
+											<Text className='text-[#F9C513] text-sm font-semibold'>
+												Use app suggested date
+											</Text>
+										</TouchableOpacity>
+									) : null}
 									<Text className='text-text-secondary text-[11px] mt-1'>
-										Enter valid current and target weight (kg) to calculate your
-										target date.
+										Tap to change (today–5 yrs). Editing goal types updates the suggestion unless
+										you picked a custom date.
 									</Text>
-								) : (
-									<Text className='text-text-secondary text-[11px] mt-1'>
-										Based on goal type, your body type (profile), and weight
-										difference when applicable. Update profile or weights to refine
-										it.
-									</Text>
-								)}
-							</View>
+								</View>
+							)}
 
 							<GradientButton
 								onPress={handleSubmit}
@@ -1332,6 +1488,10 @@ const MemberProgress = () => {
 									<Text className='text-xl font-bold text-text-primary mb-4'>
 										Your session feedback to coach
 									</Text>
+									<Text className='text-text-secondary text-sm mb-3 -mt-2'>
+										Each session can only be rated once. Below is what you submitted (stars +
+										why you rated that way).
+									</Text>
 									{mySessionRatingsList.length > 0 ? (
 										mySessionRatingsList.map((mr: any) => (
 											<View
@@ -1384,7 +1544,7 @@ const MemberProgress = () => {
 												{mr.comment ? (
 													<View className='mt-1'>
 														<Text className='text-text-secondary text-xs mb-1'>
-															Your comment
+															Why you rated this way
 														</Text>
 														<Text className='text-text-primary text-sm'>{mr.comment}</Text>
 													</View>
@@ -1467,7 +1627,7 @@ const MemberProgress = () => {
 															Rating:
 														</Text>
 														<View className='flex-row items-center'>
-															{Array.from({ length: 10 }).map((_, index) => (
+															{Array.from({ length: 5 }).map((_, index) => (
 																<Ionicons
 																	key={index}
 																	name={
@@ -1480,7 +1640,7 @@ const MemberProgress = () => {
 																/>
 															))}
 															<Text className='text-text-primary font-semibold ml-2'>
-																{rating.rating}/10
+																{rating.rating}/5
 															</Text>
 														</View>
 													</View>
@@ -1693,7 +1853,7 @@ const MemberProgress = () => {
 												{memberCoachRatingForLog.comment ? (
 													<View className='mt-2'>
 														<Text className='text-text-secondary text-xs mb-1'>
-															Your comment
+															Why you rated this way
 														</Text>
 														<Text className='text-text-primary text-sm'>
 															{memberCoachRatingForLog.comment}
@@ -1702,10 +1862,94 @@ const MemberProgress = () => {
 												) : null}
 											</View>
 										) : (
-											<Text className='text-text-secondary text-sm'>
-												No coach rating submitted for this session yet. If you just finished it,
-												submit your feedback from Schedule after completing the session.
-											</Text>
+											<View>
+												<Text className='text-text-secondary text-sm mb-3'>
+													No rating yet. Add one now (one submission only).
+												</Text>
+												<Text className='text-text-primary font-semibold mb-2'>
+													Stars <Text className='text-red-500'>*</Text>
+												</Text>
+												<View className='flex-row justify-center gap-2 mb-2'>
+													{[1, 2, 3, 4, 5].map((star) => (
+														<TouchableOpacity
+															key={star}
+															onPress={() => setPendingCoachRating(star)}
+															className='p-1'
+															accessibilityLabel={`${star} star${star > 1 ? 's' : ''}`}
+														>
+															<Ionicons
+																name={star <= pendingCoachRating ? 'star' : 'star-outline'}
+																size={28}
+																color='#F9C513'
+															/>
+														</TouchableOpacity>
+													))}
+												</View>
+												<Text className='text-text-secondary text-center text-xs mb-3'>
+													1 = Lowest, 5 = Highest satisfaction
+												</Text>
+												<Text className='text-text-primary font-semibold mb-2'>
+													Why this rating? <Text className='text-red-500'>*</Text>
+												</Text>
+												<TextInput
+													className={`bg-bg-primary rounded-lg p-3 text-text-primary text-sm border ${
+														pendingCoachCommentError ? 'border-red-500' : 'border-[#F9C513]/50'
+													}`}
+													style={{ borderWidth: 0.5, minHeight: 90, textAlignVertical: 'top' }}
+													placeholder='Tell us why'
+													placeholderTextColor='#8E8E93'
+													value={pendingCoachComment}
+													onChangeText={(t) => {
+														setPendingCoachComment(t);
+														setPendingCoachCommentError('');
+													}}
+													multiline
+													numberOfLines={4}
+												/>
+												<View className='flex-row justify-between items-start mt-1 mb-3'>
+													{pendingCoachCommentError ? (
+														<Text className='text-red-500 text-xs flex-1 mr-2'>
+															{pendingCoachCommentError}
+														</Text>
+													) : (
+														<View className='flex-1 mr-2' />
+													)}
+													<Text
+														className={`text-xs ${
+															pendingCoachComment.trim().length >=
+															MIN_COACH_RATING_COMMENT_LENGTH
+																? 'text-[#34C759]'
+																: 'text-text-secondary'
+														}`}
+													>
+														{pendingCoachComment.trim().length}/
+														{MIN_COACH_RATING_COMMENT_LENGTH}
+													</Text>
+												</View>
+												<TouchableOpacity
+													className='bg-[#F9C513] rounded-lg p-3 items-center'
+													onPress={submitCoachRatingForSelectedLog}
+													disabled={
+														creatingCoachRating ||
+														pendingCoachRating === 0 ||
+														pendingCoachComment.trim().length <
+															MIN_COACH_RATING_COMMENT_LENGTH
+													}
+													style={{
+														opacity:
+															creatingCoachRating ||
+															pendingCoachRating === 0 ||
+															pendingCoachComment.trim().length <
+																MIN_COACH_RATING_COMMENT_LENGTH
+																? 0.5
+																: 1,
+													}}
+												>
+													<Text className='text-black font-semibold'>
+														{creatingCoachRating ? 'Submitting...' : 'Submit feedback'}
+													</Text>
+												</TouchableOpacity>
+											</View>
 										)}
 									</View>
 
@@ -1759,7 +2003,7 @@ const MemberProgress = () => {
 													<View className='flex-row items-center mb-2'>
 														<Text className='text-text-secondary text-sm mr-2'>Rating:</Text>
 														<View className='flex-row items-center'>
-															{Array.from({ length: 10 }).map((_, index) => (
+															{Array.from({ length: 5 }).map((_, index) => (
 																<Ionicons
 																	key={index}
 																	name={
@@ -1770,7 +2014,7 @@ const MemberProgress = () => {
 																/>
 															))}
 															<Text className='text-text-primary font-semibold ml-2'>
-																{rating.rating}/10
+																{rating.rating}/5
 															</Text>
 														</View>
 													</View>

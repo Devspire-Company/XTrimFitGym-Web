@@ -6,10 +6,7 @@ import {
 	MemberMembershipModalProvider,
 	useMemberMembershipModal,
 } from '@/contexts/MemberMembershipModalContext';
-import {
-	memberHasActiveGymMembership,
-	memberNeedsFacilityBiometric,
-} from '@/utils/memberMembership';
+import { memberHasActiveGymMembership } from '@/utils/memberMembership';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
@@ -20,7 +17,6 @@ const MemberLayoutContent = () => {
 	const insets = useSafeAreaInsets();
 	const { user } = useAuth();
 	const hasMembership = memberHasActiveGymMembership(user);
-	const needsFacilityBiometric = memberNeedsFacilityBiometric(user);
 	const { openMembershipRequired } = useMemberMembershipModal();
 
 	const tabbarHeight =
@@ -33,8 +29,6 @@ const MemberLayoutContent = () => {
 			if (!hasMembership) {
 				e.preventDefault();
 				openMembershipRequired();
-			} else if (needsFacilityBiometric) {
-				e.preventDefault();
 			}
 		},
 	};

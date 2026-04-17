@@ -12,6 +12,7 @@ import {
 import { CREATE_PROGRESS_RATING_MUTATION } from '@/graphql/mutations';
 import {
 	GET_ALL_CLIENT_GOALS_QUERY,
+	GET_PROGRESS_RATINGS_QUERY,
 	GET_SESSION_LOGS_FOR_RATING_QUERY,
 	GET_USERS_QUERY,
 } from '@/graphql/queries';
@@ -50,12 +51,13 @@ const CoachProgress = () => {
 	const [showRatingModal, setShowRatingModal] = useState(false);
 	const [startDate, setStartDate] = useState<Date | undefined>();
 	const [endDate, setEndDate] = useState<Date | undefined>();
-	const [rating, setRating] = useState('');
+	const [rating, setRating] = useState(0);
 	const [comment, setComment] = useState('');
 	const [verdict, setVerdict] = useState('');
 	const [selectedSessionLogs, setSelectedSessionLogs] = useState<string[]>([]);
 	const [showImageModal, setShowImageModal] = useState(false);
 	const [selectedImages, setSelectedImages] = useState<any>(null);
+	const [lockedExistingRating, setLockedExistingRating] = useState<any>(null);
 	const [showRatingSuccess, setShowRatingSuccess] = useState(false);
 	const [alertModal, setAlertModal] = useState<{
 		visible: boolean;
@@ -100,6 +102,22 @@ const CoachProgress = () => {
 		}
 	);
 
+	const {
+		data: progressRatingsData,
+		refetch: refetchProgressRatings,
+		loading: loadingProgressRatings,
+	} = useQuery(
+		GET_PROGRESS_RATINGS_QUERY,
+		{
+			variables: {
+				clientId: selectedClient?.id || '',
+				goalId: selectedGoal?.id || '',
+			},
+			skip: !selectedClient?.id || !selectedGoal?.id || !showRatingModal,
+			fetchPolicy: 'network-only',
+		}
+	);
+
 	const [createRating, { loading: creatingRating }] = useMutation(
 		CREATE_PROGRESS_RATING_MUTATION,
 		{
@@ -107,7 +125,20 @@ const CoachProgress = () => {
 				setShowRatingSuccess(true);
 				closeRatingModal();
 			},
-			onError: (error) => {
+			onError: async (error) => {
+				const msg = error.message || '';
+				if (msg.toLowerCase().includes('overlapping date range')) {
+					setLockedExistingRating({ id: `locked-${selectedGoal?.id || 'rating'}` });
+					await refetchProgressRatings();
+					setAlertModal({
+						visible: true,
+						title: 'Existing rating found',
+						message:
+							'A rating already exists in this date range. It is now view-only.',
+						variant: 'warning',
+					});
+					return;
+				}
 				setAlertModal({ visible: true, title: 'Error', message: error.message, variant: 'danger' });
 			},
 		}
@@ -118,7 +149,6 @@ const CoachProgress = () => {
 		refetchGoals();
 	}, [refetchClients, refetchGoals]);
 
-	// Default date range to last 30 days when opening the rating modal
 	useEffect(() => {
 		if (showRatingModal) {
 			const today = new Date();
@@ -148,7 +178,6 @@ const CoachProgress = () => {
 		);
 	}, [clientsData, user]);
 
-	// Get goals for selected client where coach is assigned
 	const clientGoals = useMemo(() => {
 		if (!selectedClient || !(goalsData as any)?.getAllClientGoals) {
 			return [];
@@ -160,15 +189,35 @@ const CoachProgress = () => {
 	}, [selectedClient, goalsData, user]);
 
 	const sessionLogs = (sessionLogsData as any)?.getSessionLogsForRating || [];
+	const allProgressRatings = (progressRatingsData as any)?.getProgressRatings || [];
+
+	const existingOverlappingRating = useMemo(() => {
+		if (!startDate || !endDate) return null;
+		const startMs = startDate.getTime();
+		const endMs = endDate.getTime();
+		const overlaps = allProgressRatings
+			.filter((r: any) => {
+				const rs = new Date(r.startDate).getTime();
+				const re = new Date(r.endDate).getTime();
+				if (!Number.isFinite(rs) || !Number.isFinite(re)) return false;
+				return startMs <= re && endMs >= rs;
+			})
+			.sort((a: any, b: any) => {
+				const ams = new Date(a.updatedAt || a.createdAt || 0).getTime();
+				const bms = new Date(b.updatedAt || b.createdAt || 0).getTime();
+				return bms - ams;
+			});
+		return overlaps[0] || null;
+	}, [allProgressRatings, endDate, startDate]);
 
 	const resetRatingForm = () => {
 		setStartDate(undefined);
 		setEndDate(undefined);
-		setRating('');
+		setRating(0);
 		setComment('');
 		setVerdict('');
 		setSelectedSessionLogs([]);
-		// Don't clear selectedGoal here - it's needed for the rating form
+		setLockedExistingRating(null);
 	};
 
 	const closeRatingModal = () => {
@@ -180,7 +229,6 @@ const CoachProgress = () => {
 	const handleStartRating = (goal: any) => {
 		// Reset form fields first
 		resetRatingForm();
-		// Then set the goal and open the modal
 		setSelectedGoal(goal);
 		setShowClientGoals(false);
 		setShowRatingModal(true);
@@ -211,8 +259,8 @@ const CoachProgress = () => {
 			return;
 		}
 
-		if (!rating || parseInt(rating) < 1 || parseInt(rating) > 10) {
-			showAlert('Error', 'Please enter a valid rating between 1 and 10');
+		if (rating < 1 || rating > 5) {
+			showAlert('Error', 'Please choose a valid rating between 1 and 5');
 			return;
 		}
 
@@ -226,7 +274,15 @@ const CoachProgress = () => {
 			return;
 		}
 
-		// Session logs are optional - can be empty array
+		if (isExistingRatingViewOnly) {
+			showAlert(
+				'Already rated',
+				'A progress rating already exists for this range. It is view-only.',
+				'warning'
+			);
+			return;
+		}
+
 		createRating({
 			variables: {
 				input: {
@@ -234,7 +290,7 @@ const CoachProgress = () => {
 					goalId: selectedGoal.id,
 					startDate: startDate.toISOString(),
 					endDate: endDate.toISOString(),
-					rating: parseInt(rating),
+					rating,
 					comment: comment.trim(),
 					verdict: verdict,
 					sessionLogIds:
@@ -243,6 +299,23 @@ const CoachProgress = () => {
 			},
 		});
 	};
+
+	useEffect(() => {
+		if (!showRatingModal || !existingOverlappingRating) return;
+		const existingRatingValue = Number(existingOverlappingRating.rating) || 0;
+		setRating(Math.min(5, Math.max(0, existingRatingValue)));
+		setComment(existingOverlappingRating.comment || '');
+		setVerdict(existingOverlappingRating.verdict || '');
+		setSelectedSessionLogs(existingOverlappingRating.sessionLogIds || []);
+	}, [showRatingModal, existingOverlappingRating?.id]);
+
+	const effectiveExistingRating = existingOverlappingRating || lockedExistingRating;
+	const isExistingRatingViewOnly = Boolean(effectiveExistingRating?.id);
+
+	const verdictLabel = useMemo(() => {
+		const hit = verdictOptions.find((v) => v.value === verdict);
+		return hit?.label || verdict || '—';
+	}, [verdict]);
 
 	const toggleSessionLogSelection = (logId: string) => {
 		setSelectedSessionLogs((prev) => {
@@ -499,6 +572,18 @@ const CoachProgress = () => {
 								</View>
 							</View>
 
+							{isExistingRatingViewOnly ? (
+								<View
+									className='mb-6 rounded-lg border border-[#F9C513]/40 bg-bg-darker p-3'
+									style={{ borderWidth: 0.5 }}
+								>
+									<Text className='text-[#F9C513] text-xs'>
+										This date range already has a saved progress rating. You can view it
+										here, but you cannot edit or submit again.
+									</Text>
+								</View>
+							) : null}
+
 							{/* Session Logs with Images */}
 							{sessionLogs.length > 0 && (
 								<View className='mb-6'>
@@ -520,7 +605,12 @@ const CoachProgress = () => {
 											const isSelected = selectedSessionLogs.includes(item.id);
 											return (
 												<TouchableOpacity
-													onPress={() => toggleSessionLogSelection(item.id)}
+													onPress={() => {
+														if (!isExistingRatingViewOnly) {
+															toggleSessionLogSelection(item.id);
+														}
+													}}
+													disabled={isExistingRatingViewOnly}
 													className={`bg-bg-darker rounded-xl p-4 mb-3 border ${
 														isSelected ? 'border-[#F9C513]' : 'border-[#2C2C2E]'
 													}`}
@@ -589,9 +679,12 @@ const CoachProgress = () => {
 													{item.progressImages && (
 														<TouchableOpacity
 															onPress={() => {
-																setSelectedImages(item.progressImages);
-																setShowImageModal(true);
+																if (!isExistingRatingViewOnly) {
+																	setSelectedImages(item.progressImages);
+																	setShowImageModal(true);
+																}
 															}}
+															disabled={isExistingRatingViewOnly}
 															className='flex-row items-center mt-2'
 														>
 															<Ionicons
@@ -614,17 +707,43 @@ const CoachProgress = () => {
 							{/* Rating Input */}
 							<View className='mb-6'>
 								<Text className='text-text-primary font-semibold mb-2'>
-									Rating (1-10) <Text className='text-red-500'>*</Text>
+									Rating (1-5) <Text className='text-red-500'>*</Text>
 								</Text>
-								<TextInput
-									className='bg-bg-darker rounded-lg px-4 py-3 text-text-primary text-lg border border-[#F9C513]'
-									style={{ borderWidth: 0.5, paddingRight: 14 }}
-									placeholder='Enter rating (1-10)'
-									placeholderTextColor='#8E8E93'
-									value={rating}
-									onChangeText={setRating}
-									keyboardType='number-pad'
-								/>
+								<Text className='text-text-secondary text-sm mb-3'>
+									Tap stars to rate progress.
+								</Text>
+								<View className='flex-row flex-wrap justify-center mb-2'>
+									{Array.from({ length: 5 }).map((_, index) => {
+										const star = index + 1;
+										return (
+											<TouchableOpacity
+												key={star}
+												onPress={() => {
+													if (!isExistingRatingViewOnly) {
+														setRating(star);
+													}
+												}}
+												className='p-1'
+												accessibilityLabel={`${star} out of 5`}
+												disabled={isExistingRatingViewOnly}
+											>
+												<Ionicons
+													name={star <= rating ? 'star' : 'star-outline'}
+													size={30}
+													color='#F9C513'
+												/>
+											</TouchableOpacity>
+										);
+									})}
+								</View>
+								<Text className='text-text-secondary text-center text-xs'>
+									1 = Lowest, 5 = Highest progress
+								</Text>
+								{rating > 0 ? (
+									<Text className='text-text-primary text-center mt-2 font-semibold'>
+										{rating} out of 5
+									</Text>
+								) : null}
 							</View>
 
 							{/* Comment Input */}
@@ -644,6 +763,8 @@ const CoachProgress = () => {
 									placeholderTextColor='#8E8E93'
 									value={comment}
 									onChangeText={setComment}
+									editable={!isExistingRatingViewOnly}
+									selectTextOnFocus={!isExistingRatingViewOnly}
 									multiline
 									numberOfLines={4}
 								/>
@@ -654,25 +775,42 @@ const CoachProgress = () => {
 								<Text className='text-text-primary font-semibold mb-2'>
 									Final Verdict <Text className='text-red-500'>*</Text>
 								</Text>
-								<Select
-									options={verdictOptions}
-									value={verdict}
-									onChange={setVerdict}
-									placeholder='Select verdict'
-								/>
+								{isExistingRatingViewOnly ? (
+									<View
+										className='bg-bg-darker rounded-lg px-4 py-3 border border-[#F9C513]/40'
+										style={{ borderWidth: 0.5, minHeight: 48, justifyContent: 'center' }}
+									>
+										<Text className='text-text-primary'>{verdictLabel}</Text>
+									</View>
+								) : (
+									<Select
+										options={verdictOptions}
+										value={verdict}
+										onChange={(v) => {
+											if (!isExistingRatingViewOnly) {
+												setVerdict(v);
+											}
+										}}
+										placeholder='Select verdict'
+									/>
+								)}
 							</View>
 
 							{/* Submit Button */}
-							<GradientButton
-								onPress={handleSubmitRating}
-								loading={creatingRating}
-								disabled={creatingRating}
-								className='mt-4'
-							>
-								{creatingRating
-									? 'Creating Rating...'
-									: 'Create Progress Rating'}
-							</GradientButton>
+							{isExistingRatingViewOnly ? (
+								<GradientButton onPress={closeRatingModal} className='mt-4'>
+									Done
+								</GradientButton>
+							) : (
+								<GradientButton
+									onPress={handleSubmitRating}
+									loading={creatingRating || loadingProgressRatings}
+									disabled={creatingRating || loadingProgressRatings}
+									className='mt-4'
+								>
+									{creatingRating ? 'Creating Rating...' : 'Create Progress Rating'}
+								</GradientButton>
+							)}
 						</ScrollView>
 					</View>
 				</View>

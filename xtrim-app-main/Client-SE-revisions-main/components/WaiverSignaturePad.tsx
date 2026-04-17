@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Keyboard, Text, TouchableOpacity, View } from 'react-native';
 import SignatureScreen, {
 	type SignatureViewRef,
 } from 'react-native-signature-canvas';
@@ -34,6 +34,8 @@ type Props = {
 	onChange: (dataUri: string) => void;
 	disabled?: boolean;
 	height?: number;
+	/** While the user is drawing, parent ScrollViews can set scrollEnabled=false to avoid stealing touches. */
+	onDrawingChange?: (drawing: boolean) => void;
 };
 
 export function WaiverSignaturePad({
@@ -43,11 +45,19 @@ export function WaiverSignaturePad({
 	onChange,
 	disabled = false,
 	height = 200,
+	onDrawingChange,
 }: Props) {
 	const ref = useRef<SignatureViewRef>(null);
 
+	const handleBegin = () => {
+		if (disabled) return;
+		Keyboard.dismiss();
+		onDrawingChange?.(true);
+	};
+
 	const handleEnd = () => {
 		if (disabled) return;
+		onDrawingChange?.(false);
 		ref.current?.readSignature();
 	};
 
@@ -69,6 +79,7 @@ export function WaiverSignaturePad({
 			>
 				<SignatureScreen
 					ref={ref}
+					onBegin={handleBegin}
 					onOK={(sig) => onChange(sig)}
 					onEmpty={() => onChange('')}
 					onEnd={handleEnd}
@@ -80,6 +91,10 @@ export function WaiverSignaturePad({
 					scrollable={false}
 					nestedScrollEnabled
 					androidLayerType='software'
+					webviewProps={{
+						nestedScrollEnabled: true,
+						overScrollMode: 'never',
+					}}
 				/>
 			</View>
 			<View className='flex-row items-center justify-between flex-wrap gap-2'>

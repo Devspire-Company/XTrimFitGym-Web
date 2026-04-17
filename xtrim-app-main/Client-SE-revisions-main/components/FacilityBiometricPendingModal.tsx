@@ -6,23 +6,26 @@ import { Modal, StyleSheet, Text, View } from 'react-native';
 
 type Props = {
 	visible: boolean;
-	checking: boolean;
-	onCheckAgain: () => void;
+	onGotIt: () => void;
 };
 
 const BODY =
-	'Your membership is active. Please visit the front desk to register your gym access biometric. This screen will update automatically when staff marks enrollment complete.';
+	'Your membership is active. On your next visit, stop by the front desk so staff can register your gym door biometric. The app will pick that up in the background—you do not need to do anything else here.';
 
 /**
- * Full-screen gate after payment: cannot dismiss until the server clears biometric pending.
+ * One-time style reminder after payment; member can continue using the app.
  */
 export function FacilityBiometricPendingModal({
 	visible,
-	checking,
-	onCheckAgain,
+	onGotIt,
 }: Props) {
 	return (
-		<Modal visible={visible} animationType='fade' transparent onRequestClose={() => {}}>
+		<Modal
+			visible={visible}
+			animationType='fade'
+			transparent
+			onRequestClose={onGotIt}
+		>
 			<View style={styles.root}>
 				<BlurView intensity={28} tint='default' style={StyleSheet.absoluteFill} />
 				<View
@@ -36,18 +39,12 @@ export function FacilityBiometricPendingModal({
 							</View>
 						</View>
 						<Text className='text-text-primary text-2xl font-bold text-center mb-4'>
-							Biometric enrollment
+							Quick reminder
 						</Text>
 						<Text className='text-text-secondary text-base text-center leading-6 mb-6'>
 							{BODY}
 						</Text>
-						<GradientButton
-							onPress={onCheckAgain}
-							disabled={checking}
-							loading={checking}
-						>
-							{checking ? 'Checking…' : 'Check again'}
-						</GradientButton>
+						<GradientButton onPress={onGotIt}>Got it</GradientButton>
 					</View>
 				</View>
 			</View>

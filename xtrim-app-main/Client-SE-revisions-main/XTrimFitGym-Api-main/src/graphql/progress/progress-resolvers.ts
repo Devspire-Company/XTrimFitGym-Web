@@ -248,8 +248,8 @@ export default {
 			}
 
 			// Validate rating
-			if (input.rating < 1 || input.rating > 10) {
-				throw new Error('Rating must be between 1 and 10');
+			if (input.rating < 1 || input.rating > 5) {
+				throw new Error('Rating must be between 1 and 5');
 			}
 
 			// Check if a progress rating already exists for the same client, goal, and overlapping date range
@@ -344,8 +344,8 @@ export default {
 
 			const updateData: any = {};
 			if (input.rating !== undefined) {
-				if (input.rating < 1 || input.rating > 10) {
-					throw new Error('Rating must be between 1 and 10');
+				if (input.rating < 1 || input.rating > 5) {
+					throw new Error('Rating must be between 1 and 5');
 				}
 				updateData.rating = input.rating;
 			}

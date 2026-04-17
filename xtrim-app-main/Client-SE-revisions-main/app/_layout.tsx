@@ -1,6 +1,7 @@
 import { ClerkTokenBridge } from '@/components/ClerkTokenBridge';
 import { AuthProvider } from '@/contexts/AuthContext';
-import client from '@/lib/apollo-client';
+import client, { API_URL } from '@/lib/apollo-client';
+import { logClerkApiPairingHint } from '@/lib/clerk-api-pairing-hint';
 import { clerkTokenCache } from '@/lib/clerk-token-cache';
 import { persistor, store } from '@/store';
 import { ApolloProvider } from '@apollo/client/react';
@@ -9,7 +10,7 @@ import Constants from 'expo-constants';
 import { Stack } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -43,8 +44,13 @@ function LoadingScreen() {
 
 LoadingScreen.displayName = 'LoadingScreen';
 
-// Explicitly provide SafeAreaProvider so NativeWind can properly detect and hijack it
-// This fixes the "Cannot read property 'displayName' of undefined" error
+function ClerkDevPairingLogger({ publishableKey }: { publishableKey: string }) {
+	useEffect(() => {
+		logClerkApiPairingHint(API_URL, publishableKey);
+	}, [publishableKey]);
+	return null;
+}
+
 export default function RootLayout() {
 	if (!clerkPublishableKey?.trim()) {
 		return (
@@ -81,6 +87,7 @@ export default function RootLayout() {
 							publishableKey={clerkPublishableKey}
 							tokenCache={clerkTokenCache}
 						>
+							<ClerkDevPairingLogger publishableKey={clerkPublishableKey} />
 							<ApolloProvider client={client}>
 								<ClerkTokenBridge />
 								<AuthProvider>

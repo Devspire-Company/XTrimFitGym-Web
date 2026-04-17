@@ -8,22 +8,28 @@ import {
 	memberHasActiveGymMembership,
 	memberNeedsFacilityBiometric,
 } from '@/utils/memberMembership';
+import { storage } from '@/utils/storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 
 const ME_POLL_MS = 12_000;
 
+const facilityBiometricReminderStorageKey = (userId: string) =>
+	`facilityBiometricReminderAck:v1:${userId}`;
+
 /**
- * Polls `me` while membership or facility biometric enrollment is pending.
- * After payment (membership assigned), a non-dismissible biometric gate runs until the server marks enrollment complete.
+ * Polls `me` while membership is inactive or facility biometric is still being set up at the gym.
+ * Shows a dismissible front-desk reminder at most once per outstanding enrollment (persisted per user).
+ * Server clears `facilityBiometricEnrollmentComplete` when door attendance exists; `me` runs that sync.
  */
 export function MemberMeSyncAndWelcome() {
 	const { user } = useAuth();
 	const dispatch = useDispatch();
 	const router = useRouter();
 	const [showApprovedWelcome, setShowApprovedWelcome] = useState(false);
-	const [manualMeCheck, setManualMeCheck] = useState(false);
+	const [biometricReminderDismissed, setBiometricReminderDismissed] =
+		useState(false);
 	const prevHasMembershipRef = useRef<boolean | null>(null);
 	const prevNeedsBiometricRef = useRef<boolean | null>(null);
 	const seededRef = useRef(false);
@@ -57,6 +63,29 @@ export function MemberMeSyncAndWelcome() {
 	}, [skipMe]);
 
 	useEffect(() => {
+		if (!needsBiometric && user?.id) {
+			setBiometricReminderDismissed(false);
+			void storage.removeItem(facilityBiometricReminderStorageKey(user.id));
+		}
+	}, [needsBiometric, user?.id]);
+
+	useEffect(() => {
+		if (!user?.id || user.role !== 'member') return;
+		let cancelled = false;
+		void (async () => {
+			try {
+				const v = await storage.getItem(facilityBiometricReminderStorageKey(user.id!));
+				if (!cancelled && v === '1') setBiometricReminderDismissed(true);
+			} catch {
+				/* ignore */
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [user?.id, user?.role]);
+
+	useEffect(() => {
 		if (skipMe) return;
 
 		if (!seededRef.current) {
@@ -85,15 +114,15 @@ export function MemberMeSyncAndWelcome() {
 		router.replace('/(member)/dashboard');
 	};
 
-	const onBiometricCheckAgain = async () => {
-		setManualMeCheck(true);
-		try {
-			const res = await refetch();
+	const onBiometricReminderGotIt = () => {
+		void refetch().then((res) => {
 			if (res.data?.me) {
 				dispatch(setUser(convertGraphQLUser(res.data.me)));
 			}
-		} finally {
-			setManualMeCheck(false);
+		});
+		setBiometricReminderDismissed(true);
+		if (user?.id) {
+			void storage.setItem(facilityBiometricReminderStorageKey(user.id), '1');
 		}
 	};
 
@@ -102,9 +131,10 @@ export function MemberMeSyncAndWelcome() {
 	return (
 		<>
 			<FacilityBiometricPendingModal
-				visible={hasMembership && needsBiometric}
-				checking={manualMeCheck}
-				onCheckAgain={onBiometricCheckAgain}
+				visible={
+					hasMembership && needsBiometric && !biometricReminderDismissed
+				}
+				onGotIt={onBiometricReminderGotIt}
 			/>
 			<PostOnboardingWelcomeModal
 				visible={showApprovedWelcome}

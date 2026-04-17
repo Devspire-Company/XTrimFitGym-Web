@@ -90,6 +90,12 @@ export const CREATE_USER_MUTATION = gql`
 	}
 `;
 
+export const REQUEST_DEV_EMAIL_VERIFICATION_CODE_MUTATION = gql`
+	mutation RequestDevEmailVerificationCode($email: String!) {
+		requestDevEmailVerificationCode(email: $email)
+	}
+`;
+
 // Session mutations
 export const CREATE_SESSION_MUTATION = gql`
 	mutation CreateSession($input: CreateSessionInput!) {

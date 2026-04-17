@@ -24,7 +24,6 @@ const CoachAttendance = () => {
 	const [refreshing, setRefreshing] = useState(false);
 	const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
-	// Get user's attendanceId and convert to string for filtering
 	const attendanceId = user?.attendanceId?.toString();
 
 	useFocusEffect(
@@ -107,7 +106,6 @@ const CoachAttendance = () => {
 			return new Date(b).getTime() - new Date(a).getTime();
 		});
 
-		// Sort records within each date by time (newest first for display)
 		sortedDates.forEach((date) => {
 			grouped[date].sort((a, b) => {
 				const timeA = a.authTime || a.authDateTime?.split('T')[1] || '';
@@ -141,7 +139,6 @@ const CoachAttendance = () => {
 
 	const formatTime = (timeString?: string | null) => {
 		if (!timeString) return 'N/A';
-		// If time is in HH:MM:SS format, convert to 12-hour
 		if (timeString.includes(':')) {
 			const [hours, minutes] = timeString.split(':');
 			const hour = parseInt(hours);

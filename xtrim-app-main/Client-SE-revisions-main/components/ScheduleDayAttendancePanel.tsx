@@ -1,7 +1,9 @@
 import {
+	attendanceRecordSortMs,
 	attendanceRecordsForDay,
 	formatAttendanceClockLabel,
 	formatAttendanceDirectionLabel,
+	isAttendanceTimedOut,
 	type AttendanceRecordLike,
 } from '@/utils/attendanceCalendar';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,22 +30,21 @@ export function ScheduleDayAttendancePanel({
 	);
 
 	const sorted = useMemo(() => {
-		return [...dayRecords].sort((a, b) => {
-			const ta = a.authDateTime
-				? new Date(a.authDateTime).getTime()
-				: new Date(`${dayKey}T${a.authTime || '00:00:00'}`).getTime();
-			const tb = b.authDateTime
-				? new Date(b.authDateTime).getTime()
-				: new Date(`${dayKey}T${b.authTime || '00:00:00'}`).getTime();
-			return ta - tb;
-		});
+		return [...dayRecords].sort(
+			(a, b) => attendanceRecordSortMs(a, dayKey) - attendanceRecordSortMs(b, dayKey)
+		);
 	}, [dayRecords, dayKey]);
+
+	const hasCheckIns = sorted.length > 0;
+	const headerAccent = hasCheckIns ? '#34C759' : '#8E8E93';
 
 	return (
 		<View className='bg-bg-primary rounded-xl p-4 mb-4 border border-[#F9C513]/40' style={{ borderWidth: 0.5 }}>
 			<View className='flex-row items-center gap-2 mb-2'>
-				<Ionicons name='log-in-outline' size={20} color='#34C759' />
-				<Text className='text-text-primary font-semibold text-base'>
+				<Ionicons name='log-in-outline' size={20} color={headerAccent} />
+				<Text
+					className={`font-semibold text-base ${hasCheckIns ? 'text-text-primary' : 'text-text-secondary'}`}
+				>
 					Gym check-ins — {dayLabel}
 				</Text>
 			</View>
@@ -54,30 +55,38 @@ export function ScheduleDayAttendancePanel({
 						: 'No check-ins on this date.'}
 				</Text>
 			) : (
-				sorted.map((r, idx) => (
+				sorted.map((r, idx) => {
+					const isOut = isAttendanceTimedOut(r.direction);
+					const rowAccent = isOut ? '#EF4444' : '#34C759';
+					return (
 					<View
-						key={`${r.authDateTime || ''}-${idx}`}
+						key={r.id ? String(r.id) : `att-${r.authDateTime || ''}-${r.direction || ''}-${idx}`}
 						className={`flex-row items-start py-2 ${
 							idx < sorted.length - 1 ? 'border-b border-[#2C2C2E]' : ''
 						}`}
 					>
 						<View className='w-24 flex-shrink-0'>
-							<Text className='text-[#34C759] font-semibold text-sm'>
+							<Text className='font-semibold text-sm' style={{ color: rowAccent }}>
 								{formatAttendanceClockLabel(r)}
 							</Text>
 						</View>
 						<View className='flex-1'>
-							<Text className='text-text-primary text-sm font-medium'>
+							<Text className='text-sm font-medium' style={{ color: rowAccent }}>
 								{formatAttendanceDirectionLabel(r.direction)}
 							</Text>
 							{r.deviceName ? (
-								<Text className='text-text-secondary text-xs mt-0.5' numberOfLines={1}>
+								<Text
+									className={`text-xs mt-0.5 ${isOut ? '' : 'text-text-secondary'}`}
+									style={isOut ? { color: '#F87171' } : undefined}
+									numberOfLines={1}
+								>
 									{r.deviceName}
 								</Text>
 							) : null}
 						</View>
 					</View>
-				))
+					);
+				})
 			)}
 		</View>
 	);
