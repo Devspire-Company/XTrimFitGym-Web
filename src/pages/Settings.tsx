@@ -5,6 +5,7 @@ import {
 	Sliders,
 	Bell,
 	Shield,
+	Database,
 	Key,
 	History,
 	LogOut,
@@ -22,6 +23,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import {
 	UPDATE_USER,
 	CREATE_USER,
+	DELETE_USER,
 	GET_USERS,
 	GET_USER,
 } from '@/graphql/operations';
@@ -52,6 +54,7 @@ export function SettingsPage() {
 		{ id: 'notifications', label: 'Notification Settings', icon: Bell },
 		{ id: 'security', label: 'Account Security', icon: Shield },
 		{ id: 'admin', label: 'Admin Accounts', icon: UserPlus },
+		{ id: 'manageData', label: 'Manage Data', icon: Database },
 	];
 
 	const toggleEditMode = (section: string) => {
@@ -140,6 +143,7 @@ export function SettingsPage() {
 					)}
 					{activeSection === 'security' && <SecuritySection />}
 					{activeSection === 'admin' && <AdminAccountsSection />}
+					{activeSection === 'manageData' && <ManageDataSection />}
 				</div>
 			</div>
 
@@ -1009,6 +1013,175 @@ function AdminAccountsSection() {
 								</button>
 							</div>
 						</form>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function ManageDataSection() {
+	const { user } = useAppSelector((state) => state.auth);
+	const dispatch = useAppDispatch();
+	const [isClearDataOpen, setIsClearDataOpen] = useState(false);
+	const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+	const { data: usersData, loading, refetch } = useQuery(GET_USERS, {
+		variables: { includeDisabled: true },
+	});
+	const [deleteUserMutation, { loading: isDeleting }] = useMutation(DELETE_USER);
+
+	const accounts = (usersData?.getUsers || []).filter((account): account is NonNullable<typeof account> => Boolean(account));
+	const selectedCount = selectedAccountIds.length;
+
+	const toggleAccount = (accountId: string) => {
+		setSelectedAccountIds((prev) =>
+			prev.includes(accountId) ? prev.filter((id) => id !== accountId) : [...prev, accountId],
+		);
+	};
+
+	const openClearData = () => {
+		setSelectedAccountIds([]);
+		setIsClearDataOpen(true);
+	};
+
+	const closeClearData = () => {
+		setSelectedAccountIds([]);
+		setIsClearDataOpen(false);
+	};
+
+	const handleClearSelectedData = async () => {
+		if (!selectedCount) {
+			dispatch(addToast({ type: 'error', message: 'Select at least one account to delete.' }));
+			return;
+		}
+
+		try {
+			await Promise.all(
+				selectedAccountIds.map((id) =>
+					deleteUserMutation({
+						variables: { id },
+					}),
+				),
+			);
+
+			dispatch(addToast({
+				type: 'success',
+				message: selectedCount === 1 ? '1 account deleted successfully.' : `${selectedCount} accounts deleted successfully.`,
+			}));
+			closeClearData();
+			await refetch();
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : 'Failed to clear selected account data';
+			dispatch(addToast({ type: 'error', message }));
+		}
+	};
+
+	return (
+		<div className="settings-section bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-8">
+			<div className="section-header-modern flex items-center justify-between mb-8 pb-6 border-b border-[var(--card-border)]">
+				<h2 className="section-title text-[1.75rem] font-semibold text-[var(--text-primary)] font-['Poppins'] m-0">
+					Manage Data
+				</h2>
+				<button
+					onClick={openClearData}
+					className="btn-edit-modern flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--primary-yellow)] text-[#1a1a1a] text-sm font-semibold transition-[var(--transition)] hover:bg-[#E6B800] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(249,197,19,0.3)]"
+				>
+					Clear Data
+				</button>
+			</div>
+
+			<div className="section-content flex flex-col gap-6">
+				<p className="text-[var(--text-secondary)] text-sm">
+					Use clear data to remove selected accounts. Only checked accounts will be deleted.
+				</p>
+			</div>
+
+			<div
+				className={`modal-overlay ${isClearDataOpen ? 'active' : ''}`}
+				onClick={closeClearData}
+			>
+				<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+					<div className="modal-body">
+						<div className="flex items-center justify-between mb-6">
+							<h3 className="text-xl font-semibold text-[var(--text-primary)] font-['Poppins']">
+								Clear Data
+							</h3>
+							<button
+								onClick={closeClearData}
+								className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-[var(--transition)]"
+							>
+								<X className="w-5 h-5" />
+							</button>
+						</div>
+
+						<p className="text-sm text-[var(--text-secondary)] mb-4">
+							Check the accounts you want to delete.
+						</p>
+
+						<div className="max-h-[320px] overflow-y-auto border border-[var(--card-border)] rounded-xl p-3 bg-[rgba(255,255,255,0.02)]">
+							{loading ? (
+								<p className="text-[var(--text-secondary)] text-center py-6">Loading accounts...</p>
+							) : accounts.length === 0 ? (
+								<p className="text-[var(--text-secondary)] text-center py-6">No accounts found.</p>
+							) : (
+								<div className="flex flex-col gap-2">
+									{accounts.map((account) => {
+										const isCurrentUser = account.id === user?.id;
+										return (
+											<label
+												key={account.id}
+												className={`flex items-center gap-3 p-3 border rounded-lg transition-[var(--transition)] ${
+													isCurrentUser
+														? 'border-[var(--card-border)] opacity-60 cursor-not-allowed'
+														: 'border-[var(--card-border)] hover:border-[rgba(249,197,19,0.45)] cursor-pointer'
+												}`}
+											>
+												<input
+													type="checkbox"
+													checked={selectedAccountIds.includes(account.id)}
+													onChange={() => toggleAccount(account.id)}
+													disabled={isCurrentUser || isDeleting}
+													className="w-4 h-4 accent-[var(--primary-yellow)]"
+												/>
+												<div className="flex-1">
+													<p className="text-[var(--text-primary)] text-sm font-medium">
+														{account.firstName} {account.lastName}
+													</p>
+													<p className="text-xs text-[var(--text-secondary)]">
+														{account.email}
+														{isCurrentUser ? ' (You)' : ''}
+													</p>
+												</div>
+											</label>
+										);
+									})}
+								</div>
+							)}
+						</div>
+
+						<div className="flex items-center justify-between mt-4">
+							<p className="text-xs text-[var(--text-secondary)]">
+								{selectedCount} selected
+							</p>
+							<div className="flex gap-4">
+								<button
+									type="button"
+									onClick={closeClearData}
+									disabled={isDeleting}
+									className="btn-discard px-6 py-3 bg-transparent text-[var(--primary-yellow)] border border-[var(--primary-yellow)] rounded-lg font-medium text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[var(--primary-yellow)] hover:text-[#1a1a1a] disabled:opacity-60 disabled:cursor-not-allowed"
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									onClick={handleClearSelectedData}
+									disabled={!selectedCount || isDeleting}
+									className="btn-save px-6 py-3 bg-[var(--primary-yellow)] text-[#1a1a1a] border-none rounded-lg font-semibold text-[0.95rem] cursor-pointer transition-[var(--transition)] hover:bg-[#E6B800] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(249,197,19,0.3)] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+								>
+									{isDeleting ? 'Deleting...' : 'Delete Selected'}
+								</button>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
