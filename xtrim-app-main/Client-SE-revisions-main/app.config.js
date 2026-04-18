@@ -74,7 +74,7 @@ module.exports = () => {
 		extra: {
 			apiUrl: 'https://xtrimfitgym-api.onrender.com/graphql',
 			exerciseDbApiKey: 'd078060844mshfa165078724b4bcp1ead29jsn5d8ee6d515b7',
-			clerkPublishableKey: 'pk_test_cG9saXNoZWQtY29sdC05MS5jbGVyay5hY2NvdW50cy5kZXYk',
+			clerkPublishableKey: 'pk_test_bm9ibGUtY29sbGllLTUxLmNsZXJrLmFjY291bnRzLmRldiQ',
 			eas: { projectId: EAS_PROJECT_ID },
 		},
 	};

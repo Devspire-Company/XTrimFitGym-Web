@@ -7,6 +7,8 @@ import type { GetAllSubscriptionRequestsQuery } from '@/graphql/generated/types'
 import { exportTablePdf } from '@/lib/pdfExport';
 import { useAppSelector } from '@/store/hooks';
 
+const LIVE_UPDATE_INTERVAL_MS = 1500;
+
 export function SubscriptionRequestsPage() {
 	useEffect(() => {
 		document.title = 'Subscription Requests - X-TRIM FIT GYM';
@@ -21,6 +23,7 @@ export function SubscriptionRequestsPage() {
 	const { data, loading, error, refetch } = useQuery(GET_ALL_SUBSCRIPTION_REQUESTS, {
 		errorPolicy: 'none',
 		fetchPolicy: 'cache-and-network',
+		pollInterval: LIVE_UPDATE_INTERVAL_MS,
 	});
 
 	// Process data - must be before conditional returns to follow Rules of Hooks
