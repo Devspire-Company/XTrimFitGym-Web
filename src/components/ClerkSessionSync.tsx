@@ -88,7 +88,7 @@ export function ClerkSessionSync() {
 						addToast({
 							type: 'error',
 							message:
-								'No administrator account for this email. Self sign-up is disabled; an admin must create your account in Settings.',
+								'No administrator profile for this email yet. Ask an owner to add your admin account in Settings.',
 						})
 					);
 					navigate('/login', { replace: true });

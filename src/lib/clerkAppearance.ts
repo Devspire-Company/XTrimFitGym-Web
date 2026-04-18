@@ -1,4 +1,4 @@
-/** Shared Clerk auth styling (SignIn). */
+/** Shared Clerk auth styling (SignIn / SignUp). */
 export const clerkAuthAppearance = {
 	variables: {
 		colorPrimary: '#f9c513',

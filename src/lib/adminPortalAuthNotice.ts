@@ -40,7 +40,7 @@ export function messageForAdminPortalAuthNotice(n: AdminPortalAuthNotice): strin
 		case 'WRONG_ROLE_COACH':
 			return 'This portal is for gym administrators only. Coach accounts must use the coach mobile app to sign in.';
 		case 'NO_STAFF_ACCOUNT':
-			return 'No administrator account exists for this email. Self sign-up is disabled on the admin portal; ask an existing administrator to create your admin user in Settings.';
+			return 'No administrator profile exists for this email yet. You can create a Clerk account, but an owner must add your admin user in Settings before you can use this portal.';
 		case 'SESSION_ERROR':
 			return 'Could not verify your session with the server. Check that the API is reachable and try again.';
 		default:

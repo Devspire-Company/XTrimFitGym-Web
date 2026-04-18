@@ -1,24 +1,12 @@
-import { useEffect, useState } from 'react';
-import { SignIn, useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { useEffect } from 'react';
+import { SignUp, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router';
 import { useAppSelector } from '@/store/hooks';
 import { clerkAuthAppearance } from '@/lib/clerkAppearance';
-import {
-	consumeAdminPortalAuthNotice,
-	messageForAdminPortalAuthNotice,
-	type AdminPortalAuthNotice,
-} from '@/lib/adminPortalAuthNotice';
 
-export function LoginPage() {
-	const [portalNotice, setPortalNotice] = useState<AdminPortalAuthNotice | null>(null);
-
+export function SignUpPage() {
 	useEffect(() => {
-		document.title = 'Login - X-TRIM FIT GYM';
-	}, []);
-
-	useEffect(() => {
-		const n = consumeAdminPortalAuthNotice();
-		if (n) setPortalNotice(n);
+		document.title = 'Create account - X-TRIM FIT GYM';
 	}, []);
 
 	const navigate = useNavigate();
@@ -46,28 +34,20 @@ export function LoginPage() {
 			<div className="w-full max-w-md">
 				<div className="text-center mb-8">
 					<img src="/logo.png" alt="X-TRIM FIT GYM" className="h-16 w-auto mx-auto mb-4" />
-					<h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">Welcome Back</h1>
-					<p className="text-[var(--text-secondary)]">Sign in to access your admin dashboard</p>
+					<h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">Create your account</h1>
+					<p className="text-[var(--text-secondary)]">
+						Sign up to access the admin dashboard (your email must be provisioned as an admin in
+						Settings)
+					</p>
 				</div>
 
-				{portalNotice && (
-					<div
-						className="mb-4 rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-100"
-						role="alert"
-					>
-						{messageForAdminPortalAuthNotice(portalNotice)}
-					</div>
-				)}
-
 				<div className="flex justify-center clerk-auth-host">
-					<SignIn
+					<SignUp
 						routing="path"
-						path="/login"
+						path="/sign-up"
 						signInUrl="/login"
-						signUpUrl="/sign-up"
 						forceRedirectUrl="/dashboard"
 						fallbackRedirectUrl="/dashboard"
-						transferable={false}
 						appearance={clerkAuthAppearance}
 					/>
 				</div>

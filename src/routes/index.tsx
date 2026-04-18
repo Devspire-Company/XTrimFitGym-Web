@@ -3,6 +3,7 @@ import { Root } from '@/components/Root';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { LoginPage } from '@/pages/Login';
+import { SignUpPage } from '@/pages/SignUp';
 import { DashboardPage } from '@/pages/Dashboard';
 import { MembersPage } from '@/pages/Members';
 import { CoachesPage } from '@/pages/Coaches';
@@ -24,7 +25,7 @@ export const router = createBrowserRouter([
 			},
 			{
 				path: '/sign-up/*',
-				element: <Navigate to="/login" replace />,
+				element: <SignUpPage />,
 			},
 			{
 				path: '/',
