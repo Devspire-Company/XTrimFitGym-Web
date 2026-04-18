@@ -79,6 +79,8 @@ interface Member {
 const normalizeFilterValue = (value: string | null | undefined): string =>
 	(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
+const LIVE_UPDATE_INTERVAL_MS = 1500;
+
 export function MembersPage() {
 	useEffect(() => {
 		document.title = 'Member Management - X-TRIM FIT GYM';
@@ -132,9 +134,11 @@ export function MembersPage() {
 	const { data, loading, error } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Member, includeDisabled: true },
 		errorPolicy: 'none',
+		pollInterval: LIVE_UPDATE_INTERVAL_MS,
 	});
 	const { data: pendingData } = useQuery(GET_PENDING_SUBSCRIPTION_REQUESTS, {
 		errorPolicy: 'ignore',
+		pollInterval: LIVE_UPDATE_INTERVAL_MS,
 	});
 
 	// Real-time subscription for member updates
