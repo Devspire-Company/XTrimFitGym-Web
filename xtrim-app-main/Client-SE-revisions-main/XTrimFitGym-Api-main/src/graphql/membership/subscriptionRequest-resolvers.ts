@@ -58,6 +58,9 @@ const mapMembershipToGraphQL = (membership: any) => {
 
 type Context = IAuthContext;
 
+/** GraphQL `User` uses non-null strings; Mongo documents may omit or null these fields. */
+const gqlUserStr = (v: any) => (v == null || v === undefined ? '' : String(v));
+
 const isPopulatedProcessorUser = (ref: any) =>
 	ref && typeof ref === 'object' && typeof ref.firstName === 'string';
 
@@ -79,9 +82,9 @@ const formatProcessorUser = (ref: any) => {
 	if (!ref || !isPopulatedProcessorUser(ref)) return null;
 	return {
 		id: ref._id.toString(),
-		firstName: ref.firstName,
-		lastName: ref.lastName,
-		email: ref.email ?? '',
+		firstName: gqlUserStr(ref.firstName),
+		lastName: gqlUserStr(ref.lastName),
+		email: gqlUserStr(ref.email),
 	};
 };
 
@@ -99,9 +102,9 @@ async function buildProcessorUserLookupMap(requests: any[]) {
 	const users = await User.find({ _id: { $in: oids } }).select('firstName lastName email').lean();
 	for (const u of users) {
 		map.set(u._id.toString(), {
-			firstName: u.firstName,
-			lastName: u.lastName,
-			email: u.email ?? '',
+			firstName: gqlUserStr(u.firstName),
+			lastName: gqlUserStr(u.lastName),
+			email: gqlUserStr(u.email),
 		});
 	}
 	return map;
@@ -117,7 +120,12 @@ function resolveProcessorRef(
 	if (!id) return null;
 	const u = lookup.get(id);
 	if (!u) return null;
-	return { id, firstName: u.firstName, lastName: u.lastName, email: u.email };
+	return {
+		id,
+		firstName: gqlUserStr(u.firstName),
+		lastName: gqlUserStr(u.lastName),
+		email: gqlUserStr(u.email),
+	};
 }
 
 const mapSubscriptionRequestToGraphQL = (request: any, membershipData?: any, memberData?: any) => {
@@ -134,9 +142,9 @@ const mapSubscriptionRequestToGraphQL = (request: any, membershipData?: any, mem
 			// If it's a populated object, format it properly
 			member = {
 				id: memberId._id.toString(),
-				firstName: memberId.firstName,
-				lastName: memberId.lastName,
-				email: memberId.email,
+				firstName: gqlUserStr(memberId.firstName),
+				lastName: gqlUserStr(memberId.lastName),
+				email: gqlUserStr(memberId.email),
 			};
 		} else {
 			// Otherwise, it's an ID string - will be resolved by the resolver
@@ -333,9 +341,9 @@ export default {
 					// If it's a populated object, format it properly
 					memberData = {
 						id: request.member_id._id.toString(),
-						firstName: request.member_id.firstName,
-						lastName: request.member_id.lastName,
-						email: request.member_id.email,
+						firstName: gqlUserStr(request.member_id.firstName),
+						lastName: gqlUserStr(request.member_id.lastName),
+						email: gqlUserStr(request.member_id.email),
 					};
 				}
 				
@@ -368,9 +376,9 @@ export default {
 					// If it's a populated object, format it properly
 					memberData = {
 						id: request.member_id._id.toString(),
-						firstName: request.member_id.firstName,
-						lastName: request.member_id.lastName,
-						email: request.member_id.email,
+						firstName: gqlUserStr(request.member_id.firstName),
+						lastName: gqlUserStr(request.member_id.lastName),
+						email: gqlUserStr(request.member_id.email),
 					};
 				}
 
@@ -412,9 +420,9 @@ export default {
 			if (request.member_id && typeof request.member_id === 'object' && request.member_id._id) {
 				memberData = {
 					id: request.member_id._id.toString(),
-					firstName: request.member_id.firstName,
-					lastName: request.member_id.lastName,
-					email: request.member_id.email,
+					firstName: gqlUserStr(request.member_id.firstName),
+					lastName: gqlUserStr(request.member_id.lastName),
+					email: gqlUserStr(request.member_id.email),
 				};
 			}
 
@@ -450,9 +458,9 @@ export default {
 				if (request.member_id && typeof request.member_id === 'object' && request.member_id._id) {
 					memberData = {
 						id: request.member_id._id.toString(),
-						firstName: request.member_id.firstName,
-						lastName: request.member_id.lastName,
-						email: request.member_id.email,
+						firstName: gqlUserStr(request.member_id.firstName),
+						lastName: gqlUserStr(request.member_id.lastName),
+						email: gqlUserStr(request.member_id.email),
 					};
 				}
 				const mapped = mapSubscriptionRequestToGraphQL(request, undefined, memberData);
@@ -553,9 +561,9 @@ export default {
 			if (populatedRequest.member_id && typeof populatedRequest.member_id === 'object' && populatedRequest.member_id._id) {
 				memberData = {
 					id: populatedRequest.member_id._id.toString(),
-					firstName: populatedRequest.member_id.firstName,
-					lastName: populatedRequest.member_id.lastName,
-					email: populatedRequest.member_id.email,
+					firstName: gqlUserStr(populatedRequest.member_id.firstName),
+					lastName: gqlUserStr(populatedRequest.member_id.lastName),
+					email: gqlUserStr(populatedRequest.member_id.email),
 				};
 			}
 
@@ -594,9 +602,9 @@ export default {
 				if (user) {
 					mappedRequest.member = {
 						id: user._id.toString(),
-						firstName: user.firstName,
-						lastName: user.lastName,
-						email: user.email,
+						firstName: gqlUserStr(user.firstName),
+						lastName: gqlUserStr(user.lastName),
+						email: gqlUserStr(user.email),
 					};
 				} else {
 					throw new Error('Member not found');
@@ -773,9 +781,9 @@ export default {
 				return user
 					? {
 							id: user._id.toString(),
-							firstName: user.firstName,
-							lastName: user.lastName,
-							email: user.email,
+							firstName: gqlUserStr(user.firstName),
+							lastName: gqlUserStr(user.lastName),
+							email: gqlUserStr(user.email),
 					  }
 					: null;
 			}
@@ -783,15 +791,20 @@ export default {
 			if (parent.member && typeof parent.member === 'object') {
 				// Check if it's already a GraphQL-formatted object (has id field)
 				if (parent.member.id) {
-					return parent.member;
+					return {
+						...parent.member,
+						firstName: gqlUserStr(parent.member.firstName),
+						lastName: gqlUserStr(parent.member.lastName),
+						email: gqlUserStr(parent.member.email),
+					};
 				}
 				// If it's a mongoose document/object, map it
 				if (parent.member._id) {
 					return {
 						id: parent.member._id.toString(),
-						firstName: parent.member.firstName,
-						lastName: parent.member.lastName,
-						email: parent.member.email,
+						firstName: gqlUserStr(parent.member.firstName),
+						lastName: gqlUserStr(parent.member.lastName),
+						email: gqlUserStr(parent.member.email),
 					};
 				}
 			}
@@ -803,9 +816,9 @@ export default {
 				return user
 					? {
 							id: user._id.toString(),
-							firstName: user.firstName,
-							lastName: user.lastName,
-							email: user.email,
+							firstName: gqlUserStr(user.firstName),
+							lastName: gqlUserStr(user.lastName),
+							email: gqlUserStr(user.email),
 					  }
 					: null;
 			}
@@ -844,16 +857,18 @@ export default {
 				return user
 					? {
 							id: user._id.toString(),
-							firstName: user.firstName,
-							lastName: user.lastName,
-							email: user.email,
+							firstName: gqlUserStr(user.firstName),
+							lastName: gqlUserStr(user.lastName),
+							email: gqlUserStr(user.email),
 					  }
 					: null;
 			}
 			if (typeof parent.approvedBy === 'object' && parent.approvedBy.id && parent.approvedBy.firstName) {
 				return {
 					...parent.approvedBy,
-					email: parent.approvedBy.email ?? '',
+					firstName: gqlUserStr(parent.approvedBy.firstName),
+					lastName: gqlUserStr(parent.approvedBy.lastName),
+					email: gqlUserStr(parent.approvedBy.email),
 				};
 			}
 			const formatted = formatProcessorUser(parent.approvedBy);
@@ -864,9 +879,9 @@ export default {
 			return user
 				? {
 						id: user._id.toString(),
-						firstName: user.firstName,
-						lastName: user.lastName,
-						email: user.email,
+						firstName: gqlUserStr(user.firstName),
+						lastName: gqlUserStr(user.lastName),
+						email: gqlUserStr(user.email),
 				  }
 				: null;
 		},
@@ -879,16 +894,18 @@ export default {
 				return user
 					? {
 							id: user._id.toString(),
-							firstName: user.firstName,
-							lastName: user.lastName,
-							email: user.email,
+							firstName: gqlUserStr(user.firstName),
+							lastName: gqlUserStr(user.lastName),
+							email: gqlUserStr(user.email),
 					  }
 					: null;
 			}
 			if (typeof parent.rejectedBy === 'object' && parent.rejectedBy.id && parent.rejectedBy.firstName) {
 				return {
 					...parent.rejectedBy,
-					email: parent.rejectedBy.email ?? '',
+					firstName: gqlUserStr(parent.rejectedBy.firstName),
+					lastName: gqlUserStr(parent.rejectedBy.lastName),
+					email: gqlUserStr(parent.rejectedBy.email),
 				};
 			}
 			const formatted = formatProcessorUser(parent.rejectedBy);
@@ -899,9 +916,9 @@ export default {
 			return user
 				? {
 						id: user._id.toString(),
-						firstName: user.firstName,
-						lastName: user.lastName,
-						email: user.email,
+						firstName: gqlUserStr(user.firstName),
+						lastName: gqlUserStr(user.lastName),
+						email: gqlUserStr(user.email),
 				  }
 				: null;
 		},
