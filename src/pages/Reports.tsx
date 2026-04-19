@@ -45,6 +45,7 @@ import {
 	readLocalReportExportLogs,
 	type LocalReportExportLog,
 } from '@/lib/reportExportLogs';
+import { escapeCsvCell, exportTableCsv } from '@/lib/csvExport';
 
 async function loadImageAsDataUrl(path: string): Promise<string | null> {
 	try {
@@ -844,6 +845,99 @@ export function ReportsPage() {
 		}
 	};
 
+	const exportAnalyticsCsv = () => {
+		const sections = collectAnalyticsExportSections(buildAnalyticsExportContext());
+		const filename = exportTableCsv({
+			filePrefix: 'xtrimfitgym-analytics',
+			sections: sections.map((s) => ({ title: s.title, head: s.head, rows: s.rows })),
+		});
+		appendLocalExportLog('ANALYTICS_CSV', filename);
+	};
+
+	const exportAllCsv = () => {
+		exportAnalyticsCsv();
+	};
+
+	const exportRevenueCsv = () => {
+		const filename = exportTableCsv({
+			filePrefix: 'revenue-report',
+			head: ['Metric', 'Value'],
+			rows: [
+				['Total Revenue', `PHP ${Number(totalRevenue).toLocaleString()}`],
+				['Membership Revenue', `PHP ${Number(membershipSubscriptionRevenue).toLocaleString()}`],
+				['Walk-in Revenue', `PHP ${Number(walkInRevenueTotal).toLocaleString()}`],
+				['Active Subscriptions', String(activeSubscriptions)],
+			],
+		});
+		appendLocalExportLog(ReportType.Revenue, filename);
+		if (auditApiSupported) {
+			void logReportDownload({
+				variables: {
+					input: { reportType: ReportType.Revenue, fileName: filename, filterSummary: 'reports-page-summary;format=csv' },
+				},
+			})
+				.then(() => refetchReportLogs())
+				.catch(() => {});
+		}
+	};
+
+	const exportNearEndingMembershipCsv = () => {
+		const thresholdDate = new Date();
+		thresholdDate.setDate(thresholdDate.getDate() + 7);
+		const nearEnding = (data?.members || []).filter((m: any) => {
+			const exp = m.currentMembership?.expiresAt;
+			if (!exp) return false;
+			const d = new Date(exp);
+			return d >= new Date() && d <= thresholdDate;
+		});
+		const filename = exportTableCsv({
+			filePrefix: 'near-ending-memberships',
+			head: ['Member', 'Plan', 'Expires At', 'Status'],
+			rows: nearEnding.map((m: any) => [
+				`${m.firstName} ${m.lastName}`,
+				m.currentMembership?.membership?.name || 'N/A',
+				new Date(m.currentMembership?.expiresAt).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }),
+				m.currentMembership?.status || 'N/A',
+			]),
+		});
+		appendLocalExportLog(ReportType.NearEndingMemberships, filename);
+		if (auditApiSupported) {
+			void logReportDownload({
+				variables: {
+					input: {
+						reportType: ReportType.NearEndingMemberships,
+						fileName: filename,
+						filterSummary: 'threshold=7days;format=csv',
+					},
+				},
+			})
+				.then(() => refetchReportLogs())
+				.catch(() => {});
+		}
+	};
+
+	const exportWalkInCsv = () => {
+		const rows = walkInOverviewData?.walkInAccountsOverview?.rows || [];
+		const filename = exportTableCsv({
+			filePrefix: 'walk-in-report',
+			head: ['Name', 'Phone', 'Email', 'Time-ins'],
+			rows: rows.map((r: any) => [
+				`${r.client.firstName} ${r.client.lastName}`,
+				r.client.phoneNumber || '-',
+				r.client.email || '-',
+				String(r.timeInCount ?? 0),
+			]),
+		});
+		appendLocalExportLog(ReportType.WalkIn, filename);
+		if (auditApiSupported) {
+			void logReportDownload({
+				variables: { input: { reportType: ReportType.WalkIn, fileName: filename, filterSummary: 'accounts-overview;format=csv' } },
+			})
+				.then(() => refetchReportLogs())
+				.catch(() => {});
+		}
+	};
+
 	// Export all members, coaches, and admins to CSV (no filters)
 	const exportUsersToCSV = () => {
 		if (membersLoading || coachesLoading || adminsLoading) {
@@ -865,16 +959,6 @@ export function ReportsPage() {
 			alert('No users found to export.');
 			return;
 		}
-
-		// Helper functions
-		const escapeCSV = (value: any): string => {
-			if (value === null || value === undefined) return '';
-			const str = String(value);
-			if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-				return `"${str.replace(/"/g, '""')}"`;
-			}
-			return str;
-		};
 
 		// Map gender to numeric value
 		const mapGender = (gender: string | null | undefined): string => {
@@ -915,12 +999,12 @@ export function ReportsPage() {
 		// Add user rows
 		allUsers.forEach((user: any) => {
 			const row = [
-				escapeCSV(user.attendanceId || ''),
-				escapeCSV('Xtrimfitgym-users'),
-				escapeCSV(formatPersonName(user)),
-				escapeCSV(mapGender(user.gender)),
+				escapeCsvCell(user.attendanceId || ''),
+				escapeCsvCell('Xtrimfitgym-users'),
+				escapeCsvCell(formatPersonName(user)),
+				escapeCsvCell(mapGender(user.gender)),
 				'', // Contact - leave blank
-				escapeCSV(user.email || ''),
+				escapeCsvCell(user.email || ''),
 				'2026/01/01', // Effective Time - default value
 				'2026/12/01', // Expiry Time - default value
 				'', // Card No. - leave blank
@@ -1040,12 +1124,34 @@ export function ReportsPage() {
 								type="button"
 								onClick={() => {
 									setDownloadablesOpen(false);
+									exportAllCsv();
+								}}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#4ade80]" aria-hidden />
+								<span>All analytics (CSV)</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
 									void exportAnalyticsPdf();
 								}}
 								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
 							>
 								<Download className="h-4 w-4 shrink-0 text-[#fb923c]" aria-hidden />
 								<span>Analytics (PDF, Legal)</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
+									exportAnalyticsCsv();
+								}}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#4ade80]" aria-hidden />
+								<span>Analytics (CSV)</span>
 							</button>
 							<button
 								type="button"
@@ -1062,6 +1168,17 @@ export function ReportsPage() {
 								type="button"
 								onClick={() => {
 									setDownloadablesOpen(false);
+									exportRevenueCsv();
+								}}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#4ade80]" aria-hidden />
+								<span>Revenue (CSV)</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
 									void exportNearEndingMembershipPdf();
 								}}
 								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
@@ -1073,12 +1190,34 @@ export function ReportsPage() {
 								type="button"
 								onClick={() => {
 									setDownloadablesOpen(false);
+									exportNearEndingMembershipCsv();
+								}}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#4ade80]" aria-hidden />
+								<span>Near-ending memberships (CSV)</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
 									void exportWalkInPdf();
 								}}
 								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
 							>
 								<Download className="h-4 w-4 shrink-0 text-[#fb923c]" aria-hidden />
 								<span>Walk-in (PDF)</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setDownloadablesOpen(false);
+									exportWalkInCsv();
+								}}
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+							>
+								<Download className="h-4 w-4 shrink-0 text-[#4ade80]" aria-hidden />
+								<span>Walk-in (CSV)</span>
 							</button>
 							<button
 								type="button"

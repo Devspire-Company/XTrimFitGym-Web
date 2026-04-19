@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { X as XIcon, Clock, CheckCircle2, XCircle, Search, Download } from 'lucide-react';
 import { GET_ALL_SUBSCRIPTION_REQUESTS } from '@/graphql/operations/index';
 import type { GetAllSubscriptionRequestsQuery } from '@/graphql/generated/types';
+import { exportTableCsv } from '@/lib/csvExport';
 import { exportTablePdf } from '@/lib/pdfExport';
 import { useAppSelector } from '@/store/hooks';
 
@@ -85,6 +86,34 @@ export function SubscriptionRequestsPage() {
 	const pendingRequests = filteredRequests.filter((r) => r.status === 'PENDING');
 	const approvedRequests = filteredRequests.filter((r) => r.status === 'APPROVED');
 
+	const formatDate = (dateString: string | null | undefined) => {
+		if (!dateString) return 'N/A';
+		return new Date(dateString).toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit',
+		});
+	};
+
+	const subscriptionExportHead = ['Member', 'Email', 'Plan', 'Price', 'Status', 'Requested At', 'Processed By'];
+	const subscriptionExportRows = filteredRequests.map((request) => [
+		`${request.member?.firstName || ''} ${request.member?.lastName || ''}`.trim() || 'N/A',
+		request.member?.email || 'N/A',
+		request.membership?.name || 'N/A',
+		request.membership?.monthlyPrice != null
+			? `PHP ${Number(request.membership.monthlyPrice).toLocaleString()}`
+			: 'N/A',
+		request.status,
+		formatDate(request.requestedAt),
+		request.status === 'APPROVED'
+			? userFullName(request.approvedBy) || 'Not recorded'
+			: request.status === 'REJECTED'
+				? userFullName(request.rejectedBy) || 'Not recorded'
+				: '—',
+	]);
+
 	const handleExportPdf = () => {
 		exportTablePdf({
 			title: 'Subscription Requests',
@@ -93,22 +122,19 @@ export function SubscriptionRequestsPage() {
 			user: currentUser,
 			filterSummary: `status=${statusFilter};rows=${filteredRequests.length}`,
 			subtitle: `Total rows: ${filteredRequests.length} | Filter: ${statusFilter}`,
-			head: ['Member', 'Email', 'Plan', 'Price', 'Status', 'Requested At', 'Processed By'],
-			rows: filteredRequests.map((request) => [
-				`${request.member?.firstName || ''} ${request.member?.lastName || ''}`.trim() || 'N/A',
-				request.member?.email || 'N/A',
-				request.membership?.name || 'N/A',
-				request.membership?.monthlyPrice != null
-					? `PHP ${Number(request.membership.monthlyPrice).toLocaleString()}`
-					: 'N/A',
-				request.status,
-				formatDate(request.requestedAt),
-				request.status === 'APPROVED'
-					? userFullName(request.approvedBy) || 'Not recorded'
-					: request.status === 'REJECTED'
-						? userFullName(request.rejectedBy) || 'Not recorded'
-						: '—',
-			]),
+			head: subscriptionExportHead,
+			rows: subscriptionExportRows,
+		});
+	};
+
+	const handleExportCsv = () => {
+		exportTableCsv({
+			filePrefix: 'subscription-requests',
+			head: subscriptionExportHead,
+			rows: subscriptionExportRows,
+			reportType: 'SUBSCRIPTION_REQUESTS',
+			user: currentUser,
+			filterSummary: `status=${statusFilter};rows=${filteredRequests.length};format=csv`,
 		});
 	};
 
@@ -181,17 +207,6 @@ export function SubscriptionRequestsPage() {
 		);
 	};
 
-	const formatDate = (dateString: string | null | undefined) => {
-		if (!dateString) return 'N/A';
-		return new Date(dateString).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit',
-		});
-	};
-
 	const formatRelativeSince = (dateString: string | null | undefined) => {
 		if (!dateString) return '';
 		const t = new Date(dateString).getTime();
@@ -221,10 +236,16 @@ export function SubscriptionRequestsPage() {
 						Manage all subscription requests from members ({filteredRequests.length} of {activeRequests.length} shown)
 					</p>
 				</div>
-				<Button onClick={handleExportPdf} className="btn-export-pdf">
-					<Download className="w-4 h-4" />
-					Export PDF
-				</Button>
+				<div className="flex flex-wrap items-center gap-2">
+					<Button type="button" onClick={handleExportPdf} className="btn-export-pdf">
+						<Download className="w-4 h-4" />
+						Export PDF
+					</Button>
+					<Button type="button" onClick={handleExportCsv} className="btn-export-csv">
+						<Download className="w-4 h-4" />
+						Export CSV
+					</Button>
+				</div>
 			</div>
 
 			{/* Search and Filter Bar */}

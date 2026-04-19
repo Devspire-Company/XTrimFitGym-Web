@@ -43,6 +43,7 @@ type AttendanceRosterUser = {
 	attendanceId?: number | null;
 };
 import { useAppSelector } from '@/store/hooks';
+import { exportTableCsv } from '@/lib/csvExport';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -689,6 +690,47 @@ export function AttendancePage() {
 		}
 	};
 
+	const handleExportCsv = () => {
+		type ExportRow = {
+			member: string;
+			date: string;
+			timeIn: string;
+			timeOut: string;
+			logType: string;
+		};
+		const exportSourceRows =
+			roleFilter === 'coach'
+				? coachRecords
+				: roleFilter === 'client'
+					? clientRecords
+					: summarizedRecords;
+		const exportRows: ExportRow[] = exportSourceRows.map((row) => ({
+			member: row.personName,
+			date: row.date,
+			timeIn: row.timeIn === '—' ? '-' : row.timeIn,
+			timeOut: row.timeOut === '—' ? '-' : row.timeOut,
+			logType: row.logType,
+		}));
+		const fileName = exportTableCsv({
+			filePrefix: 'attendance-logs',
+			head: ['Member', 'Date', 'Time In', 'Time Out', 'Log Type'],
+			rows: exportRows.map((r) => [r.member, r.date, r.timeIn, r.timeOut, r.logType]),
+		});
+		appendLocalExportLog(fileName);
+		void logReportDownload({
+			variables: {
+				input: {
+					reportType: ReportType.Attendance,
+					fileName,
+					filterSummary: `date=${dateFilter || 'all'}; role=${roleFilter}; search=${searchTerm || 'none'};format=csv`,
+					dateRange: dateFilter
+						? { startDate: `${dateFilter}T00:00:00.000Z`, endDate: `${dateFilter}T23:59:59.999Z` }
+						: undefined,
+				},
+			},
+		}).catch(() => {});
+	};
+
 	if (loading && !data) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
@@ -758,13 +800,16 @@ export function AttendancePage() {
 					</div>
 				</div>
 
-				<button
-					onClick={handleExportPdf}
-					className="btn-export-pdf self-start"
-				>
-					<Download className="w-4 h-4" />
-					Export PDF
-				</button>
+				<div className="flex flex-wrap items-center gap-2 self-start">
+					<button type="button" onClick={() => void handleExportPdf()} className="btn-export-pdf">
+						<Download className="w-4 h-4" />
+						Export PDF
+					</button>
+					<button type="button" onClick={handleExportCsv} className="btn-export-csv">
+						<Download className="w-4 h-4" />
+						Export CSV
+					</button>
+				</div>
 			</div>
 
 			{/* Filters */}

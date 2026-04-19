@@ -18,6 +18,7 @@ import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import { uploadEquipmentImage } from '@/lib/uploadApi';
 import { EquipmentStatus, ReportType } from '@/graphql/generated/graphql';
+import { exportTableCsv } from '@/lib/csvExport';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -197,6 +198,54 @@ function actionTypeText(actionType: EquipmentActionLog['actionType']): string {
 		default:
 			return actionType;
 	}
+}
+
+type EquipmentTimelineEntry = {
+	equipmentName: string;
+	action: string;
+	fromStatus: string;
+	toStatus: string;
+	reason: string;
+	changedBy: string;
+	changedAt: string;
+};
+
+function buildEquipmentMasterTimelineEntries(
+	reportRows: any[],
+	equipmentActionLogs: EquipmentActionLog[]
+): EquipmentTimelineEntry[] {
+	const timelineEntries: EquipmentTimelineEntry[] = [];
+	reportRows.forEach((eq) => {
+		const lifecycleLogs = Array.isArray(eq.lifecycleLogs) ? eq.lifecycleLogs : [];
+		lifecycleLogs.forEach((log: any) => {
+			timelineEntries.push({
+				equipmentName: eq.name || 'Unknown',
+				action: log?.action || 'Lifecycle update',
+				fromStatus: '-',
+				toStatus: toStatusText(log?.status as EquipmentStatus | undefined),
+				reason: log?.notes || '-',
+				changedBy: log?.changedById || '-',
+				changedAt: log?.changedAt || '',
+			});
+		});
+	});
+	equipmentActionLogs.forEach((log) => {
+		timelineEntries.push({
+			equipmentName: log.equipmentName || 'Unknown',
+			action: actionTypeText(log.actionType),
+			fromStatus: toStatusText(log.fromStatus),
+			toStatus: toStatusText(log.toStatus),
+			reason: log.reason || '-',
+			changedBy: log.actionBy || '-',
+			changedAt: log.createdAt,
+		});
+	});
+	timelineEntries.sort((a, b) => {
+		const timeA = new Date(a.changedAt || '').getTime();
+		const timeB = new Date(b.changedAt || '').getTime();
+		return (Number.isFinite(timeB) ? timeB : 0) - (Number.isFinite(timeA) ? timeA : 0);
+	});
+	return timelineEntries;
 }
 
 function toEpoch(dateValue: string | null | undefined): number {
@@ -723,45 +772,7 @@ export function EquipmentPage() {
 		const maintenanceCount = reportRows.filter(
 			(eq) => eq.status === EquipmentStatus.Undermaintenance
 		).length;
-		const timelineEntries: Array<{
-			equipmentName: string;
-			action: string;
-			fromStatus: string;
-			toStatus: string;
-			reason: string;
-			changedBy: string;
-			changedAt: string;
-		}> = [];
-		reportRows.forEach((eq) => {
-			const lifecycleLogs = Array.isArray(eq.lifecycleLogs) ? eq.lifecycleLogs : [];
-			lifecycleLogs.forEach((log: any) => {
-				timelineEntries.push({
-					equipmentName: eq.name || 'Unknown',
-					action: log?.action || 'Lifecycle update',
-					fromStatus: '-',
-					toStatus: toStatusText(log?.status as EquipmentStatus | undefined),
-					reason: log?.notes || '-',
-					changedBy: log?.changedById || '-',
-					changedAt: log?.changedAt || '',
-				});
-			});
-		});
-		equipmentActionLogs.forEach((log) => {
-			timelineEntries.push({
-				equipmentName: log.equipmentName || 'Unknown',
-				action: actionTypeText(log.actionType),
-				fromStatus: toStatusText(log.fromStatus),
-				toStatus: toStatusText(log.toStatus),
-				reason: log.reason || '-',
-				changedBy: log.actionBy || '-',
-				changedAt: log.createdAt,
-			});
-		});
-		timelineEntries.sort((a, b) => {
-			const timeA = new Date(a.changedAt || '').getTime();
-			const timeB = new Date(b.changedAt || '').getTime();
-			return (Number.isFinite(timeB) ? timeB : 0) - (Number.isFinite(timeA) ? timeA : 0);
-		});
+		const timelineEntries = buildEquipmentMasterTimelineEntries(reportRows, equipmentActionLogs);
 		const exportedByLabel = [currentUser?.firstName, currentUser?.lastName]
 			.filter(Boolean)
 			.join(' ')
@@ -897,6 +908,72 @@ export function EquipmentPage() {
 		});
 	};
 
+	const handleExportCsv = () => {
+		const reportRows = normalizedList;
+		const timelineEntries = buildEquipmentMasterTimelineEntries(reportRows, equipmentActionLogs);
+		const rosterHead = [
+			'Name',
+			'Record state',
+			'Status',
+			'Added',
+			'Available since',
+			'Under maintenance since',
+			'Damaged since',
+			'Archived',
+			'Archive reason',
+			'Acquired',
+			'Notes',
+		];
+		const rosterRows = reportRows.map((eq) => {
+			const cond = conditionSetAtByEquipmentId[eq.id];
+			return [
+				eq.name,
+				eq.isArchived ? 'Archived' : 'Current',
+				toStatusText(eq.status),
+				formatDateManila(eq.createdAt),
+				formatDateManila(cond?.[EquipmentStatus.Available]),
+				formatDateManila(cond?.[EquipmentStatus.Undermaintenance]),
+				formatDateManila(cond?.[EquipmentStatus.Damaged]),
+				formatDateManila(eq.archivedAt),
+				eq.archiveReason || '-',
+				formatDateManila(eq.acquiredAt),
+				eq.notes || '-',
+			];
+		});
+		const csvName = exportTableCsv({
+			filePrefix: 'equipment-master-report',
+			sections: [
+				{ title: 'Equipment roster (all records)', head: rosterHead, rows: rosterRows },
+				{
+					title: 'Activity timeline',
+					head: ['Equipment', 'Action', 'From status', 'To status', 'Reason/Notes', 'Changed by', 'Date'],
+					rows:
+						timelineEntries.length > 0
+							? timelineEntries.map((entry) => [
+									entry.equipmentName,
+									entry.action,
+									entry.fromStatus,
+									entry.toStatus,
+									entry.reason,
+									entry.changedBy,
+									formatDateManila(entry.changedAt),
+							  ])
+							: [['-', 'No action history recorded yet', '-', '-', '-', '-', '-']],
+				},
+			],
+		});
+		appendLocalExportLog(csvName);
+		void logReportDownload({
+			variables: {
+				input: {
+					reportType: ReportType.Equipment,
+					fileName: csvName,
+					filterSummary: `scope:all-records;tab:${viewTab};condition:${statusFilter};format=csv`,
+				},
+			},
+		}).catch(() => {});
+	};
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
@@ -980,9 +1057,13 @@ export function EquipmentPage() {
 						<Plus className="w-4 h-4" />
 						Add Equipment
 					</Button>
-					<Button onClick={handleExportPdf} className="btn-export-pdf">
+					<Button type="button" onClick={() => void handleExportPdf()} className="btn-export-pdf">
 						<Download className="w-4 h-4" />
 						Export PDF
+					</Button>
+					<Button type="button" onClick={handleExportCsv} className="btn-export-csv">
+						<Download className="w-4 h-4" />
+						Export CSV
 					</Button>
 				</div>
 			</div>

@@ -37,6 +37,7 @@ import {
 	Users,
 	Download,
 } from 'lucide-react';
+import { exportTableCsv } from '@/lib/csvExport';
 import { exportTablePdf } from '@/lib/pdfExport';
 import { uploadWalkInWaiverImage } from '@/lib/uploadApi';
 
@@ -791,7 +792,7 @@ export function WalkInAttendancePage() {
 		return rows;
 	};
 
-	const handleExportPdf = async () => {
+	const buildWalkInExportSections = async () => {
 		const firstPage = logsData?.walkInAttendanceLogs?.logs ?? [];
 		let exportRows = [...firstPage];
 		let exportTotal = logsData?.walkInAttendanceLogs?.totalCount ?? firstPage.length;
@@ -813,43 +814,59 @@ export function WalkInAttendancePage() {
 			}
 		}
 		const allAccounts = await fetchAllWalkInAccounts();
+		const sections = [
+			{
+				title: 'Attendance logs',
+				head: ['Time In (Manila)', 'Payment', 'Name', 'Age', 'Gender', 'Contact', 'Email', 'Notes'],
+				rows: exportRows.map((row) => [
+					formatTimeManila(row.timedInAt),
+					`PHP ${Number(row.payment ?? 0).toLocaleString()}`,
+					formatWalkInName(row.walkInClient),
+					row.walkInClient.ageYears != null ? row.walkInClient.ageYears : '—',
+					genderLabel(row.walkInClient.gender),
+					row.walkInClient.phoneNumber ?? '—',
+					row.walkInClient.email ?? '—',
+					parseWaiverMeta(row.walkInClient.notes).visibleNotes || '—',
+				]),
+			},
+			{
+				title: 'All walk-in accounts',
+				head: ['Name', 'Contact', 'Email', 'Age', 'Gender', 'Time-ins', 'Notes'],
+				rows: allAccounts.map((row) => [
+					formatWalkInName(row.client),
+					row.client.phoneNumber ?? '—',
+					row.client.email ?? '—',
+					row.client.ageYears != null ? row.client.ageYears : '—',
+					genderLabel(row.client.gender),
+					row.timeInCount == null ? '—' : row.timeInCount,
+					parseWaiverMeta(row.client.notes).visibleNotes || '—',
+				]),
+			},
+		];
+		return { sections, exportRowsLen: exportRows.length, exportTotal, accountsLen: allAccounts.length };
+	};
 
+	const handleExportPdf = async () => {
+		const { sections, exportRowsLen, exportTotal, accountsLen } = await buildWalkInExportSections();
 		exportTablePdf({
 			title: 'Walk-in Attendance & Accounts',
 			filePrefix: 'walk-in-attendance',
 			reportType: 'WALKIN_ATTENDANCE',
 			user: currentUser,
-			filterSummary: `logDate=${logDate};logRows=${exportRows.length};accounts=${allAccounts.length}`,
-			subtitle: `Log date: ${logDate} | Attendance rows: ${exportRows.length}/${exportTotal} | Accounts: ${allAccounts.length}`,
-			sections: [
-				{
-					title: 'Attendance logs',
-					head: ['Time In (Manila)', 'Payment', 'Name', 'Age', 'Gender', 'Contact', 'Email', 'Notes'],
-					rows: exportRows.map((row) => [
-						formatTimeManila(row.timedInAt),
-						`PHP ${Number(row.payment ?? 0).toLocaleString()}`,
-						formatWalkInName(row.walkInClient),
-						row.walkInClient.ageYears != null ? row.walkInClient.ageYears : '—',
-						genderLabel(row.walkInClient.gender),
-						row.walkInClient.phoneNumber ?? '—',
-						row.walkInClient.email ?? '—',
-						parseWaiverMeta(row.walkInClient.notes).visibleNotes || '—',
-					]),
-				},
-				{
-					title: 'All walk-in accounts',
-					head: ['Name', 'Contact', 'Email', 'Age', 'Gender', 'Time-ins', 'Notes'],
-					rows: allAccounts.map((row) => [
-						formatWalkInName(row.client),
-						row.client.phoneNumber ?? '—',
-						row.client.email ?? '—',
-						row.client.ageYears != null ? row.client.ageYears : '—',
-						genderLabel(row.client.gender),
-						row.timeInCount == null ? '—' : row.timeInCount,
-						parseWaiverMeta(row.client.notes).visibleNotes || '—',
-					]),
-				},
-			],
+			filterSummary: `logDate=${logDate};logRows=${exportRowsLen};accounts=${accountsLen}`,
+			subtitle: `Log date: ${logDate} | Attendance rows: ${exportRowsLen}/${exportTotal} | Accounts: ${accountsLen}`,
+			sections,
+		});
+	};
+
+	const handleExportCsv = async () => {
+		const { sections, exportRowsLen, accountsLen } = await buildWalkInExportSections();
+		exportTableCsv({
+			filePrefix: 'walk-in-attendance',
+			sections,
+			reportType: 'WALKIN_ATTENDANCE',
+			user: currentUser,
+			filterSummary: `logDate=${logDate};logRows=${exportRowsLen};accounts=${accountsLen};format=csv`,
 		});
 	};
 
@@ -993,6 +1010,14 @@ export function WalkInAttendancePage() {
 					>
 						<Download className="h-4 w-4" />
 						Export PDF
+					</button>
+					<button
+						type="button"
+						onClick={() => void handleExportCsv()}
+						className="btn-export-csv"
+					>
+						<Download className="h-4 w-4" />
+						Export CSV
 					</button>
 				</div>
 			</div>

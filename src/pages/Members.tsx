@@ -35,6 +35,7 @@ import { addToast } from '@/store/slices/uiSlice';
 import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
 import { AdjustSubscriptionDurationModal } from '@/components/modals/AdjustSubscriptionDurationModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { exportTableCsv } from '@/lib/csvExport';
 import { exportTablePdf } from '@/lib/pdfExport';
 
 interface Member {
@@ -520,6 +521,18 @@ export function MembersPage() {
 		});
 	}, [apiMembers, searchTerm, statusFilter, membershipFilter]);
 
+	const memberExportHead = ['Member', 'Email', 'Phone', 'Membership', 'Status', 'Disabled Reason', 'Join Date', 'Expires'];
+	const memberExportRows = filteredMembers.map((member) => [
+		member.name,
+		member.email,
+		member.phone,
+		member.membership,
+		member.status,
+		member.status === 'Disabled' ? member.disableReason || 'No reason provided' : '—',
+		member.joinDate,
+		member.endDate || '—',
+	]);
+
 	const handleExportPdf = () => {
 		exportTablePdf({
 			title: 'Member Management',
@@ -528,17 +541,19 @@ export function MembersPage() {
 			reportType: 'MEMBER_MANAGEMENT',
 			user: currentUser,
 			filterSummary: `status=${statusFilter};membership=${membershipFilter}`,
-			head: ['Member', 'Email', 'Phone', 'Membership', 'Status', 'Disabled Reason', 'Join Date', 'Expires'],
-			rows: filteredMembers.map((member) => [
-				member.name,
-				member.email,
-				member.phone,
-				member.membership,
-				member.status,
-				member.status === 'Disabled' ? member.disableReason || 'No reason provided' : '—',
-				member.joinDate,
-				member.endDate || '—',
-			]),
+			head: memberExportHead,
+			rows: memberExportRows,
+		});
+	};
+
+	const handleExportCsv = () => {
+		exportTableCsv({
+			filePrefix: 'members',
+			head: memberExportHead,
+			rows: memberExportRows,
+			reportType: 'MEMBER_MANAGEMENT',
+			user: currentUser,
+			filterSummary: `status=${statusFilter};membership=${membershipFilter};format=csv`,
 		});
 	};
 
@@ -774,10 +789,16 @@ export function MembersPage() {
 						Manage all gym members, view details, and update information ({apiMembers.length} total, {filteredMembers.length} filtered)
 					</p>
 				</div>
-				<button onClick={handleExportPdf} className="btn-export-pdf">
-					<Download className="w-4 h-4" />
-					Export PDF
-				</button>
+				<div className="flex flex-wrap items-center gap-2">
+					<button type="button" onClick={handleExportPdf} className="btn-export-pdf">
+						<Download className="w-4 h-4" />
+						Export PDF
+					</button>
+					<button type="button" onClick={handleExportCsv} className="btn-export-csv">
+						<Download className="w-4 h-4" />
+						Export CSV
+					</button>
+				</div>
 			</div>
 
 			{/* Search and Filters */}

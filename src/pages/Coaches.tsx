@@ -33,6 +33,7 @@ import { RoleType } from '@/graphql/generated/graphql';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfDay, startOfMonth } from 'date-fns';
+import { exportTableCsv } from '@/lib/csvExport';
 import { exportTablePdf } from '@/lib/pdfExport';
 import { cn } from '@/lib/utils';
 
@@ -446,8 +447,21 @@ export function CoachesPage() {
 		});
 	}, [apiCoaches, searchTerm, statusFilter]);
 
-	const handleExportPdf = () => {
-		const activeRows = filteredCoaches.map((coach) => [
+	const coachExportHead = [
+		'Record Type',
+		'Coach',
+		'Email',
+		'Phone',
+		'Specialization',
+		'Experience',
+		'Teaching Time',
+		'Clients',
+		'Status',
+		'Reason',
+		'Action Date',
+	];
+	const coachExportRows = [
+		...filteredCoaches.map((coach) => [
 			'Active',
 			coach.name,
 			coach.email,
@@ -461,8 +475,8 @@ export function CoachesPage() {
 			coach.statusUpdatedAt
 				? new Date(coach.statusUpdatedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
 				: '—',
-		]);
-		const removedRows = removedCoachLogs.map((log) => [
+		]),
+		...removedCoachLogs.map((log) => [
 			'Removed',
 			log.coachName,
 			log.email,
@@ -474,7 +488,10 @@ export function CoachesPage() {
 			'Removed',
 			log.reason,
 			new Date(log.removedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
-		]);
+		]),
+	];
+
+	const handleExportPdf = () => {
 		exportTablePdf({
 			title: 'Coach Management',
 			filePrefix: 'coaches',
@@ -482,20 +499,19 @@ export function CoachesPage() {
 			user: currentUser,
 			filterSummary: `status=${statusFilter};rows=${filteredCoaches.length}`,
 			subtitle: `Visible rows: ${filteredCoaches.length} | Removed history: ${removedCoachLogs.length}`,
-			head: [
-				'Record Type',
-				'Coach',
-				'Email',
-				'Phone',
-				'Specialization',
-				'Experience',
-				'Teaching Time',
-				'Clients',
-				'Status',
-				'Reason',
-				'Action Date',
-			],
-			rows: [...activeRows, ...removedRows],
+			head: coachExportHead,
+			rows: coachExportRows,
+		});
+	};
+
+	const handleExportCsv = () => {
+		exportTableCsv({
+			filePrefix: 'coaches',
+			head: coachExportHead,
+			rows: coachExportRows,
+			reportType: 'COACH_MANAGEMENT',
+			user: currentUser,
+			filterSummary: `status=${statusFilter};rows=${filteredCoaches.length};format=csv`,
 		});
 	};
 
@@ -557,10 +573,14 @@ export function CoachesPage() {
 						Manage all gym coaches, view details, and update information ({apiCoaches.length} total)
 					</p>
 				</div>
-				<div className="flex items-center gap-3">
-					<Button onClick={handleExportPdf} className="btn-export-pdf">
+				<div className="flex flex-wrap items-center gap-3">
+					<Button type="button" onClick={handleExportPdf} className="btn-export-pdf">
 						<Download className="w-4 h-4" />
 						Export PDF
+					</Button>
+					<Button type="button" onClick={handleExportCsv} className="btn-export-csv">
+						<Download className="w-4 h-4" />
+						Export CSV
 					</Button>
 					<Button onClick={handleAddCoach}>
 						Add New Coach

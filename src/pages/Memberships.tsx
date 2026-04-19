@@ -22,6 +22,7 @@ import {
 	readRemovedMembershipLogs,
 	type RemovedMembershipLog,
 } from '@/lib/membershipRemovalLogs';
+import { exportTableCsv } from '@/lib/csvExport';
 import { exportTablePdf } from '@/lib/pdfExport';
 
 export function MembershipsPage() {
@@ -290,6 +291,43 @@ export function MembershipsPage() {
 		});
 	};
 
+	const handleExportCsv = () => {
+		if (activeTab === 'active') {
+			exportTableCsv({
+				filePrefix: 'membership-plans-active',
+				reportType: 'MEMBERSHIP_MANAGEMENT',
+				user: currentUser,
+				filterSummary: 'tab=active;format=csv',
+				head: ['Plan Name', 'Status', 'Price', 'Duration', 'Description', 'Features'],
+				rows: plans.map((plan) => [
+					plan.name,
+					plan.status,
+					`PHP ${Number(plan.monthlyPrice || 0).toLocaleString()}`,
+					durationMap[plan.durationType] || plan.durationType || '-',
+					plan.description || '-',
+					(plan.features || []).join(', ') || '-',
+				]),
+			});
+			return;
+		}
+
+		exportTableCsv({
+			filePrefix: 'membership-plans-removed',
+			reportType: 'MEMBERSHIP_REMOVED_HISTORY',
+			user: currentUser,
+			filterSummary: 'tab=removed;format=csv',
+			head: ['Removed At', 'Plan', 'Price', 'Duration', 'Reason', 'Removed By'],
+			rows: removedPlans.map((log) => [
+				new Date(log.removedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
+				log.planName,
+				`PHP ${Number(log.planPrice || 0).toLocaleString()}`,
+				durationMap[log.planDurationType] || log.planDurationType,
+				log.reason,
+				log.removedBy,
+			]),
+		});
+	};
+
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
@@ -304,10 +342,14 @@ export function MembershipsPage() {
 						{activeTab === 'active' ? 'plans' : 'removed'})
 					</p>
 				</div>
-				<div className="flex items-center gap-3">
-					<Button onClick={handleExportPdf} className="btn-export-pdf">
+				<div className="flex flex-wrap items-center gap-3">
+					<Button type="button" onClick={handleExportPdf} className="btn-export-pdf">
 						<Download className="w-4 h-4" />
 						Export PDF
+					</Button>
+					<Button type="button" onClick={handleExportCsv} className="btn-export-csv">
+						<Download className="w-4 h-4" />
+						Export CSV
 					</Button>
 					{activeTab === 'active' && (
 						<Button onClick={handleCreatePlan}>
