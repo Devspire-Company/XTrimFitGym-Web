@@ -28,7 +28,14 @@ import {
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import {
+	KeyboardAvoidingView,
+	Platform,
+	ScrollView,
+	Text,
+	TouchableOpacity,
+	View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Step = 'form' | 'verify';
@@ -363,22 +370,26 @@ const SignUp = () => {
 
 	return (
 		<FixedView className='flex-1 bg-bg-darker'>
-			<ScrollView
-				automaticallyAdjustKeyboardInsets
-				contentContainerClassName={
-					emailFormExpanded
-						? 'flex-grow px-5 pt-4 pb-2'
-						: 'flex-grow justify-center px-5 py-8'
-				}
-				contentContainerStyle={{ paddingBottom: scrollContentBottomPad }}
-				contentInsetAdjustmentBehavior='automatic'
-				keyboardShouldPersistTaps='handled'
-				keyboardDismissMode={
-					Platform.OS === 'ios' ? 'interactive' : 'on-drag'
-				}
-				showsVerticalScrollIndicator={false}
-				scrollEnabled={!blockInputs}
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : insets.top}
 			>
+				<ScrollView
+					automaticallyAdjustKeyboardInsets
+					contentContainerClassName={
+						emailFormExpanded
+							? 'flex-grow px-5 pt-4 pb-2'
+							: 'flex-grow justify-center px-5 py-8'
+					}
+					contentContainerStyle={{ paddingBottom: scrollContentBottomPad + 24 }}
+					contentInsetAdjustmentBehavior='automatic'
+					keyboardShouldPersistTaps='handled'
+					keyboardDismissMode={
+						Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+					}
+					showsVerticalScrollIndicator={false}
+				>
 					<View className='items-center mb-6'>
 						<Image
 							source={require('@/assets/logos/XTFG_icon_1024.png')}
@@ -533,7 +544,8 @@ const SignUp = () => {
 							<Text className='text-[#F9C513] font-semibold'>Log in</Text>
 						</TouchableOpacity>
 					</View>
-			</ScrollView>
+				</ScrollView>
+			</KeyboardAvoidingView>
 			<ConfirmModal
 				visible={alertModal.visible}
 				title={alertModal.title}

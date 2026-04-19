@@ -1,8 +1,16 @@
 import type { User } from '@/graphql/generated/types';
 
-/** Active gym membership is represented by an assigned membership id on the user. */
+/**
+ * True when the member has an active gym subscription (paid access), matching dashboard logic.
+ * Do not use `membershipDetails.membershipId` alone — the API may leave it set after admin
+ * unsubscribe while the transaction is canceled; `currentMembership` reflects active tx only.
+ */
 export function memberHasActiveGymMembership(user: User | null | undefined): boolean {
-	return !!user?.membershipDetails?.membershipId;
+	const tx = user?.currentMembership;
+	if (tx != null) {
+		return tx.status === 'ACTIVE';
+	}
+	return false;
 }
 
 /**

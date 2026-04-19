@@ -38,6 +38,7 @@ import {
 	TouchableOpacity,
 	View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type LoginStep = 'email' | 'code';
 type VerificationMode = 'clerk' | 'dev_coach';
@@ -46,6 +47,7 @@ type EmailCodeFactor = { strategy: string; emailAddressId?: string };
 
 const Login = () => {
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const dispatch = useAppDispatch();
 	const { isLoaded, signIn, setActive } = useSignIn();
 	const { getToken } = useAuth();
@@ -299,17 +301,27 @@ const Login = () => {
 
 	const loading = submitting || !isLoaded;
 	const blockInputs = loading || googleLoading || requestingDevCoachCode;
+	const contentBottomPad = Math.max(insets.bottom + 12, 24);
 
 	return (
 		<FixedView className='flex-1 bg-bg-darker'>
 			<KeyboardAvoidingView
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 				className='flex-1'
-				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : insets.top}
 			>
 				<ScrollView
-					contentContainerClassName='flex-grow justify-center px-5 py-8'
+					automaticallyAdjustKeyboardInsets
+					contentContainerClassName={
+						step === 'code'
+							? 'flex-grow px-5 pt-4 pb-2'
+							: 'flex-grow justify-center px-5 py-8'
+					}
+					contentContainerStyle={{ paddingBottom: contentBottomPad + 24 }}
+					contentInsetAdjustmentBehavior='automatic'
 					keyboardShouldPersistTaps='handled'
+					keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+					showsVerticalScrollIndicator={false}
 				>
 					<View className='items-center mb-8'>
 						<Image

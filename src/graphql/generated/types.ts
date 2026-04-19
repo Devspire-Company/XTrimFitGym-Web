@@ -251,13 +251,18 @@ export type CreateUserInput = {
   coachDetails?: InputMaybe<CoachDetailsInput>;
   currentPassword?: InputMaybe<Scalars['String']['input']>;
   dateOfBirth?: InputMaybe<Scalars['String']['input']>;
+  /** Development-only fallback email verification code used when Clerk email quota is exceeded. */
+  devVerificationCode?: InputMaybe<Scalars['String']['input']>;
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
   gender?: InputMaybe<Scalars['String']['input']>;
+  guardianIdVerificationPhotoUrl?: InputMaybe<Scalars['String']['input']>;
   heardFrom?: InputMaybe<Array<InputMaybe<Scalars['String']['input']>>>;
   lastName: Scalars['String']['input'];
   membershipDetails?: InputMaybe<MemberDetailsInput>;
   middleName?: InputMaybe<Scalars['String']['input']>;
+  minorLiabilityWaiverPrintedName?: InputMaybe<Scalars['String']['input']>;
+  minorLiabilityWaiverSignatureUrl?: InputMaybe<Scalars['String']['input']>;
   /**
    * Password is optional for Clerk-based admin creation (backend generates one).
    * Legacy email/password auth still uses this field.
@@ -494,6 +499,7 @@ export type Mutation = {
   deleteProgressRating: Scalars['Boolean']['output'];
   deleteSubscriptionRequest: Scalars['Boolean']['output'];
   deleteUser?: Maybe<Scalars['Boolean']['output']>;
+  devCoachSignIn: AuthResponse;
   directSubscribeMember: MembershipTransaction;
   disableUser?: Maybe<User>;
   enableUser?: Maybe<User>;
@@ -507,6 +513,8 @@ export type Mutation = {
   rejectSubscriptionRequest: Scalars['Boolean']['output'];
   removeClient: Scalars['Boolean']['output'];
   removeClientFromClassSession: Session;
+  requestDevCoachSignInCode: Scalars['Boolean']['output'];
+  requestDevEmailVerificationCode: Scalars['Boolean']['output'];
   requestToJoinClassSession: Session;
   respondToClassInvitation: Session;
   unarchiveEquipment: Equipment;
@@ -670,6 +678,12 @@ export type MutationDeleteUserArgs = {
 };
 
 
+export type MutationDevCoachSignInArgs = {
+  code: Scalars['String']['input'];
+  email: Scalars['String']['input'];
+};
+
+
 export type MutationDirectSubscribeMemberArgs = {
   input: DirectSubscribeInput;
 };
@@ -730,6 +744,16 @@ export type MutationRemoveClientArgs = {
 export type MutationRemoveClientFromClassSessionArgs = {
   clientId: Scalars['ID']['input'];
   sessionId: Scalars['ID']['input'];
+};
+
+
+export type MutationRequestDevCoachSignInCodeArgs = {
+  email: Scalars['String']['input'];
+};
+
+
+export type MutationRequestDevEmailVerificationCodeArgs = {
+  email: Scalars['String']['input'];
 };
 
 
@@ -1411,10 +1435,13 @@ export type UpdateUserInput = {
   email?: InputMaybe<Scalars['String']['input']>;
   firstName?: InputMaybe<Scalars['String']['input']>;
   gender?: InputMaybe<Scalars['String']['input']>;
+  guardianIdVerificationPhotoUrl?: InputMaybe<Scalars['String']['input']>;
   heardFrom?: InputMaybe<Array<InputMaybe<Scalars['String']['input']>>>;
   lastName?: InputMaybe<Scalars['String']['input']>;
   membershipDetails?: InputMaybe<MemberDetailsInput>;
   middleName?: InputMaybe<Scalars['String']['input']>;
+  minorLiabilityWaiverPrintedName?: InputMaybe<Scalars['String']['input']>;
+  minorLiabilityWaiverSignatureUrl?: InputMaybe<Scalars['String']['input']>;
   password?: InputMaybe<Scalars['String']['input']>;
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
@@ -1447,6 +1474,7 @@ export type User = {
   email: Scalars['String']['output'];
   firstName: Scalars['String']['output'];
   gender: Scalars['String']['output'];
+  guardianIdVerificationPhotoUrl?: Maybe<Scalars['String']['output']>;
   heardFrom?: Maybe<Array<Maybe<Scalars['String']['output']>>>;
   id: Scalars['ID']['output'];
   isDisabled: Scalars['Boolean']['output'];
@@ -1454,6 +1482,8 @@ export type User = {
   loginHistory?: Maybe<Array<Maybe<LoginHistoryEntry>>>;
   membershipDetails?: Maybe<MemberDetails>;
   middleName?: Maybe<Scalars['String']['output']>;
+  minorLiabilityWaiverPrintedName?: Maybe<Scalars['String']['output']>;
+  minorLiabilityWaiverSignatureUrl?: Maybe<Scalars['String']['output']>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   role: RoleType;
   updatedAt?: Maybe<Scalars['String']['output']>;
@@ -1767,7 +1797,7 @@ export type GetPendingSubscriptionRequestsQuery = { __typename?: 'Query', getPen
 export type GetAllSubscriptionRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAllSubscriptionRequestsQuery = { __typename?: 'Query', getAllSubscriptionRequests: Array<{ __typename?: 'SubscriptionRequest', id: string, memberId: string, membershipId: string, status: SubscriptionRequestStatus, requestedAt: string, approvedAt?: string | null, rejectedAt?: string | null, createdAt?: string | null, updatedAt?: string | null, member?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number } | null, approvedBy?: { __typename?: 'User', id: string, firstName: string, lastName: string } | null, rejectedBy?: { __typename?: 'User', id: string, firstName: string, lastName: string } | null }> };
+export type GetAllSubscriptionRequestsQuery = { __typename?: 'Query', getAllSubscriptionRequests: Array<{ __typename?: 'SubscriptionRequest', id: string, memberId: string, membershipId: string, status: SubscriptionRequestStatus, requestedAt: string, approvedAt?: string | null, rejectedAt?: string | null, createdAt?: string | null, updatedAt?: string | null, member?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null, membership?: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number } | null, approvedBy?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null, rejectedBy?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null }> };
 
 export type ApproveSubscriptionRequestMutationVariables = Exact<{
   input: ApproveSubscriptionRequestInput;
@@ -1970,3 +2000,11 @@ export type UpdateWalkInClientMutationVariables = Exact<{
 
 
 export type UpdateWalkInClientMutation = { __typename?: 'Mutation', updateWalkInClient: { __typename?: 'WalkInClient', id: string, firstName: string, middleName?: string | null, lastName: string, phoneNumber?: string | null, email?: string | null, gender: WalkInGender, notes?: string | null, ageYears?: number | null, minorWaiverGuardianName?: string | null, minorWaiverAcceptedAt?: string | null, createdAt: string, updatedAt: string } };
+
+export type GetUsersAttendanceRosterQueryVariables = Exact<{
+  role?: InputMaybe<RoleType>;
+  includeDisabled?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+
+export type GetUsersAttendanceRosterQuery = { __typename?: 'Query', getUsers?: Array<{ __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, attendanceId?: number | null } | null> | null };

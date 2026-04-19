@@ -29,6 +29,15 @@ export const ME_QUERY = gql`
 				hasEnteredDetails
 				facilityBiometricEnrollmentComplete
 			}
+			currentMembership {
+				id
+				status
+				expiresAt
+				membership {
+					id
+					name
+				}
+			}
 			coachDetails {
 				clientsIds
 				sessionsIds

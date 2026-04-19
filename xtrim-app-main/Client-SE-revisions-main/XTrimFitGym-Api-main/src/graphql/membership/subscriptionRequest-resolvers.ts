@@ -58,6 +58,68 @@ const mapMembershipToGraphQL = (membership: any) => {
 
 type Context = IAuthContext;
 
+const isPopulatedProcessorUser = (ref: any) =>
+	ref && typeof ref === 'object' && typeof ref.firstName === 'string';
+
+const processorUserIdString = (ref: any): string | null => {
+	if (!ref) return null;
+	if (isPopulatedProcessorUser(ref) && ref._id) return ref._id.toString();
+	if (typeof ref === 'object' && ref._id) return ref._id.toString();
+	if (typeof ref === 'string') return ref;
+	try {
+		const s = ref.toString();
+		if (mongoose.Types.ObjectId.isValid(s)) return s;
+	} catch {
+		/* noop */
+	}
+	return null;
+};
+
+const formatProcessorUser = (ref: any) => {
+	if (!ref || !isPopulatedProcessorUser(ref)) return null;
+	return {
+		id: ref._id.toString(),
+		firstName: ref.firstName,
+		lastName: ref.lastName,
+		email: ref.email ?? '',
+	};
+};
+
+async function buildProcessorUserLookupMap(requests: any[]) {
+	const ids = new Set<string>();
+	for (const r of requests) {
+		const aid = processorUserIdString(r.approvedBy);
+		if (aid && !isPopulatedProcessorUser(r.approvedBy)) ids.add(aid);
+		const rid = processorUserIdString(r.rejectedBy);
+		if (rid && !isPopulatedProcessorUser(r.rejectedBy)) ids.add(rid);
+	}
+	const map = new Map<string, { firstName: string; lastName: string; email: string }>();
+	if (ids.size === 0) return map;
+	const oids = [...ids].map((id) => new mongoose.Types.ObjectId(id));
+	const users = await User.find({ _id: { $in: oids } }).select('firstName lastName email').lean();
+	for (const u of users) {
+		map.set(u._id.toString(), {
+			firstName: u.firstName,
+			lastName: u.lastName,
+			email: u.email ?? '',
+		});
+	}
+	return map;
+}
+
+function resolveProcessorRef(
+	ref: any,
+	lookup: Map<string, { firstName: string; lastName: string; email: string }>
+) {
+	const formatted = formatProcessorUser(ref);
+	if (formatted) return formatted;
+	const id = processorUserIdString(ref);
+	if (!id) return null;
+	const u = lookup.get(id);
+	if (!u) return null;
+	return { id, firstName: u.firstName, lastName: u.lastName, email: u.email };
+}
+
 const mapSubscriptionRequestToGraphQL = (request: any, membershipData?: any, memberData?: any) => {
 	// If membershipData is provided, use it; otherwise use the request's membership_id
 	const membership = membershipData 
@@ -291,10 +353,12 @@ export default {
 			const requests = await SubscriptionRequest.find({})
 				.populate('member_id', 'firstName lastName email')
 				.populate('membership_id')
-				.populate('approvedBy', 'firstName lastName')
-				.populate('rejectedBy', 'firstName lastName')
+				.populate('approvedBy', 'firstName lastName email')
+				.populate('rejectedBy', 'firstName lastName email')
 				.sort({ createdAt: -1 })
 				.lean();
+
+			const processorLookup = await buildProcessorUserLookupMap(requests);
 
 			// Map requests and ensure member data is properly formatted
 			return requests.map((request) => {
@@ -309,34 +373,13 @@ export default {
 						email: request.member_id.email,
 					};
 				}
-				
-				// Format approvedBy and rejectedBy if populated
-				let approvedByData: any = null;
-				if (request.approvedBy && typeof request.approvedBy === 'object' && request.approvedBy._id) {
-					approvedByData = {
-						id: request.approvedBy._id.toString(),
-						firstName: request.approvedBy.firstName,
-						lastName: request.approvedBy.lastName,
-					};
-				}
-				
-				let rejectedByData: any = null;
-				if (request.rejectedBy && typeof request.rejectedBy === 'object' && request.rejectedBy._id) {
-					rejectedByData = {
-						id: request.rejectedBy._id.toString(),
-						firstName: request.rejectedBy.firstName,
-						lastName: request.rejectedBy.lastName,
-					};
-				}
-				
+
+				const approvedByData = resolveProcessorRef(request.approvedBy, processorLookup);
+				const rejectedByData = resolveProcessorRef(request.rejectedBy, processorLookup);
+
 				const mapped = mapSubscriptionRequestToGraphQL(request, undefined, memberData);
-				// Override approvedBy and rejectedBy with properly formatted data
-				if (approvedByData) {
-					mapped.approvedBy = approvedByData;
-				}
-				if (rejectedByData) {
-					mapped.rejectedBy = rejectedByData;
-				}
+				if (approvedByData) mapped.approvedBy = approvedByData;
+				if (rejectedByData) mapped.rejectedBy = rejectedByData;
 				return mapped;
 			});
 		},
@@ -351,8 +394,8 @@ export default {
 			const request = await SubscriptionRequest.findById(id)
 				.populate('member_id', 'firstName lastName email')
 				.populate('membership_id')
-				.populate('approvedBy', 'firstName lastName')
-				.populate('rejectedBy', 'firstName lastName')
+				.populate('approvedBy', 'firstName lastName email')
+				.populate('rejectedBy', 'firstName lastName email')
 				.lean();
 
 			if (!request) {
@@ -375,7 +418,13 @@ export default {
 				};
 			}
 
-			return mapSubscriptionRequestToGraphQL(request, undefined, memberData);
+			const processorLookup = await buildProcessorUserLookupMap([request]);
+			const mapped = mapSubscriptionRequestToGraphQL(request, undefined, memberData);
+			const approvedByData = resolveProcessorRef(request.approvedBy, processorLookup);
+			const rejectedByData = resolveProcessorRef(request.rejectedBy, processorLookup);
+			if (approvedByData) mapped.approvedBy = approvedByData;
+			if (rejectedByData) mapped.rejectedBy = rejectedByData;
+			return mapped;
 		},
 
 		getMySubscriptionRequests: async (_: any, __: any, context: Context) => {
@@ -388,10 +437,12 @@ export default {
 				member_id: new mongoose.Types.ObjectId(userId),
 			})
 				.populate('membership_id')
-				.populate('approvedBy', 'firstName lastName')
-				.populate('rejectedBy', 'firstName lastName')
+				.populate('approvedBy', 'firstName lastName email')
+				.populate('rejectedBy', 'firstName lastName email')
 				.sort({ createdAt: -1 })
 				.lean();
+
+			const processorLookup = await buildProcessorUserLookupMap(requests);
 
 			return requests.map((request) => {
 				// Format member data if populated
@@ -404,7 +455,12 @@ export default {
 						email: request.member_id.email,
 					};
 				}
-				return mapSubscriptionRequestToGraphQL(request, undefined, memberData);
+				const mapped = mapSubscriptionRequestToGraphQL(request, undefined, memberData);
+				const approvedByData = resolveProcessorRef(request.approvedBy, processorLookup);
+				const rejectedByData = resolveProcessorRef(request.rejectedBy, processorLookup);
+				if (approvedByData) mapped.approvedBy = approvedByData;
+				if (rejectedByData) mapped.rejectedBy = rejectedByData;
+				return mapped;
 			});
 		},
 	},
@@ -783,33 +839,71 @@ export default {
 			if (!parent.approvedBy) return null;
 			if (typeof parent.approvedBy === 'string') {
 				const user = await User.findById(parent.approvedBy)
-					.select('firstName lastName')
+					.select('firstName lastName email')
 					.lean();
 				return user
 					? {
 							id: user._id.toString(),
 							firstName: user.firstName,
 							lastName: user.lastName,
+							email: user.email,
 					  }
 					: null;
 			}
-			return parent.approvedBy;
+			if (typeof parent.approvedBy === 'object' && parent.approvedBy.id && parent.approvedBy.firstName) {
+				return {
+					...parent.approvedBy,
+					email: parent.approvedBy.email ?? '',
+				};
+			}
+			const formatted = formatProcessorUser(parent.approvedBy);
+			if (formatted) return formatted;
+			const id = processorUserIdString(parent.approvedBy);
+			if (!id) return null;
+			const user = await User.findById(id).select('firstName lastName email').lean();
+			return user
+				? {
+						id: user._id.toString(),
+						firstName: user.firstName,
+						lastName: user.lastName,
+						email: user.email,
+				  }
+				: null;
 		},
 		rejectedBy: async (parent: any) => {
 			if (!parent.rejectedBy) return null;
 			if (typeof parent.rejectedBy === 'string') {
 				const user = await User.findById(parent.rejectedBy)
-					.select('firstName lastName')
+					.select('firstName lastName email')
 					.lean();
 				return user
 					? {
 							id: user._id.toString(),
 							firstName: user.firstName,
 							lastName: user.lastName,
+							email: user.email,
 					  }
 					: null;
 			}
-			return parent.rejectedBy;
+			if (typeof parent.rejectedBy === 'object' && parent.rejectedBy.id && parent.rejectedBy.firstName) {
+				return {
+					...parent.rejectedBy,
+					email: parent.rejectedBy.email ?? '',
+				};
+			}
+			const formatted = formatProcessorUser(parent.rejectedBy);
+			if (formatted) return formatted;
+			const id = processorUserIdString(parent.rejectedBy);
+			if (!id) return null;
+			const user = await User.findById(id).select('firstName lastName email').lean();
+			return user
+				? {
+						id: user._id.toString(),
+						firstName: user.firstName,
+						lastName: user.lastName,
+						email: user.email,
+				  }
+				: null;
 		},
 	},
 };

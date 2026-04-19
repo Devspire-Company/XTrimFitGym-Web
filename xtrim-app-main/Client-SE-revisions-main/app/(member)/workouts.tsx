@@ -102,7 +102,6 @@ const MemberWorkouts = () => {
 
 	const dismissPostOnboardingWelcome = () => {
 		setPostOnboardingWelcomeVisible(false);
-		router.replace('/(member)/workouts');
 	};
 
 	const [exercises, setExercises] = useState<Exercise[]>([]);

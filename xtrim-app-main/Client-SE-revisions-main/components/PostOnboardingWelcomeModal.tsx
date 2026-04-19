@@ -5,9 +5,9 @@ import React from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 
 const POST_ONBOARDING_WELCOME_MESSAGE =
-	"Your account is ready—jump in and explore the app. Schedules, workouts, progress, and more are waiting for you. Glad you're here!";
-const LIMITED_WELCOME_REMINDER =
-	" Reminder: you're only in free access mode, please avail a membership plan to access other features.";
+	"Your account is ready. You can now use the app and explore your available member features.";
+const FREE_ACCESS_WELCOME_MESSAGE =
+	'Welcome to Free Access! You can use Workouts anytime. Upgrade to a gym membership whenever you are ready to unlock dashboard, schedule, progress, coaches, attendance, and session logs.';
 
 type Props = {
 	visible: boolean;
@@ -16,10 +16,11 @@ type Props = {
 };
 
 export function PostOnboardingWelcomeModal({ visible, onDismiss, kind }: Props) {
-	const welcomeMessage =
-		kind === 'limited'
-			? `${POST_ONBOARDING_WELCOME_MESSAGE}${LIMITED_WELCOME_REMINDER}`
-			: POST_ONBOARDING_WELCOME_MESSAGE;
+	const isFreeAccessWelcome = kind === 'limited';
+	const modalTitle = isFreeAccessWelcome ? 'Welcome to Free Access!' : 'Welcome aboard!';
+	const welcomeMessage = isFreeAccessWelcome
+		? FREE_ACCESS_WELCOME_MESSAGE
+		: POST_ONBOARDING_WELCOME_MESSAGE;
 
 	return (
 		<Modal
@@ -41,7 +42,7 @@ export function PostOnboardingWelcomeModal({ visible, onDismiss, kind }: Props) 
 							</View>
 						</View>
 						<Text className='text-text-primary text-2xl font-bold text-center mb-4'>
-							Welcome aboard!
+							{modalTitle}
 						</Text>
 						<Text className='text-text-secondary text-base text-center leading-6 mb-8'>
 							{welcomeMessage}

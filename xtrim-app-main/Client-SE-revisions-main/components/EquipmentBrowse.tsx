@@ -1,5 +1,6 @@
 import { PremiumLoadingContent } from '@/components/AuthProcessingScreen';
 import TabHeader from '@/components/TabHeader';
+import type { GetEquipmentsQuery } from '@/graphql/generated/types';
 import { GET_EQUIPMENTS_QUERY } from '@/graphql/queries';
 import { useQuery } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,11 +70,38 @@ function normalizeStatus(raw: unknown): EquipmentStatusValue {
 	return 'AVAILABLE';
 }
 
+function isArchivedEquipmentRow(row: Partial<EquipmentRow> & Record<string, unknown>): boolean {
+	const flag = row.isArchived ?? row.archived ?? row.is_archive;
+	if (typeof flag === 'boolean' && flag) return true;
+	const archivedAt = row.archivedAt ?? row.archived_at;
+	if (typeof archivedAt === 'string' && archivedAt.trim()) return true;
+	if (typeof row.notes === 'string' && row.notes.trim()) {
+		const rawNotes = row.notes.trim().toLowerCase();
+		let decodedNotes = rawNotes;
+		try {
+			decodedNotes = decodeURIComponent(rawNotes);
+		} catch {
+			// Keep raw notes if decoding fails.
+		}
+		return (
+			rawNotes.includes('__archived__') ||
+			decodedNotes.includes('__archived__') ||
+			rawNotes.includes('_archived_|') ||
+			decodedNotes.includes('_archived_|') ||
+			rawNotes.includes('archived|') ||
+			decodedNotes.includes('archived|') ||
+			rawNotes.includes('archived:') ||
+			decodedNotes.includes('archived:')
+		);
+	}
+	return false;
+}
+
 type Props = { showTabHeader?: boolean };
 
 export function EquipmentBrowse({ showTabHeader = true }: Props) {
 	const [refreshing, setRefreshing] = useState(false);
-	const { data, loading, error, refetch } = useQuery(GET_EQUIPMENTS_QUERY, {
+	const { data, loading, error, refetch } = useQuery<GetEquipmentsQuery>(GET_EQUIPMENTS_QUERY, {
 		fetchPolicy: 'cache-and-network',
 	});
 
@@ -85,7 +113,8 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 			setRefreshing(false);
 		}
 	}, [refetch]);
-	const rawList = (data?.getEquipments ?? []) as Partial<EquipmentRow>[];
+	const rawList = (data?.getEquipments ?? []) as (Partial<EquipmentRow> &
+		Record<string, unknown>)[];
 	const list: EquipmentRow[] = rawList.map((row) => ({
 		id: String(row.id),
 		name: String(row.name),
@@ -96,7 +125,7 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 		status: normalizeStatus(row.status),
 		createdAt: row.createdAt ?? null,
 		updatedAt: row.updatedAt ?? null,
-	}));
+	})).filter((row, index) => !isArchivedEquipmentRow(rawList[index]));
 	const [detail, setDetail] = useState<EquipmentRow | null>(null);
 
 	return (

@@ -255,7 +255,7 @@ const MemberDashboard = () => {
 					daysUntilExpiry > 0 &&
 					daysUntilExpiry <= 7 &&
 					!dismissedExpiryCard && (
-						<View className='bg-amber-500/20 border border-amber-500/40 rounded-xl p-4 mb-6'>
+						<View className='bg-red-500/20 border border-amber-500/40 rounded-xl p-4 mb-6'>
 							<View className='flex-row justify-between items-start'>
 								<TouchableOpacity
 									onPress={() => router.push('/(member)/subscription')}

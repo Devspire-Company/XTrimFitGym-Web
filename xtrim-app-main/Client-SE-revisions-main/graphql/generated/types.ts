@@ -1600,7 +1600,7 @@ export type DeleteProgressRatingMutation = { __typename?: 'Mutation', deleteProg
 export type MeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, agreedToTermsAndConditions?: boolean | null, agreedToPrivacyPolicy?: boolean | null, agreedToLiabilityWaiver?: boolean | null, guardianIdVerificationPhotoUrl?: string | null, minorLiabilityWaiverPrintedName?: string | null, minorLiabilityWaiverSignatureUrl?: string | null, attendanceId?: number | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, facilityBiometricEnrollmentComplete?: boolean | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null } | null };
+export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, firstName: string, middleName?: string | null, lastName: string, email: string, role: RoleType, phoneNumber?: string | null, dateOfBirth?: string | null, gender: string, heardFrom?: Array<string | null> | null, agreedToTermsAndConditions?: boolean | null, agreedToPrivacyPolicy?: boolean | null, agreedToLiabilityWaiver?: boolean | null, guardianIdVerificationPhotoUrl?: string | null, minorLiabilityWaiverPrintedName?: string | null, minorLiabilityWaiverSignatureUrl?: string | null, attendanceId?: number | null, createdAt?: string | null, updatedAt?: string | null, membershipDetails?: { __typename?: 'MemberDetails', membershipId?: string | null, physiqueGoalType: string, fitnessGoal?: Array<string> | null, workOutTime?: Array<string | null> | null, coachesIds?: Array<string | null> | null, hasEnteredDetails?: boolean | null, facilityBiometricEnrollmentComplete?: boolean | null } | null, currentMembership?: { __typename?: 'MembershipTransaction', id: string, status: TransactionStatus, expiresAt: string, membership?: { __typename?: 'Membership', id: string, name: string } | null } | null, coachDetails?: { __typename?: 'CoachDetails', clientsIds?: Array<string | null> | null, sessionsIds?: Array<string | null> | null, specialization?: Array<string> | null, ratings?: number | null, yearsOfExperience?: number | null, moreDetails?: string | null, teachingDate?: Array<string | null> | null, teachingTime?: Array<string | null> | null, clientLimit?: number | null } | null } | null };
 
 export type GetCoachSessionsQueryVariables = Exact<{
   coachId: Scalars['ID']['input'];
@@ -3236,6 +3236,15 @@ export const MeDocument = gql`
       coachesIds
       hasEnteredDetails
       facilityBiometricEnrollmentComplete
+    }
+    currentMembership {
+      id
+      status
+      expiresAt
+      membership {
+        id
+        name
+      }
     }
     coachDetails {
       clientsIds
