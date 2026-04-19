@@ -8,12 +8,7 @@ import TabHeader from '@/components/TabHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMemberMembershipModal } from '@/contexts/MemberMembershipModalContext';
 import { memberHasActiveGymMembership } from '@/utils/memberMembership';
-import {
-	GetGoalsQuery,
-	GetGoalsQueryVariables,
-	GetWeightProgressChartQuery,
-	GetWeightProgressChartQueryVariables,
-} from '@/graphql/generated/types';
+import { GetGoalsQuery, GetGoalsQueryVariables } from '@/graphql/generated/types';
 import {
 	CREATE_GOAL_MUTATION,
 	CREATE_COACH_RATING_MUTATION,
@@ -22,12 +17,10 @@ import {
 import { normalizePhysiqueGoalTypeForApi } from '@/constants/onboarding-options';
 import {
 	GET_GOALS_QUERY,
-	GET_WEIGHT_PROGRESS_CHART_QUERY,
 	GET_PROGRESS_RATINGS_QUERY,
 	GET_CLIENT_SESSIONS_QUERY,
 	GET_SESSION_LOGS_QUERY,
 	GET_COACH_RATING_BY_SESSION_LOG_QUERY,
-	GET_MY_COACH_RATINGS_FOR_GOAL_QUERY,
 } from '@/graphql/queries';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
@@ -327,14 +320,6 @@ const MemberProgress = () => {
 		}
 	};
 
-	const { data: progressData } = useQuery<
-		GetWeightProgressChartQuery,
-		GetWeightProgressChartQueryVariables
-	>(GET_WEIGHT_PROGRESS_CHART_QUERY, {
-		variables: { clientId: user?.id || '', goalId: selectedGoal?.id },
-		skip: !selectedGoal || !showWeightChart || !user?.id,
-	});
-
 	const { data: ratingsData } = useQuery<any>(
 		GET_PROGRESS_RATINGS_QUERY,
 		{
@@ -368,12 +353,6 @@ const MemberProgress = () => {
 			!selectedSessionLog?.id ||
 			!goalIdForSessionRecap ||
 			!user?.id,
-		fetchPolicy: 'cache-and-network',
-	});
-
-	const { data: myCoachRatingsForGoal } = useQuery<any>(GET_MY_COACH_RATINGS_FOR_GOAL_QUERY, {
-		variables: { goalId: selectedGoal?.id || '' },
-		skip: !selectedGoal?.id || !showWeightChart || !user?.id,
 		fetchPolicy: 'cache-and-network',
 	});
 
@@ -426,11 +405,6 @@ const MemberProgress = () => {
 		setPendingCoachComment('');
 		setPendingCoachCommentError('');
 	}, [selectedSessionLog?.id]);
-
-	const mySessionRatingsList = useMemo(
-		() => myCoachRatingsForGoal?.getMyCoachRatingsForGoal || [],
-		[myCoachRatingsForGoal]
-	);
 
 	const sortedGoalProgressRatings = useMemo(() => {
 		const list = ratingsData?.getProgressRatings || [];
@@ -660,7 +634,6 @@ const MemberProgress = () => {
 	]);
 
 	const goals = goalsData?.getGoals || [];
-	const progressPoints = progressData?.getWeightProgressChart || [];
 
 	const goalTargetDateMaximum = useMemo(() => {
 		const d = new Date();
@@ -772,63 +745,6 @@ const MemberProgress = () => {
 		targetDateIsCustom,
 		computeSuggestedTargetDate,
 	]);
-
-	const renderWeightChart = () => {
-		if (progressPoints.length === 0) {
-			return (
-				<View className='items-center justify-center py-10'>
-					<Text className='text-text-secondary'>
-						No weight data available yet
-					</Text>
-				</View>
-			);
-		}
-
-		const weights = progressPoints.map((p: any) => p.weight);
-		const minWeight = Math.min(...weights);
-		const maxWeight = Math.max(...weights);
-		const range = maxWeight - minWeight || 1;
-		const chartHeight = 200;
-		const chartWidth = screenWidth - 60;
-
-		return (
-			<View>
-				<View
-					className='border-l-2 border-b-2 border-text-secondary'
-					style={{ height: chartHeight, width: chartWidth }}
-				>
-					{progressPoints.map((point: any, index: number) => {
-						const normalizedWeight = (point.weight - minWeight) / range;
-						const y = chartHeight - normalizedWeight * chartHeight;
-						const x = (index / (progressPoints.length - 1 || 1)) * chartWidth;
-
-						return (
-							<View
-								key={index}
-								className='absolute bg-[#F9C513] rounded-full'
-								style={{
-									left: x - 4,
-									top: y - 4,
-									width: 8,
-									height: 8,
-								}}
-							/>
-						);
-					})}
-				</View>
-				<View className='flex-row justify-between mt-2'>
-					<Text className='text-text-secondary text-xs'>
-						{new Date(progressPoints[0]?.date).toLocaleDateString()}
-					</Text>
-					<Text className='text-text-secondary text-xs'>
-						{new Date(
-							progressPoints[progressPoints.length - 1]?.date
-						).toLocaleDateString()}
-					</Text>
-				</View>
-			</View>
-		);
-	};
 
 	return (
 		<FixedView className='flex-1 bg-bg-darker'>
@@ -1514,6 +1430,118 @@ const MemberProgress = () => {
 						</View>
 						<ScrollView showsVerticalScrollIndicator={false}>
 							{selectedGoal && (
+								<>
+									{/* Progress Data — same structure as Session Logs details */}
+									<View className='mb-6'>
+										<Text className='text-lg font-semibold text-text-primary mb-3'>
+											Progress Data
+										</Text>
+										<View
+											className='bg-bg-darker rounded-xl p-4 border border-[#F9C513]'
+											style={{ borderWidth: 0.5 }}
+										>
+											{latestSessionLogForSelectedGoal?.weight != null && (
+												<View className='mb-3'>
+													<Text className='text-text-secondary text-xs mb-1'>Weight</Text>
+													<Text className='text-text-primary font-semibold text-lg'>
+														{latestSessionLogForSelectedGoal.weight} kg
+													</Text>
+												</View>
+											)}
+											{latestSessionLogForSelectedGoal?.completedAt ? (
+												<View className='mb-3'>
+													<Text className='text-text-secondary text-xs mb-1'>
+														Completed At
+													</Text>
+													<Text className='text-text-primary font-semibold'>
+														{new Date(
+															latestSessionLogForSelectedGoal.completedAt
+														).toLocaleString('en-US', {
+															month: 'short',
+															day: 'numeric',
+															year: 'numeric',
+															hour: 'numeric',
+															minute: '2-digit',
+														})}
+													</Text>
+												</View>
+											) : null}
+											{latestSessionLogForSelectedGoal?.notes ? (
+												<View
+													className={
+														formatKgDisplay(selectedGoal.currentWeight) ||
+														formatKgDisplay(selectedGoal.targetWeight)
+															? 'mb-3'
+															: ''
+													}
+												>
+													<Text className='text-text-secondary text-xs mb-1'>Notes</Text>
+													<Text className='text-text-primary'>
+														{latestSessionLogForSelectedGoal.notes}
+													</Text>
+												</View>
+											) : null}
+											{formatKgDisplay(selectedGoal.currentWeight) ||
+											formatKgDisplay(selectedGoal.targetWeight) ? (
+												<View
+													className={
+														latestSessionLogForSelectedGoal?.weight != null ||
+														latestSessionLogForSelectedGoal?.completedAt ||
+														latestSessionLogForSelectedGoal?.notes
+															? 'mt-3 pt-3 border-t border-[#F9C513]/30'
+															: ''
+													}
+												>
+													<Text className='text-text-secondary text-xs mb-2'>
+														Goal reference
+													</Text>
+													{formatKgDisplay(selectedGoal.currentWeight) ? (
+														<Text className='text-text-primary text-sm mb-1'>
+															Starting weight (goal):{' '}
+															<Text className='font-bold text-[#F9C513]'>
+																{formatKgDisplay(selectedGoal.currentWeight)} kg
+															</Text>
+														</Text>
+													) : null}
+													{formatKgDisplay(selectedGoal.targetWeight) ? (
+														<Text className='text-text-primary text-sm mb-1'>
+															Target:{' '}
+															<Text className='font-semibold'>
+																{formatKgDisplay(selectedGoal.targetWeight)} kg
+															</Text>
+														</Text>
+													) : null}
+													{latestSessionLogForSelectedGoal?.weight != null &&
+													selectedGoal.currentWeight != null ? (
+														<Text className='text-text-secondary text-sm mt-2'>
+															vs goal start:{' '}
+															{(() => {
+																const delta =
+																	Math.round(
+																		(Number(latestSessionLogForSelectedGoal.weight) -
+																			Number(selectedGoal.currentWeight)) *
+																			10
+																	) / 10;
+																const sign = delta > 0 ? '+' : '';
+																return (
+																	<Text className='text-[#F9C513] font-semibold'>
+																		{sign}
+																		{delta} kg
+																	</Text>
+																);
+															})()}
+														</Text>
+													) : null}
+												</View>
+											) : !latestSessionLogForSelectedGoal ? (
+												<Text className='text-text-secondary text-sm'>
+													No session completed for this goal yet. Progress entries will
+													appear here after you finish a linked session.
+												</Text>
+											) : null}
+										</View>
+									</View>
+
 								<View className='mb-6'>
 									<Text className='text-xl font-bold text-text-primary mb-3'>
 										Session & goal details
@@ -1648,6 +1676,7 @@ const MemberProgress = () => {
 										</View>
 									</View>
 								</View>
+								</>
 							)}
 
 							{selectedGoal?.coachId && (
@@ -1748,95 +1777,6 @@ const MemberProgress = () => {
 											</Text>
 											<Text className='text-text-secondary mt-2 text-center text-sm'>
 												Your coach hasn&apos;t rated your progress for this goal yet
-											</Text>
-										</View>
-									)}
-								</View>
-							)}
-
-							<View className='mb-6'>
-								<Text className='text-xl font-bold text-text-primary mb-2'>Weight progress</Text>
-								<Text className='text-text-secondary text-sm mb-3'>
-									Weight entries from sessions linked to this goal.
-								</Text>
-								{renderWeightChart()}
-							</View>
-
-							{(selectedGoal?.coachId || mySessionRatingsList.length > 0) && (
-								<View className='mt-2 mb-4'>
-									<Text className='text-xl font-bold text-text-primary mb-4'>
-										Your session feedback to coach
-									</Text>
-									<Text className='text-text-secondary text-sm mb-3 -mt-2'>
-										Each session can only be rated once. Below is what you submitted (stars +
-										why you rated that way).
-									</Text>
-									{mySessionRatingsList.length > 0 ? (
-										mySessionRatingsList.map((mr: any) => (
-											<View
-												key={mr.id}
-												className='bg-bg-darker rounded-xl p-4 mb-3 border border-[#F9C513]'
-												style={{ borderWidth: 0.5 }}
-											>
-												<Text className='text-text-primary font-semibold text-base mb-1'>
-													{mr.sessionLog?.session?.name || 'Session'}
-												</Text>
-												{mr.sessionLog?.session?.date ? (
-													<Text className='text-text-secondary text-xs mb-2'>
-														{new Date(mr.sessionLog.session.date).toLocaleDateString(
-															'en-US',
-															{ month: 'short', day: 'numeric', year: 'numeric' }
-														)}
-													</Text>
-												) : null}
-												{mr.coach ? (
-													<Text className='text-text-secondary text-sm mb-2'>
-														Coach {mr.coach.firstName} {mr.coach.lastName}
-													</Text>
-												) : null}
-												{mr.sessionLog?.weight != null ? (
-													<Text className='text-text-secondary text-sm mb-2'>
-														Weight logged:{' '}
-														<Text className='text-text-primary font-semibold'>
-															{mr.sessionLog.weight} kg
-														</Text>
-													</Text>
-												) : null}
-												<View className='flex-row items-center mb-2'>
-													<Text className='text-text-secondary text-sm mr-2'>
-														Your rating:
-													</Text>
-													<View className='flex-row items-center'>
-														{Array.from({ length: 5 }).map((_, index) => (
-															<Ionicons
-																key={index}
-																name={index < (mr.rating || 0) ? 'star' : 'star-outline'}
-																size={16}
-																color='#F9C513'
-															/>
-														))}
-														<Text className='text-text-primary font-semibold ml-2'>
-															{mr.rating}/5
-														</Text>
-													</View>
-												</View>
-												{mr.comment ? (
-													<View className='mt-1'>
-														<Text className='text-text-secondary text-xs mb-1'>
-															Why you rated this way
-														</Text>
-														<Text className='text-text-primary text-sm'>{mr.comment}</Text>
-													</View>
-												) : null}
-											</View>
-										))
-									) : (
-										<View
-											className='items-center justify-center py-6 bg-bg-darker rounded-xl border border-[#F9C513]'
-											style={{ borderWidth: 0.5 }}
-										>
-											<Text className='text-text-secondary text-center text-sm px-2'>
-												No coach ratings submitted yet for sessions linked to this goal.
 											</Text>
 										</View>
 									)}

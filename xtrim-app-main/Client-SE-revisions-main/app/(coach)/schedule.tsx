@@ -1347,25 +1347,22 @@ const CoachSchedule = () => {
 
 				{/* Calendar + sessions */}
 				<View className='mb-4'>
-					<Text className='text-xl font-semibold text-text-primary mb-2'>
+					<Text className='text-xl font-semibold text-text-primary mb-3'>
 						Calendar
 					</Text>
-					<Text className='text-text-secondary text-sm mb-3'>
-						Gold dot: coaching session. Green check: your gym check-in. Tap a day for
-						check-in times and that day&apos;s sessions.
-					</Text>
-					<View className='flex-row gap-2 mb-3'>
+					<View
+						className='mb-3 flex-row rounded-2xl border border-[#F9C513]/25 bg-bg-darker p-1'
+						style={{ borderWidth: 1 }}
+					>
 						<TouchableOpacity
 							onPress={() => setScheduleListUpcoming(false)}
-							className={`flex-1 py-2.5 rounded-xl border items-center justify-center ${
-								!scheduleListUpcoming
-									? 'bg-[#F9C513] border-[#F9C513]'
-									: 'bg-bg-primary border-[#F9C513]/35'
+							activeOpacity={0.85}
+							className={`flex-1 items-center justify-center rounded-xl py-2.5 ${
+								!scheduleListUpcoming ? 'bg-[#F9C513]' : ''
 							}`}
-							style={{ borderWidth: 0.5 }}
 						>
 							<Text
-								className={`text-sm font-semibold ${
+								className={`text-sm font-bold ${
 									!scheduleListUpcoming ? 'text-[#111827]' : 'text-text-secondary'
 								}`}
 							>
@@ -1374,15 +1371,13 @@ const CoachSchedule = () => {
 						</TouchableOpacity>
 						<TouchableOpacity
 							onPress={() => setScheduleListUpcoming(true)}
-							className={`flex-1 py-2.5 rounded-xl border items-center justify-center ${
-								scheduleListUpcoming
-									? 'bg-[#F9C513] border-[#F9C513]'
-									: 'bg-bg-primary border-[#F9C513]/35'
+							activeOpacity={0.85}
+							className={`flex-1 items-center justify-center rounded-xl py-2.5 ${
+								scheduleListUpcoming ? 'bg-[#F9C513]' : ''
 							}`}
-							style={{ borderWidth: 0.5 }}
 						>
 							<Text
-								className={`text-sm font-semibold ${
+								className={`text-sm font-bold ${
 									scheduleListUpcoming ? 'text-[#111827]' : 'text-text-secondary'
 								}`}
 							>
@@ -1391,8 +1386,8 @@ const CoachSchedule = () => {
 						</TouchableOpacity>
 					</View>
 					<View
-						className='bg-bg-primary rounded-xl border border-[#F9C513]/40 overflow-hidden mb-4'
-						style={{ borderWidth: 0.5 }}
+						className='mb-4 overflow-hidden rounded-2xl border border-[#F9C513]/35 bg-bg-primary'
+						style={{ borderWidth: 1 }}
 					>
 						<CoachScheduleCalendar
 							selectedDay={selectedScheduleDay}
@@ -1405,11 +1400,16 @@ const CoachSchedule = () => {
 							}}
 						/>
 					</View>
-					<Text className='text-lg font-semibold text-text-primary mb-3'>
-						{scheduleListUpcoming
-							? 'Upcoming sessions'
-							: `Sessions — ${formatCalendarDayLabel(selectedScheduleDay)}`}
-					</Text>
+					<View className='mb-3'>
+						<Text className='text-[10px] font-bold uppercase tracking-wider text-text-secondary'>
+							{scheduleListUpcoming ? 'List view' : 'Selected day'}
+						</Text>
+						<Text className='text-xl font-bold text-text-primary'>
+							{scheduleListUpcoming
+								? 'Upcoming sessions'
+								: formatCalendarDayLabel(selectedScheduleDay)}
+						</Text>
+					</View>
 					{!scheduleListUpcoming ? (
 						<ScheduleDayAttendancePanel
 							dayKey={selectedScheduleDay}

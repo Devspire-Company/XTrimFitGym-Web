@@ -83,7 +83,7 @@ const CoachProgress = () => {
 		}
 	);
 
-	const { data: sessionLogsData } = useQuery(
+	const { data: sessionLogsData, loading: loadingSessionLogsForRating } = useQuery(
 		GET_SESSION_LOGS_FOR_RATING_QUERY,
 		{
 			variables: {
@@ -283,6 +283,29 @@ const CoachProgress = () => {
 			return;
 		}
 
+		if (loadingSessionLogsForRating) {
+			showAlert('Please wait', 'Loading completed sessions for this range…');
+			return;
+		}
+
+		if (sessionLogs.length === 0) {
+			showAlert(
+				'No completed sessions',
+				'There are no completed sessions with this member for this goal in this date range. Finish at least one session together, then rate progress.',
+				'warning'
+			);
+			return;
+		}
+
+		if (selectedSessionLogs.length === 0) {
+			showAlert(
+				'Session required',
+				'Select at least one completed session log. Ratings must be tied to real sessions you completed with this member.',
+				'warning'
+			);
+			return;
+		}
+
 		createRating({
 			variables: {
 				input: {
@@ -293,8 +316,7 @@ const CoachProgress = () => {
 					rating,
 					comment: comment.trim(),
 					verdict: verdict,
-					sessionLogIds:
-						selectedSessionLogs.length > 0 ? selectedSessionLogs : [],
+					sessionLogIds: selectedSessionLogs,
 				},
 			},
 		});
@@ -311,6 +333,10 @@ const CoachProgress = () => {
 
 	const effectiveExistingRating = existingOverlappingRating || lockedExistingRating;
 	const isExistingRatingViewOnly = Boolean(effectiveExistingRating?.id);
+
+	/** Rating / comment / verdict only apply when there are sessions (or we're showing a saved rating). */
+	const showRatingVerdictSections =
+		sessionLogs.length > 0 || isExistingRatingViewOnly;
 
 	const verdictLabel = useMemo(() => {
 		const hit = verdictOptions.find((v) => v.value === verdict);
@@ -584,18 +610,40 @@ const CoachProgress = () => {
 								</View>
 							) : null}
 
+							{!isExistingRatingViewOnly && loadingSessionLogsForRating ? (
+								<View className='mb-6'>
+									<Text className='text-text-secondary text-sm'>
+										Loading completed sessions in this date range…
+									</Text>
+								</View>
+							) : null}
+
+							{!isExistingRatingViewOnly &&
+							!loadingSessionLogsForRating &&
+							sessionLogs.length === 0 ? (
+								<View
+									className='mb-6 rounded-lg border border-[#F9C513]/40 bg-bg-darker p-3'
+									style={{ borderWidth: 0.5 }}
+								>
+									<Text className='text-text-secondary text-sm'>
+										No completed sessions appear in this range for this goal. You can only
+										submit a rating after at least one session with this member is completed.
+									</Text>
+								</View>
+							) : null}
+
 							{/* Session Logs with Images */}
 							{sessionLogs.length > 0 && (
 								<View className='mb-6'>
 									<Text className='text-text-primary font-semibold mb-3'>
-										Session Logs ({sessionLogs.length}){' '}
-										<Text className='text-text-secondary text-xs font-normal'>
-											(Optional)
-										</Text>
+										Session logs ({sessionLogs.length}){' '}
+										{!isExistingRatingViewOnly ? (
+											<Text className='text-red-500 text-xs font-normal'>*</Text>
+										) : null}
 									</Text>
 									<Text className='text-text-secondary text-sm mb-3'>
-										Optionally select session logs to include in this rating.
-										Review the progress images to make your assessment.
+										Select one or more completed sessions this rating is based on. Review
+										progress images if available.
 									</Text>
 									<FlatList
 										data={sessionLogs}
@@ -604,88 +652,91 @@ const CoachProgress = () => {
 										renderItem={({ item }) => {
 											const isSelected = selectedSessionLogs.includes(item.id);
 											return (
-												<TouchableOpacity
-													onPress={() => {
-														if (!isExistingRatingViewOnly) {
-															toggleSessionLogSelection(item.id);
-														}
-													}}
-													disabled={isExistingRatingViewOnly}
+												<View
 													className={`bg-bg-darker rounded-xl p-4 mb-3 border ${
 														isSelected ? 'border-[#F9C513]' : 'border-[#2C2C2E]'
 													}`}
 													style={{ borderWidth: 0.5 }}
 												>
-													<View className='flex-row items-start justify-between mb-2'>
-														<View className='flex-1 mr-2'>
-															<Text className='text-text-primary font-semibold mb-1'>
-																{item.session?.name || 'Session'}
-															</Text>
-															<View className='flex-row items-center mb-1'>
-																<Ionicons
-																	name='calendar-outline'
-																	size={12}
-																	color='#8E8E93'
-																/>
-																<Text className='text-text-secondary text-xs ml-1'>
-																	{formatDate(
-																		item.completedAt || item.session?.date
-																	)}
+													<TouchableOpacity
+														activeOpacity={isExistingRatingViewOnly ? 1 : 0.7}
+														onPress={() => {
+															if (!isExistingRatingViewOnly) {
+																toggleSessionLogSelection(item.id);
+															}
+														}}
+													>
+														<View className='flex-row items-start justify-between mb-2'>
+															<View className='flex-1 mr-2'>
+																<Text className='text-text-primary font-semibold mb-1'>
+																	{item.session?.name || 'Session'}
 																</Text>
-															</View>
-															{item.session?.startTime && (
 																<View className='flex-row items-center mb-1'>
 																	<Ionicons
-																		name='time-outline'
+																		name='calendar-outline'
 																		size={12}
 																		color='#8E8E93'
 																	/>
 																	<Text className='text-text-secondary text-xs ml-1'>
-																		{formatTimeTo12Hour(item.session.startTime)}
-																		{item.session?.endTime &&
-																			` - ${formatTimeTo12Hour(item.session.endTime)}`}
+																		{formatDate(
+																			item.completedAt || item.session?.date
+																		)}
 																	</Text>
 																</View>
-															)}
-															{item.session?.gymArea && (
-																<View className='flex-row items-center'>
+																{item.session?.startTime && (
+																	<View className='flex-row items-center mb-1'>
+																		<Ionicons
+																			name='time-outline'
+																			size={12}
+																			color='#8E8E93'
+																		/>
+																		<Text className='text-text-secondary text-xs ml-1'>
+																			{formatTimeTo12Hour(item.session.startTime)}
+																			{item.session?.endTime &&
+																				` - ${formatTimeTo12Hour(item.session.endTime)}`}
+																		</Text>
+																	</View>
+																)}
+																{item.session?.gymArea && (
+																	<View className='flex-row items-center'>
+																		<Ionicons
+																			name='location-outline'
+																			size={12}
+																			color='#8E8E93'
+																		/>
+																		<Text className='text-text-secondary text-xs ml-1'>
+																			{item.session.gymArea}
+																		</Text>
+																	</View>
+																)}
+															</View>
+															<View
+																className={`w-6 h-6 rounded-full border-2 items-center justify-center flex-shrink-0 ${
+																	isSelected
+																		? 'bg-[#F9C513] border-[#F9C513]'
+																		: 'border-[#8E8E93]'
+																}`}
+															>
+																{isSelected && (
 																	<Ionicons
-																		name='location-outline'
-																		size={12}
-																		color='#8E8E93'
+																		name='checkmark'
+																		size={16}
+																		color='#1C1C1E'
 																	/>
-																	<Text className='text-text-secondary text-xs ml-1'>
-																		{item.session.gymArea}
-																	</Text>
-																</View>
-															)}
+																)}
+															</View>
 														</View>
-														<View
-															className={`w-6 h-6 rounded-full border-2 items-center justify-center flex-shrink-0 ${
-																isSelected
-																	? 'bg-[#F9C513] border-[#F9C513]'
-																	: 'border-[#8E8E93]'
-															}`}
-														>
-															{isSelected && (
-																<Ionicons
-																	name='checkmark'
-																	size={16}
-																	color='#1C1C1E'
-																/>
-															)}
-														</View>
-													</View>
-													{item.progressImages && (
+													</TouchableOpacity>
+													{item.progressImages ? (
 														<TouchableOpacity
 															onPress={() => {
-																if (!isExistingRatingViewOnly) {
-																	setSelectedImages(item.progressImages);
-																	setShowImageModal(true);
-																}
+																setSelectedImages(item.progressImages);
+																setShowImageModal(true);
 															}}
-															disabled={isExistingRatingViewOnly}
 															className='flex-row items-center mt-2'
+															hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+															accessibilityRole='button'
+															accessibilityLabel='View progress photos'
 														>
 															<Ionicons
 																name='images'
@@ -696,121 +747,134 @@ const CoachProgress = () => {
 																View Progress Photos
 															</Text>
 														</TouchableOpacity>
-													)}
-												</TouchableOpacity>
+													) : null}
+												</View>
 											);
 										}}
 									/>
 								</View>
 							)}
 
-							{/* Rating Input */}
-							<View className='mb-6'>
-								<Text className='text-text-primary font-semibold mb-2'>
-									Rating (1-5) <Text className='text-red-500'>*</Text>
-								</Text>
-								<Text className='text-text-secondary text-sm mb-3'>
-									Tap stars to rate progress.
-								</Text>
-								<View className='flex-row flex-wrap justify-center mb-2'>
-									{Array.from({ length: 5 }).map((_, index) => {
-										const star = index + 1;
-										return (
-											<TouchableOpacity
-												key={star}
-												onPress={() => {
+							{showRatingVerdictSections ? (
+								<>
+									{/* Rating Input */}
+									<View className='mb-6'>
+										<Text className='text-text-primary font-semibold mb-2'>
+											Rating (1-5) <Text className='text-red-500'>*</Text>
+										</Text>
+										<Text className='text-text-secondary text-sm mb-3'>
+											Tap stars to rate progress.
+										</Text>
+										<View className='flex-row flex-wrap justify-center mb-2'>
+											{Array.from({ length: 5 }).map((_, index) => {
+												const star = index + 1;
+												return (
+													<TouchableOpacity
+														key={star}
+														onPress={() => {
+															if (!isExistingRatingViewOnly) {
+																setRating(star);
+															}
+														}}
+														className='p-1'
+														accessibilityLabel={`${star} out of 5`}
+														disabled={isExistingRatingViewOnly}
+													>
+														<Ionicons
+															name={star <= rating ? 'star' : 'star-outline'}
+															size={30}
+															color='#F9C513'
+														/>
+													</TouchableOpacity>
+												);
+											})}
+										</View>
+										<Text className='text-text-secondary text-center text-xs'>
+											1 = Lowest, 5 = Highest progress
+										</Text>
+										{rating > 0 ? (
+											<Text className='text-text-primary text-center mt-2 font-semibold'>
+												{rating} out of 5
+											</Text>
+										) : null}
+									</View>
+
+									{/* Comment Input */}
+									<View className='mb-6'>
+										<Text className='text-text-primary font-semibold mb-2'>
+											Comment <Text className='text-red-500'>*</Text>
+										</Text>
+										<TextInput
+											className='bg-bg-darker rounded-lg px-4 py-3 text-text-primary border border-[#F9C513]'
+											style={{
+												borderWidth: 0.5,
+												minHeight: 100,
+												textAlignVertical: 'top',
+												paddingRight: 14,
+											}}
+											placeholder='Enter your assessment and feedback...'
+											placeholderTextColor='#8E8E93'
+											value={comment}
+											onChangeText={setComment}
+											editable={!isExistingRatingViewOnly}
+											selectTextOnFocus={!isExistingRatingViewOnly}
+											multiline
+											numberOfLines={4}
+										/>
+									</View>
+
+									{/* Verdict Selection */}
+									<View className='mb-6'>
+										<Text className='text-text-primary font-semibold mb-2'>
+											Final Verdict <Text className='text-red-500'>*</Text>
+										</Text>
+										{isExistingRatingViewOnly ? (
+											<View
+												className='bg-bg-darker rounded-lg px-4 py-3 border border-[#F9C513]/40'
+												style={{
+													borderWidth: 0.5,
+													minHeight: 48,
+													justifyContent: 'center',
+												}}
+											>
+												<Text className='text-text-primary'>{verdictLabel}</Text>
+											</View>
+										) : (
+											<Select
+												options={verdictOptions}
+												value={verdict}
+												onChange={(v) => {
 													if (!isExistingRatingViewOnly) {
-														setRating(star);
+														setVerdict(v);
 													}
 												}}
-												className='p-1'
-												accessibilityLabel={`${star} out of 5`}
-												disabled={isExistingRatingViewOnly}
-											>
-												<Ionicons
-													name={star <= rating ? 'star' : 'star-outline'}
-													size={30}
-													color='#F9C513'
-												/>
-											</TouchableOpacity>
-										);
-									})}
-								</View>
-								<Text className='text-text-secondary text-center text-xs'>
-									1 = Lowest, 5 = Highest progress
-								</Text>
-								{rating > 0 ? (
-									<Text className='text-text-primary text-center mt-2 font-semibold'>
-										{rating} out of 5
-									</Text>
-								) : null}
-							</View>
-
-							{/* Comment Input */}
-							<View className='mb-6'>
-								<Text className='text-text-primary font-semibold mb-2'>
-									Comment <Text className='text-red-500'>*</Text>
-								</Text>
-								<TextInput
-									className='bg-bg-darker rounded-lg px-4 py-3 text-text-primary border border-[#F9C513]'
-									style={{
-										borderWidth: 0.5,
-										minHeight: 100,
-										textAlignVertical: 'top',
-										paddingRight: 14,
-									}}
-									placeholder='Enter your assessment and feedback...'
-									placeholderTextColor='#8E8E93'
-									value={comment}
-									onChangeText={setComment}
-									editable={!isExistingRatingViewOnly}
-									selectTextOnFocus={!isExistingRatingViewOnly}
-									multiline
-									numberOfLines={4}
-								/>
-							</View>
-
-							{/* Verdict Selection */}
-							<View className='mb-6'>
-								<Text className='text-text-primary font-semibold mb-2'>
-									Final Verdict <Text className='text-red-500'>*</Text>
-								</Text>
-								{isExistingRatingViewOnly ? (
-									<View
-										className='bg-bg-darker rounded-lg px-4 py-3 border border-[#F9C513]/40'
-										style={{ borderWidth: 0.5, minHeight: 48, justifyContent: 'center' }}
-									>
-										<Text className='text-text-primary'>{verdictLabel}</Text>
+												placeholder='Select verdict'
+											/>
+										)}
 									</View>
-								) : (
-									<Select
-										options={verdictOptions}
-										value={verdict}
-										onChange={(v) => {
-											if (!isExistingRatingViewOnly) {
-												setVerdict(v);
-											}
-										}}
-										placeholder='Select verdict'
-									/>
-								)}
-							</View>
+								</>
+							) : null}
 
-							{/* Submit Button */}
+							{/* Submit: no sessions in range → no create button (rating UI is hidden too). */}
 							{isExistingRatingViewOnly ? (
 								<GradientButton onPress={closeRatingModal} className='mt-4'>
 									Done
 								</GradientButton>
-							) : (
+							) : sessionLogs.length > 0 ? (
 								<GradientButton
 									onPress={handleSubmitRating}
 									loading={creatingRating || loadingProgressRatings}
-									disabled={creatingRating || loadingProgressRatings}
+									disabled={
+										creatingRating ||
+										loadingProgressRatings ||
+										loadingSessionLogsForRating ||
+										selectedSessionLogs.length === 0
+									}
 									className='mt-4'
 								>
 									{creatingRating ? 'Creating Rating...' : 'Create Progress Rating'}
 								</GradientButton>
-							)}
+							) : null}
 						</ScrollView>
 					</View>
 				</View>

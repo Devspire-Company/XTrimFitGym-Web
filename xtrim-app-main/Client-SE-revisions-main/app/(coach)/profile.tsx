@@ -2,6 +2,7 @@ import DatePicker from '@/components/DatePicker';
 import FixedView from '@/components/FixedView';
 import GradientButton from '@/components/GradientButton';
 import Input from '@/components/Input';
+import PhilippinePhoneInput from '@/components/PhilippinePhoneInput';
 import Select from '@/components/Select';
 import TabHeader from '@/components/TabHeader';
 import TimePicker from '@/components/TimePicker';
@@ -11,11 +12,16 @@ import { GET_COACH_RATINGS_QUERY } from '@/graphql/queries';
 import { useAppDispatch } from '@/store/hooks';
 import { setUser } from '@/store/slices/userSlice';
 import { convertGraphQLUser } from '@/utils/graphql-utils';
+import {
+	formatPhilippinePhoneDisplay,
+	isValidPhilippineMobileNational,
+	nationalDigitsFromStoredPhone,
+} from '@/utils/philippine-phone';
 import { formatTimeRangeTo12Hour } from '@/utils/time-utils';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import ConfirmModal from '@/components/ConfirmModal';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
 	Modal,
 	ScrollView,
@@ -80,8 +86,8 @@ const CoachProfile = () => {
 	const [firstName, setFirstName] = useState(user?.firstName || '');
 	const [middleName, setMiddleName] = useState(user?.middleName || '');
 	const [lastName, setLastName] = useState(user?.lastName || '');
-	const [phoneNumber, setPhoneNumber] = useState(
-		user?.phoneNumber?.toString() || ''
+	const [phoneNumber, setPhoneNumber] = useState(() =>
+		nationalDigitsFromStoredPhone(user?.phoneNumber)
 	);
 	const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(
 		user?.dateOfBirth ? new Date(user.dateOfBirth) : undefined
@@ -151,6 +157,11 @@ const CoachProfile = () => {
 		Record<string, string>
 	>({});
 
+	useEffect(() => {
+		if (!user || isEditing) return;
+		setPhoneNumber(nationalDigitsFromStoredPhone(user.phoneNumber));
+	}, [user?.id, user?.phoneNumber, isEditing]);
+
 	const [updateUserMutation, { loading }] = useMutation<
 		UpdateUserMutation,
 		UpdateUserMutationVariables
@@ -189,8 +200,9 @@ const CoachProfile = () => {
 
 		if (!phoneNumber.trim()) {
 			newErrors.phoneNumber = 'Phone number is required';
-		} else if (!/^\d{10,15}$/.test(phoneNumber.replace(/\D/g, ''))) {
-			newErrors.phoneNumber = 'Please enter a valid phone number';
+		} else if (!isValidPhilippineMobileNational(phoneNumber)) {
+			newErrors.phoneNumber =
+				'Enter 10 digits after +63 (Philippine mobile, e.g. 9XX XXX XXXX — no leading 0)';
 		}
 
 		if (!dateOfBirth) {
@@ -315,7 +327,7 @@ const CoachProfile = () => {
 		setFirstName(user?.firstName || '');
 		setMiddleName(user?.middleName || '');
 		setLastName(user?.lastName || '');
-		setPhoneNumber(user?.phoneNumber?.toString() || '');
+		setPhoneNumber(nationalDigitsFromStoredPhone(user?.phoneNumber));
 		setDateOfBirth(user?.dateOfBirth ? new Date(user.dateOfBirth) : undefined);
 		setGender(user?.gender || '');
 		setSpecializations(user?.coachDetails?.specialization || []);
@@ -444,15 +456,13 @@ const CoachProfile = () => {
 							error={errors.lastName}
 						/>
 
-						<Input
+						<PhilippinePhoneInput
 							label='Phone Number'
-							placeholder='Enter your phone number'
 							value={phoneNumber}
-							onChangeText={(text) => {
-								setPhoneNumber(text);
+							onChangeText={(digits) => {
+								setPhoneNumber(digits);
 								setErrors({ ...errors, phoneNumber: '' });
 							}}
-							keyboardType='phone-pad'
 							error={errors.phoneNumber}
 						/>
 
@@ -663,7 +673,7 @@ const CoachProfile = () => {
 							<View className='mb-3'>
 								<Text className='text-text-secondary text-sm mb-1'>Phone</Text>
 								<Text className='text-text-primary font-medium'>
-									{user?.phoneNumber?.toString() || 'Not provided'}
+									{formatPhilippinePhoneDisplay(user?.phoneNumber) ?? 'Not provided'}
 								</Text>
 							</View>
 							<View className='mb-3'>

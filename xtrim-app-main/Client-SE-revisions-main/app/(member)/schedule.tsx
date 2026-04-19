@@ -609,25 +609,22 @@ const MemberSchedule = () => {
 				) : (
 					<>
 						<View className='mb-4'>
-							<Text className='text-xl font-semibold text-text-primary mb-2'>
+							<Text className='text-xl font-semibold text-text-primary mb-3'>
 								Calendar
 							</Text>
-							<Text className='text-text-secondary text-sm mb-3'>
-								Gold dot: scheduled session. Green check: gym door check-in. Tap a day
-								for check-in times and that day&apos;s sessions.
-							</Text>
-							<View className='flex-row gap-2 mb-3'>
+							<View
+								className='mb-3 flex-row rounded-2xl border border-[#F9C513]/25 bg-bg-darker p-1'
+								style={{ borderWidth: 1 }}
+							>
 								<TouchableOpacity
 									onPress={() => setScheduleShowAll(false)}
-									className={`flex-1 py-2.5 rounded-xl border items-center justify-center ${
-										!scheduleShowAll
-											? 'bg-[#F9C513] border-[#F9C513]'
-											: 'bg-bg-primary border-[#F9C513]/35'
+									activeOpacity={0.85}
+									className={`flex-1 items-center justify-center rounded-xl py-2.5 ${
+										!scheduleShowAll ? 'bg-[#F9C513]' : ''
 									}`}
-									style={{ borderWidth: 0.5 }}
 								>
 									<Text
-										className={`text-sm font-semibold ${
+										className={`text-sm font-bold ${
 											!scheduleShowAll ? 'text-[#111827]' : 'text-text-secondary'
 										}`}
 									>
@@ -636,15 +633,13 @@ const MemberSchedule = () => {
 								</TouchableOpacity>
 								<TouchableOpacity
 									onPress={() => setScheduleShowAll(true)}
-									className={`flex-1 py-2.5 rounded-xl border items-center justify-center ${
-										scheduleShowAll
-											? 'bg-[#F9C513] border-[#F9C513]'
-											: 'bg-bg-primary border-[#F9C513]/35'
+									activeOpacity={0.85}
+									className={`flex-1 items-center justify-center rounded-xl py-2.5 ${
+										scheduleShowAll ? 'bg-[#F9C513]' : ''
 									}`}
-									style={{ borderWidth: 0.5 }}
 								>
 									<Text
-										className={`text-sm font-semibold ${
+										className={`text-sm font-bold ${
 											scheduleShowAll ? 'text-[#111827]' : 'text-text-secondary'
 										}`}
 									>
@@ -653,8 +648,8 @@ const MemberSchedule = () => {
 								</TouchableOpacity>
 							</View>
 							<View
-								className='bg-bg-primary rounded-xl border border-[#F9C513]/40 overflow-hidden mb-2'
-								style={{ borderWidth: 0.5 }}
+								className='mb-2 overflow-hidden rounded-2xl border border-[#F9C513]/35 bg-bg-primary'
+								style={{ borderWidth: 1 }}
 							>
 								<CoachScheduleCalendar
 									selectedDay={selectedScheduleDay}
@@ -669,11 +664,16 @@ const MemberSchedule = () => {
 							</View>
 						</View>
 
-						<Text className='text-lg font-semibold text-text-primary mb-3'>
-							{scheduleShowAll
-								? 'All scheduled sessions'
-								: `Sessions — ${formatCalendarDayLabel(selectedScheduleDay)}`}
-						</Text>
+						<View className='mb-3'>
+							<Text className='text-[10px] font-bold uppercase tracking-wider text-text-secondary'>
+								{scheduleShowAll ? 'List view' : 'Selected day'}
+							</Text>
+							<Text className='text-xl font-bold text-text-primary'>
+								{scheduleShowAll
+									? 'All scheduled sessions'
+									: formatCalendarDayLabel(selectedScheduleDay)}
+							</Text>
+						</View>
 
 						{!scheduleShowAll ? (
 							<ScheduleDayAttendancePanel
@@ -687,30 +687,34 @@ const MemberSchedule = () => {
 						{displayedMemberSessions.length === 0 ? (
 							sessions.length === 0 && joinableClasses.length === 0 ? (
 								<View
-									className='bg-bg-primary rounded-xl p-6 items-center border border-[#F9C513]'
-									style={{ borderWidth: 0.5 }}
+									className='items-center rounded-2xl border border-[#F9C513]/30 bg-bg-primary px-6 py-10'
+									style={{ borderWidth: 1 }}
 								>
-									<Ionicons name='calendar-outline' size={48} color='#8E8E93' />
-									<Text className='text-text-secondary mt-4 text-center text-base'>
+									<View className='mb-4 h-16 w-16 items-center justify-center rounded-2xl bg-bg-darker'>
+										<Ionicons name='calendar-outline' size={36} color='#9CA3AF' />
+									</View>
+									<Text className='text-center text-lg font-semibold text-text-primary'>
 										No scheduled sessions
 									</Text>
-									<Text className='text-text-secondary mt-2 text-center text-sm'>
-										Your coach will schedule sessions or post classes you can join
+									<Text className='mt-2 max-w-xs text-center text-sm leading-5 text-text-secondary'>
+										Your coach will schedule sessions or post classes you can join.
 									</Text>
 								</View>
 							) : (
 								<View
-									className='bg-bg-primary rounded-xl p-6 items-center border border-[#F9C513]'
-									style={{ borderWidth: 0.5 }}
+									className='items-center rounded-2xl border border-[#F9C513]/30 bg-bg-primary px-6 py-10'
+									style={{ borderWidth: 1 }}
 								>
-									<Ionicons name='calendar-outline' size={48} color='#8E8E93' />
-									<Text className='text-text-secondary mt-2 text-center text-base'>
+									<View className='mb-4 h-16 w-16 items-center justify-center rounded-2xl bg-bg-darker'>
+										<Ionicons name='calendar-outline' size={36} color='#9CA3AF' />
+									</View>
+									<Text className='text-center text-lg font-semibold text-text-primary'>
 										{scheduleShowAll
 											? 'No scheduled sessions yet'
 											: 'No sessions on this date'}
 									</Text>
 									{!scheduleShowAll && sessions.length > 0 ? (
-										<Text className='text-text-secondary text-sm mt-2 text-center'>
+										<Text className='mt-2 max-w-xs text-center text-sm leading-5 text-text-secondary'>
 											Try another day or switch to &quot;All sessions&quot;.
 										</Text>
 									) : null}

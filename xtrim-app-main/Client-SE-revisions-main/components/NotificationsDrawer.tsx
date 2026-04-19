@@ -9,7 +9,6 @@ import {
 	GET_UPCOMING_SESSIONS_QUERY,
 	GET_USER_QUERY,
 	GET_USERS_QUERY,
-	GET_MY_SUBSCRIPTION_REQUESTS_QUERY,
 } from '@/graphql/queries';
 import { useAppDispatch } from '@/store/hooks';
 import { updateUser } from '@/store/slices/userSlice';
@@ -370,16 +369,6 @@ const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
 		notifyOnNetworkStatusChange: true,
 	});
 
-	const { data: subscriptionRequestsData } = useQuery(
-		GET_MY_SUBSCRIPTION_REQUESTS_QUERY,
-		{
-			skip: !visible || user?.role !== 'member',
-			fetchPolicy: 'cache-and-network',
-			pollInterval: user?.role === 'member' && visible ? 2000 : 0,
-			notifyOnNetworkStatusChange: true,
-		}
-	);
-
 	const { data: coachSessionsDrawerData } = useQuery(GET_COACH_SESSIONS_QUERY, {
 		skip: !user?.id || user?.role !== 'coach',
 		variables: { coachId: user?.id || '' },
@@ -682,47 +671,8 @@ const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
 			allNotifications.push(...statusNotifications);
 		}
 
-		if (
-			subscriptionRequestsData &&
-			Array.isArray(
-				(subscriptionRequestsData as any).getMySubscriptionRequests
-			) &&
-			user?.role === 'member'
-		) {
-			const requests = (subscriptionRequestsData as any).getMySubscriptionRequests;
-			const recentSubscriptionUpdates = requests.filter((req: any) => {
-				if (!req || !req.id) return false;
-				if (req.status !== 'APPROVED' && req.status !== 'REJECTED') return false;
-				const updatedAt = new Date(req.updatedAt || req.approvedAt || req.rejectedAt);
-				if (Number.isNaN(updatedAt.getTime())) return false;
-				const now = new Date();
-				const hoursSinceUpdate =
-					(now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60);
-				return hoursSinceUpdate < 24;
-			});
-
-			const subscriptionNotifications: Notification[] =
-				recentSubscriptionUpdates.map((req: any) => {
-					const membershipName = req.membership?.name || 'Membership';
-					const isApproved = req.status === 'APPROVED';
-					return {
-						id: `subscription-${req.id}`,
-						type: 'membership' as const,
-						title: isApproved
-							? 'Subscription Approved'
-							: 'Subscription Rejected',
-						message: isApproved
-							? `Your subscription request for ${membershipName} has been approved.`
-							: `Your subscription request for ${membershipName} was rejected.`,
-						time: formatTimeAgo(
-							req.updatedAt || req.approvedAt || req.rejectedAt
-						),
-						read: false,
-					};
-				});
-
-			allNotifications.push(...subscriptionNotifications);
-		}
+		// Subscription request approved/rejected is surfaced on the admin web app only,
+		// not in the member mobile notification center.
 
 		if (user?.role === 'member' && removedCoaches.length > 0 && coachesData) {
 			const coaches = (coachesData as any)?.getUsers || [];
@@ -762,7 +712,6 @@ const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
 		user?.id,
 		formatTimeAgo,
 		dismissedNotifications,
-		subscriptionRequestsData,
 	]);
 
 	const dismissIds = useCallback(
