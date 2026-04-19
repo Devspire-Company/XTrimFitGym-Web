@@ -9,6 +9,11 @@ import { useAppSelector } from '@/store/hooks';
 
 const LIVE_UPDATE_INTERVAL_MS = 1500;
 
+function userFullName(u: { firstName?: string | null; lastName?: string | null } | null | undefined) {
+	if (!u) return '';
+	return `${u.firstName || ''} ${u.lastName || ''}`.trim();
+}
+
 export function SubscriptionRequestsPage() {
 	useEffect(() => {
 		document.title = 'Subscription Requests - X-TRIM FIT GYM';
@@ -98,11 +103,11 @@ export function SubscriptionRequestsPage() {
 					: 'N/A',
 				request.status,
 				formatDate(request.requestedAt),
-				request.status === 'APPROVED' && request.approvedBy
-					? `${request.approvedBy.firstName} ${request.approvedBy.lastName}`
-					: request.status === 'REJECTED' && request.rejectedBy
-						? `${request.rejectedBy.firstName} ${request.rejectedBy.lastName}`
-						: '-',
+				request.status === 'APPROVED'
+					? userFullName(request.approvedBy) || 'Not recorded'
+					: request.status === 'REJECTED'
+						? userFullName(request.rejectedBy) || 'Not recorded'
+						: '—',
 			]),
 		});
 	};
@@ -354,22 +359,26 @@ export function SubscriptionRequestsPage() {
 										</td>
 										<td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(request.status)}</td>
 										<td className="px-6 py-4 whitespace-nowrap">
-											{request.status === 'APPROVED' && request.approvedBy ? (
+											{request.status === 'APPROVED' ? (
 												<div>
 													<p className="text-sm text-[var(--text-primary)]">
-														{request.approvedBy.firstName} {request.approvedBy.lastName}
+														{userFullName(request.approvedBy) || 'Not recorded'}
 													</p>
-													<p className="text-xs text-[var(--text-secondary)]">{formatDate(request.approvedAt)}</p>
+													{request.approvedAt ? (
+														<p className="text-xs text-[var(--text-secondary)]">{formatDate(request.approvedAt)}</p>
+													) : null}
 												</div>
-											) : request.status === 'REJECTED' && request.rejectedBy ? (
+											) : request.status === 'REJECTED' ? (
 												<div>
 													<p className="text-sm text-[var(--text-primary)]">
-														{request.rejectedBy.firstName} {request.rejectedBy.lastName}
+														{userFullName(request.rejectedBy) || 'Not recorded'}
 													</p>
-													<p className="text-xs text-[var(--text-secondary)]">{formatDate(request.rejectedAt)}</p>
+													{request.rejectedAt ? (
+														<p className="text-xs text-[var(--text-secondary)]">{formatDate(request.rejectedAt)}</p>
+													) : null}
 												</div>
 											) : (
-												<p className="text-sm text-[var(--text-secondary)]">-</p>
+												<p className="text-sm text-[var(--text-secondary)]">—</p>
 											)}
 										</td>
 									</tr>
