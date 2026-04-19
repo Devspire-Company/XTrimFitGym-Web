@@ -1763,36 +1763,7 @@ function AddCoachModal({
 							borderRadius: '12px',
 						}}
 					>
-						<div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-							<Save
-								className="w-5 h-5"
-								style={{ color: 'var(--primary-yellow)', marginTop: '0.125rem', flexShrink: 0 }}
-							/>
-							<div>
-								<h4
-									style={{
-										fontFamily: 'Poppins, sans-serif',
-										fontSize: '0.95rem',
-										fontWeight: '600',
-										color: 'var(--text-primary)',
-										margin: '0 0 0.5rem 0',
-									}}
-								>
-									Clerk sign-in
-								</h4>
-								<p
-									style={{
-										fontSize: '0.85rem',
-										color: 'var(--text-secondary)',
-										margin: 0,
-										lineHeight: '1.5',
-									}}
-								>
-									The coach is created in Clerk with this email. They sign in at the login page with
-									that address (same as admins). No password is stored in Clerk from this form.
-								</p>
-							</div>
-						</div>
+						
 					</div>
 
 					<div className="form-grid">
@@ -1850,28 +1821,7 @@ function AddCoachModal({
 									style={{ flex: 1 }}
 									placeholder="name@example.com"
 								/>
-								<button
-									type="button"
-									onClick={() => handleCopyToClipboard(formData.email)}
-									disabled={!formData.email}
-									style={{
-										padding: '0.9rem 1rem',
-										background: 'var(--primary-yellow)',
-										color: '#1a1a1a',
-										borderRadius: '12px',
-										fontWeight: '600',
-										cursor: formData.email ? 'pointer' : 'not-allowed',
-										display: 'flex',
-										alignItems: 'center',
-										gap: '0.5rem',
-										border: 'none',
-										transition: 'all 0.3s ease',
-										opacity: formData.email ? 1 : 0.5,
-									}}
-									title="Copy email"
-								>
-									Copy
-								</button>
+							
 							</div>
 						</div>
 						<div className="form-group">
