@@ -99,9 +99,9 @@ export function SubscriptionRequestsPage() {
 				request.status,
 				formatDate(request.requestedAt),
 				request.status === 'APPROVED' && request.approvedBy
-					? `${request.approvedBy.firstName} ${request.approvedBy.lastName}${request.approvedBy.email ? ` (${request.approvedBy.email})` : ''}`
+					? `${request.approvedBy.firstName} ${request.approvedBy.lastName}`
 					: request.status === 'REJECTED' && request.rejectedBy
-						? `${request.rejectedBy.firstName} ${request.rejectedBy.lastName}${request.rejectedBy.email ? ` (${request.rejectedBy.email})` : ''}`
+						? `${request.rejectedBy.firstName} ${request.rejectedBy.lastName}`
 						: '-',
 			]),
 		});
@@ -359,28 +359,14 @@ export function SubscriptionRequestsPage() {
 													<p className="text-sm text-[var(--text-primary)]">
 														{request.approvedBy.firstName} {request.approvedBy.lastName}
 													</p>
-													{request.approvedBy.email ? (
-														<p className="text-xs text-[var(--text-secondary)] mt-0.5">
-															{request.approvedBy.email}
-														</p>
-													) : null}
-													<p className="text-xs text-[var(--text-secondary)] mt-0.5">
-														{formatDate(request.approvedAt)}
-													</p>
+													<p className="text-xs text-[var(--text-secondary)]">{formatDate(request.approvedAt)}</p>
 												</div>
 											) : request.status === 'REJECTED' && request.rejectedBy ? (
 												<div>
 													<p className="text-sm text-[var(--text-primary)]">
 														{request.rejectedBy.firstName} {request.rejectedBy.lastName}
 													</p>
-													{request.rejectedBy.email ? (
-														<p className="text-xs text-[var(--text-secondary)] mt-0.5">
-															{request.rejectedBy.email}
-														</p>
-													) : null}
-													<p className="text-xs text-[var(--text-secondary)] mt-0.5">
-														{formatDate(request.rejectedAt)}
-													</p>
+													<p className="text-xs text-[var(--text-secondary)]">{formatDate(request.rejectedAt)}</p>
 												</div>
 											) : (
 												<p className="text-sm text-[var(--text-secondary)]">-</p>

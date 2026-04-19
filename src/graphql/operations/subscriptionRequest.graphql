@@ -54,14 +54,12 @@ query GetAllSubscriptionRequests {
 			id
 			firstName
 			lastName
-			email
 		}
 		rejectedAt
 		rejectedBy {
 			id
 			firstName
 			lastName
-			email
 		}
 		createdAt
 		updatedAt
