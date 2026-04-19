@@ -1680,24 +1680,6 @@ function AddCoachModal({
 		});
 	};
 
-	const handleCopyToClipboard = async (text: string) => {
-		try {
-			await navigator.clipboard.writeText(text);
-			dispatch(
-				addToast({
-					type: 'success',
-					message: 'Copied to clipboard!',
-				})
-			);
-		} catch {
-			dispatch(
-				addToast({
-					type: 'error',
-					message: 'Failed to copy to clipboard',
-				})
-			);
-		}
-	};
 
 	const handleClose = () => {
 		if (!isSubmitting) {
@@ -1709,7 +1691,7 @@ function AddCoachModal({
 				phone: '',
 				specializations: [],
 				yearsExperience: '',
-				gender: '',
+				gender: '',``
 				dateOfBirth: '',
 				status: 'Active',
 				statusReason: '',
