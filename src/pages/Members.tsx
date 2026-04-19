@@ -17,7 +17,6 @@ import {
 	Dumbbell,
 	FileText,
 	RotateCw,
-	Download,
 } from 'lucide-react';
 import {
 	GET_USERS,
@@ -32,6 +31,7 @@ import {
 import { RoleType } from '@/graphql/generated/graphql';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
+import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { DirectSubscribeModal } from '@/components/modals/DirectSubscribeModal';
 import { AdjustSubscriptionDurationModal } from '@/components/modals/AdjustSubscriptionDurationModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -789,16 +789,7 @@ export function MembersPage() {
 						Manage all gym members, view details, and update information ({apiMembers.length} total, {filteredMembers.length} filtered)
 					</p>
 				</div>
-				<div className="flex flex-wrap items-center gap-2">
-					<button type="button" onClick={handleExportPdf} className="btn-export-pdf">
-						<Download className="w-4 h-4" />
-						Export PDF
-					</button>
-					<button type="button" onClick={handleExportCsv} className="btn-export-csv">
-						<Download className="w-4 h-4" />
-						Export CSV
-					</button>
-				</div>
+				<ExportDownloadDropdown onExportPdf={handleExportPdf} onExportCsv={handleExportCsv} />
 			</div>
 
 			{/* Search and Filters */}

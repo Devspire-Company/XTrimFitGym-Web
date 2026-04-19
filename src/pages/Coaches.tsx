@@ -8,7 +8,6 @@ import {
 	Eye,
 	UserCog,
 	X,
-	Download,
 	Save,
 	Edit,
 	Users,
@@ -25,6 +24,7 @@ import {
 	Stethoscope,
 	Trophy,
 } from 'lucide-react';
+import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { GET_USERS, GET_COACH_SESSIONS, GET_COACH_SESSION_LOGS, DELETE_USER, CREATE_USER, UPDATE_USER, USERS_UPDATED } from '@/graphql/operations/index';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
@@ -574,14 +574,7 @@ export function CoachesPage() {
 					</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
-					<Button type="button" onClick={handleExportPdf} className="btn-export-pdf">
-						<Download className="w-4 h-4" />
-						Export PDF
-					</Button>
-					<Button type="button" onClick={handleExportCsv} className="btn-export-csv">
-						<Download className="w-4 h-4" />
-						Export CSV
-					</Button>
+					<ExportDownloadDropdown onExportPdf={handleExportPdf} onExportCsv={handleExportCsv} />
 					<Button onClick={handleAddCoach}>
 						Add New Coach
 					</Button>

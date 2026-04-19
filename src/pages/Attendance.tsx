@@ -6,8 +6,8 @@ import {
 	User,
 	UserCog,
 	Fingerprint,
-	Download,
 } from 'lucide-react';
+import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
 	GET_ATTENDANCE_RECORDS,
@@ -801,14 +801,10 @@ export function AttendancePage() {
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2 self-start">
-					<button type="button" onClick={() => void handleExportPdf()} className="btn-export-pdf">
-						<Download className="w-4 h-4" />
-						Export PDF
-					</button>
-					<button type="button" onClick={handleExportCsv} className="btn-export-csv">
-						<Download className="w-4 h-4" />
-						Export CSV
-					</button>
+					<ExportDownloadDropdown
+						onExportPdf={() => void handleExportPdf()}
+						onExportCsv={handleExportCsv}
+					/>
 				</div>
 			</div>
 

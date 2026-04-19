@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { Plus, Eye, Edit, Trash2, CreditCard, Crown, Check, Download } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, CreditCard, Crown, Check } from 'lucide-react';
+import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { MembershipFormModal, type MembershipFormData } from '@/components/modals/MembershipFormModal';
 import { MembershipViewModal } from '@/components/modals/MembershipViewModal';
 import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
@@ -343,14 +344,7 @@ export function MembershipsPage() {
 					</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
-					<Button type="button" onClick={handleExportPdf} className="btn-export-pdf">
-						<Download className="w-4 h-4" />
-						Export PDF
-					</Button>
-					<Button type="button" onClick={handleExportCsv} className="btn-export-csv">
-						<Download className="w-4 h-4" />
-						Export CSV
-					</Button>
+					<ExportDownloadDropdown onExportPdf={handleExportPdf} onExportCsv={handleExportCsv} />
 					{activeTab === 'active' && (
 						<Button onClick={handleCreatePlan}>
 							<Plus className="w-4 h-4" />

@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
+import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { Button } from '@/components/ui/button';
-import { Plus, Dumbbell, Download, AlertTriangle } from 'lucide-react';
+import { Plus, Dumbbell, AlertTriangle } from 'lucide-react';
 import { EquipmentFormModal, type EquipmentFormData } from '@/components/modals/EquipmentFormModal';
 import { EquipmentViewModal } from '@/components/modals/EquipmentViewModal';
 import { SuccessModal } from '@/components/modals/SuccessModal';
@@ -1057,14 +1058,10 @@ export function EquipmentPage() {
 						<Plus className="w-4 h-4" />
 						Add Equipment
 					</Button>
-					<Button type="button" onClick={() => void handleExportPdf()} className="btn-export-pdf">
-						<Download className="w-4 h-4" />
-						Export PDF
-					</Button>
-					<Button type="button" onClick={handleExportCsv} className="btn-export-csv">
-						<Download className="w-4 h-4" />
-						Export CSV
-					</Button>
+					<ExportDownloadDropdown
+						onExportPdf={() => void handleExportPdf()}
+						onExportCsv={handleExportCsv}
+					/>
 				</div>
 			</div>
 

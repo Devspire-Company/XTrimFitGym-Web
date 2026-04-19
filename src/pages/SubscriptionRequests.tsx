@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
-import { X as XIcon, Clock, CheckCircle2, XCircle, Search, Download } from 'lucide-react';
+import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
+import { X as XIcon, Clock, CheckCircle2, XCircle, Search } from 'lucide-react';
 import { GET_ALL_SUBSCRIPTION_REQUESTS } from '@/graphql/operations/index';
 import type { GetAllSubscriptionRequestsQuery } from '@/graphql/generated/types';
 import { exportTableCsv } from '@/lib/csvExport';
@@ -236,16 +237,7 @@ export function SubscriptionRequestsPage() {
 						Manage all subscription requests from members ({filteredRequests.length} of {activeRequests.length} shown)
 					</p>
 				</div>
-				<div className="flex flex-wrap items-center gap-2">
-					<Button type="button" onClick={handleExportPdf} className="btn-export-pdf">
-						<Download className="w-4 h-4" />
-						Export PDF
-					</Button>
-					<Button type="button" onClick={handleExportCsv} className="btn-export-csv">
-						<Download className="w-4 h-4" />
-						Export CSV
-					</Button>
-				</div>
+				<ExportDownloadDropdown onExportPdf={handleExportPdf} onExportCsv={handleExportCsv} />
 			</div>
 
 			{/* Search and Filter Bar */}

@@ -17,6 +17,7 @@ import {
 } from '@/graphql/operations/index';
 import { WalkInGender } from '@/graphql/generated/graphql';
 import type { SearchWalkInClientsQuery } from '@/graphql/generated/graphql';
+import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { WalkInModalShell } from '@/components/modals/WalkInModalShell';
 
 type WalkInClientRow = SearchWalkInClientsQuery['searchWalkInClients'][number];
@@ -35,7 +36,6 @@ import {
 	X,
 	Pencil,
 	Users,
-	Download,
 } from 'lucide-react';
 import { exportTableCsv } from '@/lib/csvExport';
 import { exportTablePdf } from '@/lib/pdfExport';
@@ -1003,22 +1003,10 @@ export function WalkInAttendancePage() {
 						<Search className="h-4 w-4" />
 						Returning walk-in
 					</button>
-					<button
-						type="button"
-						onClick={() => void handleExportPdf()}
-						className="btn-export-pdf"
-					>
-						<Download className="h-4 w-4" />
-						Export PDF
-					</button>
-					<button
-						type="button"
-						onClick={() => void handleExportCsv()}
-						className="btn-export-csv"
-					>
-						<Download className="h-4 w-4" />
-						Export CSV
-					</button>
+					<ExportDownloadDropdown
+						onExportPdf={() => void handleExportPdf()}
+						onExportCsv={() => void handleExportCsv()}
+					/>
 				</div>
 			</div>
 
