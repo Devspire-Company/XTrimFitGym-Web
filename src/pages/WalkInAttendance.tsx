@@ -480,28 +480,32 @@ export function WalkInAttendancePage() {
 		}
 	}, [authToken, dispatch, editWaiverFile, parsedEditAge]);
 
-	const handleUploadNewWaiver = useCallback(async () => {
-		if (!newWaiverFile) {
-			dispatch(addToast({ type: 'error', message: 'Choose an image file first.' }));
-			return;
-		}
-		if (!newWaiverFile.type.startsWith('image/')) {
-			dispatch(addToast({ type: 'error', message: 'Waiver must be an image file.' }));
-			return;
-		}
+	const handleUploadNewWaiver = useCallback(
+		async (fileOverride?: File | null) => {
+			const file = fileOverride !== undefined ? fileOverride : newWaiverFile;
+			if (!file) {
+				dispatch(addToast({ type: 'error', message: 'Choose an image file first.' }));
+				return;
+			}
+			if (!file.type.startsWith('image/')) {
+				dispatch(addToast({ type: 'error', message: 'Waiver must be an image file.' }));
+				return;
+			}
 
-		setUploadingNewWaiver(true);
-		try {
-			const url = await uploadWalkInWaiverImage(newWaiverFile, authToken ?? null);
-			setNewWaiverUrl(url);
-			setNewWaiverKind(parsedNewAge !== null && parsedNewAge < 18 ? 'minor' : 'adult');
-			dispatch(addToast({ type: 'success', message: 'Waiver uploaded successfully.' }));
-		} catch (err) {
-			dispatch(addToast({ type: 'error', message: (err as Error).message || 'Upload failed.' }));
-		} finally {
-			setUploadingNewWaiver(false);
-		}
-	}, [authToken, dispatch, newWaiverFile, parsedNewAge]);
+			setUploadingNewWaiver(true);
+			try {
+				const url = await uploadWalkInWaiverImage(file, authToken ?? null);
+				setNewWaiverUrl(url);
+				setNewWaiverKind(parsedNewAge !== null && parsedNewAge < 18 ? 'minor' : 'adult');
+				dispatch(addToast({ type: 'success', message: 'Waiver uploaded successfully.' }));
+			} catch (err) {
+				dispatch(addToast({ type: 'error', message: (err as Error).message || 'Upload failed.' }));
+			} finally {
+				setUploadingNewWaiver(false);
+			}
+		},
+		[authToken, dispatch, newWaiverFile, parsedNewAge]
+	);
 
 	const handleSubmitEdit = useCallback(
 		(e: React.FormEvent) => {
@@ -1522,21 +1526,17 @@ export function WalkInAttendancePage() {
 								type="file"
 								accept="image/*"
 								aria-label="Upload signed waiver image"
-								onChange={(e) => setNewWaiverFile(e.target.files?.[0] ?? null)}
+								onChange={(e) => {
+									const file = e.target.files?.[0] ?? null;
+									setNewWaiverFile(file);
+									if (file) void handleUploadNewWaiver(file);
+								}}
 								className="w-full rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-[var(--text-primary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--primary-yellow)] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-[#1a1a1a]"
 							/>
 							<div className="flex flex-wrap items-center gap-2">
-								<Button
-									type="button"
-									variant="outline"
-									className="btn-secondary gap-2"
-									onClick={() => void handleUploadNewWaiver()}
-									disabled={!newWaiverFile || uploadingNewWaiver}
-								>
-									{uploadingNewWaiver ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-									{uploadingNewWaiver ? 'Uploading...' : 'Upload waiver image'}
-								</Button>
-								{newWaiverUrl ? (
+								{uploadingNewWaiver ? (
+									<span className="text-xs text-[var(--text-secondary)]">Uploading…</span>
+								) : newWaiverUrl ? (
 									<a
 										href={newWaiverUrl}
 										target="_blank"
@@ -1621,11 +1621,7 @@ export function WalkInAttendancePage() {
 						disabled={creating}
 						className="w-full gap-2 rounded-xl border-0 bg-[var(--primary-yellow)] py-3 font-semibold text-[#1a1a1a] shadow-md hover:brightness-105 disabled:opacity-50"
 					>
-						{creating ? (
-							<Loader2 className="w-4 h-4 animate-spin" />
-						) : (
-							<CheckCircle2 className="w-4 h-4" />
-						)}
+						{creating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
 						{timeInNow ? 'Save & time in' : 'Save profile only'}
 					</Button>
 				</form>
@@ -1704,11 +1700,7 @@ export function WalkInAttendancePage() {
 							disabled={!selectedReturningId || timingIn}
 							onClick={handleTimeInReturning}
 						>
-							{timingIn ? (
-								<Loader2 className="w-4 h-4 animate-spin" />
-							) : (
-								<Clock className="w-4 h-4" />
-							)}
+							{timingIn ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
 							Time in now
 						</Button>
 						<Button
@@ -1722,7 +1714,6 @@ export function WalkInAttendancePage() {
 								setReturningModalOpen(false);
 							}}
 						>
-							<Pencil className="w-4 h-4" />
 							Edit profile
 						</Button>
 						<Button
@@ -1737,7 +1728,6 @@ export function WalkInAttendancePage() {
 								setReturningModalOpen(false);
 							}}
 						>
-							<History className="w-4 h-4" />
 							View all their logs
 						</Button>
 					</div>
