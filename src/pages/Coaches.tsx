@@ -8,7 +8,6 @@ import {
 	Eye,
 	UserCog,
 	X,
-	Save,
 	Edit,
 	Users,
 	Calendar as CalendarIcon,
@@ -1680,7 +1679,6 @@ function AddCoachModal({
 		});
 	};
 
-
 	const handleClose = () => {
 		if (!isSubmitting) {
 			setFormData({
@@ -1691,7 +1689,7 @@ function AddCoachModal({
 				phone: '',
 				specializations: [],
 				yearsExperience: '',
-				gender: '',``
+				gender: '',
 				dateOfBirth: '',
 				status: 'Active',
 				statusReason: '',
