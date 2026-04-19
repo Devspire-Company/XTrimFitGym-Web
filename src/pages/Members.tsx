@@ -1380,7 +1380,6 @@ export function MembersPage() {
 										opacity: isRenewing ? 0.6 : 1,
 									}}
 								>
-									<X className="w-4 h-4" />
 									Cancel
 								</button>
 								<button
@@ -1409,7 +1408,6 @@ export function MembersPage() {
 										</>
 									) : (
 										<>
-											<RotateCw className="w-4 h-4" />
 											Renew
 										</>
 									)}

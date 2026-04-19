@@ -544,6 +544,16 @@ export const UPDATE_USER_MUTATION = gql`
 				workOutTime
 				coachesIds
 				hasEnteredDetails
+				facilityBiometricEnrollmentComplete
+			}
+			currentMembership {
+				id
+				status
+				expiresAt
+				membership {
+					id
+					name
+				}
 			}
 			coachDetails {
 				clientsIds

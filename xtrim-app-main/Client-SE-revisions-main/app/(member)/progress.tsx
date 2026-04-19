@@ -65,6 +65,20 @@ function progressVerdictKey(verdict: string | undefined | null): string {
 		.replace(/-/g, '_');
 }
 
+const PROGRESS_VERDICT_LABELS: Record<string, string> = {
+	PROGRESSIVE: 'Progressive',
+	CLOSE_TO_ACHIEVEMENT: 'Close to Achievement',
+	ACHIEVED: 'Achieved',
+	REGRESSING: 'Regressing',
+};
+
+const PROGRESS_VERDICT_COLORS: Record<string, string> = {
+	PROGRESSIVE: '#10B981',
+	CLOSE_TO_ACHIEVEMENT: '#F59E0B',
+	ACHIEVED: '#3B82F6',
+	REGRESSING: '#EF4444',
+};
+
 interface WorkoutExercise {
 	id: string;
 	name: string;
@@ -418,6 +432,27 @@ const MemberProgress = () => {
 		[myCoachRatingsForGoal]
 	);
 
+	const sortedGoalProgressRatings = useMemo(() => {
+		const list = ratingsData?.getProgressRatings || [];
+		return [...list].sort(
+			(a: any, b: any) =>
+				new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+		);
+	}, [ratingsData?.getProgressRatings]);
+
+	const latestSessionLogForSelectedGoal = useMemo(() => {
+		const goalId = selectedGoal?.id;
+		const logs = sessionLogsData?.getSessionLogs;
+		if (!goalId || !Array.isArray(logs)) return null;
+		const linked = logs.filter((log: any) => log.session?.goal?.id === goalId);
+		if (linked.length === 0) return null;
+		return [...linked].sort((a: any, b: any) => {
+			const ta = new Date(a.completedAt || a.session?.date || 0).getTime();
+			const tb = new Date(b.completedAt || b.session?.date || 0).getTime();
+			return tb - ta;
+		})[0];
+	}, [selectedGoal?.id, sessionLogsData?.getSessionLogs]);
+
 	const [createGoal, { loading: creating }] = useMutation(
 		CREATE_GOAL_MUTATION,
 		{
@@ -757,10 +792,7 @@ const MemberProgress = () => {
 		const chartWidth = screenWidth - 60;
 
 		return (
-			<View className='mt-4'>
-				<Text className='text-text-primary font-semibold mb-4'>
-					Weight Progress
-				</Text>
+			<View>
 				<View
 					className='border-l-2 border-b-2 border-text-secondary'
 					style={{ height: chartHeight, width: chartWidth }}
@@ -1480,11 +1512,258 @@ const MemberProgress = () => {
 								<Ionicons name='close' size={28} color='#8E8E93' />
 							</TouchableOpacity>
 						</View>
-						<ScrollView>
-							{renderWeightChart()}
+						<ScrollView showsVerticalScrollIndicator={false}>
+							{selectedGoal && (
+								<View className='mb-6'>
+									<Text className='text-xl font-bold text-text-primary mb-3'>
+										Session & goal details
+									</Text>
+									<View
+										className='bg-bg-darker rounded-xl p-4 border border-[#F9C513]/50'
+										style={{ borderWidth: 0.5 }}
+									>
+										{latestSessionLogForSelectedGoal?.session ? (
+											<View className='mb-4'>
+												<Text className='text-text-secondary text-xs mb-1'>
+													Latest session for this goal
+												</Text>
+												<Text className='text-text-primary font-semibold text-lg'>
+													{latestSessionLogForSelectedGoal.session.name}
+												</Text>
+												{latestSessionLogForSelectedGoal.session.date ? (
+													<Text className='text-text-secondary text-sm mt-1'>
+														{new Date(
+															latestSessionLogForSelectedGoal.session.date
+														).toLocaleDateString('en-US', {
+															month: 'long',
+															day: 'numeric',
+															year: 'numeric',
+														})}
+													</Text>
+												) : null}
+												{latestSessionLogForSelectedGoal.session.startTime &&
+												latestSessionLogForSelectedGoal.session.endTime ? (
+													<Text className='text-text-secondary text-sm mt-1'>
+														{latestSessionLogForSelectedGoal.session.startTime} –{' '}
+														{latestSessionLogForSelectedGoal.session.endTime}
+													</Text>
+												) : null}
+												{latestSessionLogForSelectedGoal.session.gymArea ? (
+													<Text className='text-text-secondary text-sm mt-1'>
+														Area: {latestSessionLogForSelectedGoal.session.gymArea}
+													</Text>
+												) : null}
+												{latestSessionLogForSelectedGoal.session.coach ? (
+													<Text className='text-text-secondary text-sm mt-1'>
+														Session coach:{' '}
+														{latestSessionLogForSelectedGoal.session.coach.firstName}{' '}
+														{latestSessionLogForSelectedGoal.session.coach.lastName}
+													</Text>
+												) : null}
+												{latestSessionLogForSelectedGoal.completedAt ? (
+													<Text className='text-text-secondary text-xs mt-2'>
+														Completed:{' '}
+														{new Date(
+															latestSessionLogForSelectedGoal.completedAt
+														).toLocaleString('en-US', {
+															month: 'short',
+															day: 'numeric',
+															year: 'numeric',
+															hour: 'numeric',
+															minute: '2-digit',
+														})}
+													</Text>
+												) : null}
+												{latestSessionLogForSelectedGoal.weight != null ? (
+													<Text className='text-text-secondary text-sm mt-2'>
+														Weight logged:{' '}
+														<Text className='text-text-primary font-semibold'>
+															{latestSessionLogForSelectedGoal.weight} kg
+														</Text>
+													</Text>
+												) : null}
+											</View>
+										) : (
+											<Text className='text-text-secondary text-sm mb-4'>
+												No sessions logged for this goal yet. Session schedule and weight will
+												show here after you complete a session tied to this goal.
+											</Text>
+										)}
+										<View
+											className={
+												latestSessionLogForSelectedGoal?.session
+													? 'pt-4 border-t border-[#F9C513]/25'
+													: ''
+											}
+										>
+											<Text className='text-text-secondary text-xs mb-2'>Goal summary</Text>
+											<Text className='text-text-primary text-sm mb-1'>
+												Type:{' '}
+												<Text className='font-semibold'>
+													{goalTypeOptions.find((o) => o.value === selectedGoal.goalType)
+														?.label || selectedGoal.goalType}
+												</Text>
+											</Text>
+											{selectedGoal.description ? (
+												<Text className='text-text-primary text-sm mb-2 mt-1'>
+													{selectedGoal.description}
+												</Text>
+											) : null}
+											{formatKgDisplay(selectedGoal.currentWeight) ? (
+												<Text className='text-text-secondary text-sm'>
+													Starting weight:{' '}
+													<Text className='text-text-primary font-semibold'>
+														{formatKgDisplay(selectedGoal.currentWeight)} kg
+													</Text>
+												</Text>
+											) : null}
+											{formatKgDisplay(selectedGoal.targetWeight) ? (
+												<Text className='text-text-secondary text-sm mt-1'>
+													Target weight:{' '}
+													<Text className='text-text-primary font-semibold'>
+														{formatKgDisplay(selectedGoal.targetWeight)} kg
+													</Text>
+												</Text>
+											) : null}
+											{selectedGoal.targetDate ? (
+												<Text className='text-text-secondary text-sm mt-1'>
+													Target date:{' '}
+													<Text className='text-text-primary font-semibold'>
+														{new Date(selectedGoal.targetDate).toLocaleDateString('en-US', {
+															month: 'short',
+															day: 'numeric',
+															year: 'numeric',
+														})}
+													</Text>
+												</Text>
+											) : null}
+											{selectedGoal.coach ? (
+												<Text className='text-text-secondary text-sm mt-2'>
+													Your coach:{' '}
+													<Text className='text-text-primary font-semibold'>
+														{selectedGoal.coach.firstName} {selectedGoal.coach.lastName}
+													</Text>
+												</Text>
+											) : null}
+										</View>
+									</View>
+								</View>
+							)}
+
+							{selectedGoal?.coachId && (
+								<View className='mb-6'>
+									<Text className='text-xl font-bold text-text-primary mb-2'>
+										{"Coach's rating & comments"}
+									</Text>
+									<Text className='text-text-secondary text-sm mb-4'>
+										Your coach&apos;s feedback on your progress for this goal (review period,
+										stars, and comment).
+									</Text>
+									{sortedGoalProgressRatings.length > 0 ? (
+										sortedGoalProgressRatings.map((rating: any) => {
+											const startDate = new Date(rating.startDate);
+											const endDate = new Date(rating.endDate);
+											const vk = progressVerdictKey(rating.verdict);
+											return (
+												<View
+													key={rating.id}
+													className='bg-bg-darker rounded-xl p-4 mb-3 border border-[#F9C513]'
+													style={{ borderWidth: 0.5 }}
+												>
+													<View className='flex-row justify-between items-start mb-2'>
+														<View className='flex-1'>
+															<Text className='text-text-primary font-semibold text-base mb-1'>
+																{startDate.toLocaleDateString()} -{' '}
+																{endDate.toLocaleDateString()}
+															</Text>
+															{rating.coach && (
+																<Text className='text-text-secondary text-sm'>
+																	By Coach {rating.coach.firstName}{' '}
+																	{rating.coach.lastName}
+																</Text>
+															)}
+														</View>
+														<View
+															className='px-3 py-1 rounded-full'
+															style={{
+																backgroundColor:
+																	PROGRESS_VERDICT_COLORS[vk] || '#8E8E93',
+															}}
+														>
+															<Text className='text-white text-xs font-semibold'>
+																{PROGRESS_VERDICT_LABELS[vk] || rating.verdict}
+															</Text>
+														</View>
+													</View>
+
+													<View className='flex-row items-center mb-2'>
+														<Text className='text-text-secondary text-sm mr-2'>
+															Rating:
+														</Text>
+														<View className='flex-row items-center'>
+															{Array.from({ length: 5 }).map((_, index) => (
+																<Ionicons
+																	key={index}
+																	name={
+																		index < rating.rating
+																			? 'star'
+																			: 'star-outline'
+																	}
+																	size={18}
+																	color='#F9C513'
+																/>
+															))}
+															<Text className='text-text-primary font-semibold ml-2'>
+																{rating.rating}/5
+															</Text>
+														</View>
+													</View>
+
+													{rating.comment ? (
+														<View className='mt-2'>
+															<Text className='text-text-secondary text-xs mb-1'>
+																Comment from coach:
+															</Text>
+															<Text className='text-text-primary text-sm'>
+																{rating.comment}
+															</Text>
+														</View>
+													) : null}
+
+													<Text className='text-text-secondary text-xs mt-2'>
+														Created:{' '}
+														{new Date(rating.createdAt).toLocaleDateString()}
+													</Text>
+												</View>
+											);
+										})
+									) : (
+										<View
+											className='items-center justify-center py-8 bg-bg-darker rounded-xl border border-[#F9C513]'
+											style={{ borderWidth: 0.5 }}
+										>
+											<Ionicons name='star-outline' size={48} color='#8E8E93' />
+											<Text className='text-text-secondary mt-4 text-center text-base'>
+												No ratings yet
+											</Text>
+											<Text className='text-text-secondary mt-2 text-center text-sm'>
+												Your coach hasn&apos;t rated your progress for this goal yet
+											</Text>
+										</View>
+									)}
+								</View>
+							)}
+
+							<View className='mb-6'>
+								<Text className='text-xl font-bold text-text-primary mb-2'>Weight progress</Text>
+								<Text className='text-text-secondary text-sm mb-3'>
+									Weight entries from sessions linked to this goal.
+								</Text>
+								{renderWeightChart()}
+							</View>
 
 							{(selectedGoal?.coachId || mySessionRatingsList.length > 0) && (
-								<View className='mt-6'>
+								<View className='mt-2 mb-4'>
 									<Text className='text-xl font-bold text-text-primary mb-4'>
 										Your session feedback to coach
 									</Text>
@@ -1558,119 +1837,6 @@ const MemberProgress = () => {
 										>
 											<Text className='text-text-secondary text-center text-sm px-2'>
 												No coach ratings submitted yet for sessions linked to this goal.
-											</Text>
-										</View>
-									)}
-								</View>
-							)}
-							
-							{/* Progress Ratings Section */}
-							{selectedGoal?.coachId && (
-								<View className='mt-6'>
-									<Text className='text-xl font-bold text-text-primary mb-4'>
-										Coach rate progress
-									</Text>
-									{ratingsData?.getProgressRatings &&
-									ratingsData.getProgressRatings.length > 0 ? (
-										ratingsData.getProgressRatings.map((rating: any) => {
-											const startDate = new Date(rating.startDate);
-											const endDate = new Date(rating.endDate);
-											const verdictLabels: Record<string, string> = {
-												PROGRESSIVE: 'Progressive',
-												CLOSE_TO_ACHIEVEMENT: 'Close to Achievement',
-												ACHIEVED: 'Achieved',
-												REGRESSING: 'Regressing',
-											};
-											const verdictColors: Record<string, string> = {
-												PROGRESSIVE: '#10B981', // green
-												CLOSE_TO_ACHIEVEMENT: '#F59E0B', // amber
-												ACHIEVED: '#3B82F6', // blue
-												REGRESSING: '#EF4444', // red
-											};
-
-											return (
-												<View
-													key={rating.id}
-													className='bg-bg-darker rounded-xl p-4 mb-3 border border-[#F9C513]'
-													style={{ borderWidth: 0.5 }}
-												>
-													<View className='flex-row justify-between items-start mb-2'>
-														<View className='flex-1'>
-															<Text className='text-text-primary font-semibold text-base mb-1'>
-																{startDate.toLocaleDateString()} -{' '}
-																{endDate.toLocaleDateString()}
-															</Text>
-															{rating.coach && (
-																<Text className='text-text-secondary text-sm'>
-																	By Coach {rating.coach.firstName}{' '}
-																	{rating.coach.lastName}
-																</Text>
-															)}
-														</View>
-														<View
-															className='px-3 py-1 rounded-full'
-															style={{
-																backgroundColor:
-																	verdictColors[progressVerdictKey(rating.verdict)] ||
-																	'#8E8E93',
-															}}
-														>
-															<Text className='text-white text-xs font-semibold'>
-																{verdictLabels[progressVerdictKey(rating.verdict)] ||
-																	rating.verdict}
-															</Text>
-														</View>
-													</View>
-
-													<View className='flex-row items-center mb-2'>
-														<Text className='text-text-secondary text-sm mr-2'>
-															Rating:
-														</Text>
-														<View className='flex-row items-center'>
-															{Array.from({ length: 5 }).map((_, index) => (
-																<Ionicons
-																	key={index}
-																	name={
-																		index < rating.rating
-																			? 'star'
-																			: 'star-outline'
-																	}
-																	size={16}
-																	color='#F9C513'
-																/>
-															))}
-															<Text className='text-text-primary font-semibold ml-2'>
-																{rating.rating}/5
-															</Text>
-														</View>
-													</View>
-
-													{rating.comment && (
-														<View className='mt-2'>
-															<Text className='text-text-secondary text-xs mb-1'>
-																Comment:
-															</Text>
-															<Text className='text-text-primary text-sm'>
-																{rating.comment}
-															</Text>
-														</View>
-													)}
-
-													<Text className='text-text-secondary text-xs mt-2'>
-														Created:{' '}
-														{new Date(rating.createdAt).toLocaleDateString()}
-													</Text>
-												</View>
-											);
-										})
-									) : (
-										<View className='items-center justify-center py-8 bg-bg-darker rounded-xl border border-[#F9C513]' style={{ borderWidth: 0.5 }}>
-											<Ionicons name='star-outline' size={48} color='#8E8E93' />
-											<Text className='text-text-secondary mt-4 text-center text-base'>
-												No ratings yet
-											</Text>
-											<Text className='text-text-secondary mt-2 text-center text-sm'>
-												Your coach hasn&apos;t rated your progress for this goal yet
 											</Text>
 										</View>
 									)}
@@ -1960,18 +2126,6 @@ const MemberProgress = () => {
 										recapRatingsForLog.map((rating: any) => {
 											const startDate = new Date(rating.startDate);
 											const endDate = new Date(rating.endDate);
-											const vLabels: Record<string, string> = {
-												PROGRESSIVE: 'Progressive',
-												CLOSE_TO_ACHIEVEMENT: 'Close to Achievement',
-												ACHIEVED: 'Achieved',
-												REGRESSING: 'Regressing',
-											};
-											const vColors: Record<string, string> = {
-												PROGRESSIVE: '#10B981',
-												CLOSE_TO_ACHIEVEMENT: '#F59E0B',
-												ACHIEVED: '#3B82F6',
-												REGRESSING: '#EF4444',
-											};
 											const vk = progressVerdictKey(rating.verdict);
 											return (
 												<View
@@ -1993,10 +2147,12 @@ const MemberProgress = () => {
 														</View>
 														<View
 															className='px-3 py-1 rounded-full'
-															style={{ backgroundColor: vColors[vk] || '#8E8E93' }}
+															style={{
+																backgroundColor: PROGRESS_VERDICT_COLORS[vk] || '#8E8E93',
+															}}
 														>
 															<Text className='text-white text-xs font-semibold'>
-																{vLabels[vk] || rating.verdict}
+																{PROGRESS_VERDICT_LABELS[vk] || rating.verdict}
 															</Text>
 														</View>
 													</View>
