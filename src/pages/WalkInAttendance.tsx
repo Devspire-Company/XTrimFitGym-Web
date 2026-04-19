@@ -191,10 +191,6 @@ export function WalkInAttendancePage() {
 	const [email, setEmail] = useState('');
 	const [gender, setGender] = useState<WalkInGender>(WalkInGender.Male);
 	const [notes, setNotes] = useState('');
-	const [newWaiverUrl, setNewWaiverUrl] = useState('');
-	const [newWaiverKind, setNewWaiverKind] = useState<WaiverKind | null>(null);
-	const [newWaiverFile, setNewWaiverFile] = useState<File | null>(null);
-	const [uploadingNewWaiver, setUploadingNewWaiver] = useState(false);
 	const [timeInNow, setTimeInNow] = useState(true);
 
 	const [searchRaw, setSearchRaw] = useState('');
@@ -365,9 +361,6 @@ export function WalkInAttendancePage() {
 			setPhone('');
 			setEmail('');
 			setNotes('');
-			setNewWaiverUrl('');
-			setNewWaiverKind(null);
-			setNewWaiverFile(null);
 			setGender(WalkInGender.Male);
 			setAgeYears('');
 			setMinorWaiverAck(false);
@@ -480,33 +473,6 @@ export function WalkInAttendancePage() {
 			setUploadingWaiver(false);
 		}
 	}, [authToken, dispatch, editWaiverFile, parsedEditAge]);
-
-	const handleUploadNewWaiver = useCallback(
-		async (fileOverride?: File | null) => {
-			const file = fileOverride !== undefined ? fileOverride : newWaiverFile;
-			if (!file) {
-				dispatch(addToast({ type: 'error', message: 'Choose an image file first.' }));
-				return;
-			}
-			if (!file.type.startsWith('image/')) {
-				dispatch(addToast({ type: 'error', message: 'Waiver must be an image file.' }));
-				return;
-			}
-
-			setUploadingNewWaiver(true);
-			try {
-				const url = await uploadWalkInWaiverImage(file, authToken ?? null);
-				setNewWaiverUrl(url);
-				setNewWaiverKind(parsedNewAge !== null && parsedNewAge < 18 ? 'minor' : 'adult');
-				dispatch(addToast({ type: 'success', message: 'Waiver uploaded successfully.' }));
-			} catch (err) {
-				dispatch(addToast({ type: 'error', message: (err as Error).message || 'Upload failed.' }));
-			} finally {
-				setUploadingNewWaiver(false);
-			}
-		},
-		[authToken, dispatch, newWaiverFile, parsedNewAge]
-	);
 
 	const handleSubmitEdit = useCallback(
 		(e: React.FormEvent) => {
@@ -625,29 +591,6 @@ export function WalkInAttendancePage() {
 				return;
 			}
 
-			const waiverType: WaiverKind = ageParsed < 18 ? 'minor' : 'adult';
-			if (!newWaiverUrl.trim()) {
-				dispatch(
-					addToast({
-						type: 'error',
-						message: 'Upload the signed waiver image before saving this profile.',
-					}),
-				);
-				return;
-			}
-			if (newWaiverKind && newWaiverKind !== waiverType) {
-				dispatch(
-					addToast({
-						type: 'error',
-						message:
-							waiverType === 'minor'
-								? 'Please upload a minor waiver image for guests under 18.'
-								: 'Please upload an adult waiver image for guests 18 and above.',
-					}),
-				);
-				return;
-			}
-
 			if (ageParsed < 18) {
 				if (!minorWaiverAck || !minorGuardianName.trim()) {
 					dispatch(
@@ -665,7 +608,7 @@ export function WalkInAttendancePage() {
 				dispatch(addToast({ type: 'error', message: 'Contact number must be exactly 11 digits.' }));
 				return;
 			}
-			const composedNotes = buildNotesWithWaiver(notes, newWaiverUrl.trim(), waiverType);
+			const composedNotes = notes.trim();
 			createWalkIn({
 				variables: {
 					input: {
@@ -675,7 +618,7 @@ export function WalkInAttendancePage() {
 						phoneNumber: cleanedPhone || undefined,
 						email: email.trim() || undefined,
 						gender,
-						notes: composedNotes,
+						notes: composedNotes || undefined,
 						ageYears: ageParsed,
 						...(ageParsed < 18
 							? {
@@ -697,8 +640,6 @@ export function WalkInAttendancePage() {
 			email,
 			gender,
 			notes,
-			newWaiverUrl,
-			newWaiverKind,
 			ageYears,
 			minorWaiverAck,
 			minorGuardianName,
@@ -1526,42 +1467,6 @@ export function WalkInAttendancePage() {
 								onChange={(e) => setAgeYears(e.target.value)}
 								className="w-full max-w-[200px] rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 font-['Inter',sans-serif] text-sm tabular-nums text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(249,197,19,0.12)]"
 							/>
-						</div>
-						<div className="sm:col-span-2 space-y-3 rounded-xl border border-[rgba(249,197,19,0.28)] bg-[rgba(249,197,19,0.07)] p-4">
-							<p className="text-xs leading-relaxed text-[var(--text-secondary)]">
-								Upload the signed{' '}
-								<strong className="text-[var(--text-primary)]">
-									{parsedNewAge !== null && parsedNewAge < 18 ? 'minor waiver' : 'client waiver'}
-								</strong>{' '}
-								for this profile.
-							</p>
-							<input
-								type="file"
-								accept="image/*"
-								aria-label="Upload signed waiver image"
-								onChange={(e) => {
-									const file = e.target.files?.[0] ?? null;
-									setNewWaiverFile(file);
-									if (file) void handleUploadNewWaiver(file);
-								}}
-								className="w-full rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-[var(--text-primary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--primary-yellow)] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-[#1a1a1a]"
-							/>
-							<div className="flex flex-wrap items-center gap-2">
-								{uploadingNewWaiver ? (
-									<span className="text-xs text-[var(--text-secondary)]">Uploading…</span>
-								) : newWaiverUrl ? (
-									<a
-										href={newWaiverUrl}
-										target="_blank"
-										rel="noreferrer"
-										className="text-sm text-[var(--primary-yellow)] underline underline-offset-2"
-									>
-										View uploaded waiver
-									</a>
-								) : (
-									<span className="text-xs text-[var(--text-secondary)]">No waiver uploaded yet</span>
-								)}
-							</div>
 						</div>
 						{showNewMinorBlock && (
 							<div className="sm:col-span-2 space-y-3 rounded-xl border border-[rgba(249,197,19,0.28)] bg-[rgba(249,197,19,0.07)] p-4">

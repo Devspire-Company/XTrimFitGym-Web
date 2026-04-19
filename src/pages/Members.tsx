@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNotifyMembershipExpiry } from '@/hooks/useNotifyMembershipExpiry';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import {
 	Search,
@@ -165,6 +166,8 @@ export function MembersPage() {
 		});
 		return Array.from(mergedById.values());
 	}, [data?.getUsers, subscriptionData?.usersUpdated]);
+
+	useNotifyMembershipExpiry(membersData, loading);
 
 	const [disableUserMutation] = useMutation(DISABLE_USER, {
 		refetchQueries: [{ query: GET_USERS, variables: { role: RoleType.Member, includeDisabled: true } }],

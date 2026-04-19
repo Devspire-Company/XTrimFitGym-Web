@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useQuery, useSubscription } from '@apollo/client';
 import { Link } from 'react-router';
 import {
@@ -26,6 +26,7 @@ import {
 	WALK_IN_STATS,
 } from '@/graphql/operations/index';
 import { RoleType } from '@/graphql/generated/graphql';
+import { useNotifyMembershipExpiry } from '@/hooks/useNotifyMembershipExpiry';
 import type { AttendanceRecord } from '@/graphql/generated/types';
 import {
 	Chart as ChartJS,
@@ -298,13 +299,28 @@ export function DashboardPage() {
 		}
 	}, [batchSubscriptionData]);
 
+	const mergedMembersList = useMemo(() => {
+		const queriedMembers = (membersData?.getUsers || []) as any[];
+		const subscribedMembers = (membersSubscriptionData?.usersUpdated || []) as any[];
+		if (subscribedMembers.length === 0) return queriedMembers;
+		const mergedById = new Map<string, any>();
+		queriedMembers.forEach((member) => mergedById.set(member.id, member));
+		subscribedMembers.forEach((member) => {
+			const previous = mergedById.get(member.id) || {};
+			mergedById.set(member.id, { ...previous, ...member });
+		});
+		return Array.from(mergedById.values());
+	}, [membersData?.getUsers, membersSubscriptionData?.usersUpdated]);
+
+	useNotifyMembershipExpiry(mergedMembersList, membersLoading);
+
 	// Only block on members and coaches loading - analytics can load in background
 	const loading = membersLoading || coachesLoading;
 	const error = null; // Handle errors separately if needed
 	
 	// Use subscription data if available, otherwise fall back to query data
 	const data = {
-		members: membersSubscriptionData?.usersUpdated || membersData?.getUsers || [],
+		members: mergedMembersList,
 		coaches: coachesSubscriptionData?.usersUpdated || coachesData?.getUsers || [],
 	};
 	
