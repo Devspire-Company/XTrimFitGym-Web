@@ -1550,94 +1550,27 @@ export function ReportsPage() {
 							<tr className="text-left text-[var(--text-secondary)] border-b border-[var(--card-border)]">
 								<th className="px-3 py-2 font-medium">Exported At</th>
 								<th className="px-3 py-2 font-medium">Report</th>
-								<th className="px-3 py-2 font-medium">Exported By</th>
-								<th className="px-3 py-2 font-medium">Role</th>
+								{/* <th className="px-3 py-2 font-medium">Exported By</th> */}
+								{/* <th className="px-3 py-2 font-medium">Role</th> */}
 								<th className="px-3 py-2 font-medium">File</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-[var(--card-border)]">
 							{reportLogsLoading ? (
 								<tr>
-									<td colSpan={5} className="px-3 py-6 text-center text-[var(--text-secondary)]">
+									<td colSpan={3} className="px-3 py-6 text-center text-[var(--text-secondary)]">
 										Loading export logs...
 									</td>
 								</tr>
 							) : recentReportLogs.length === 0 ? (
 								<tr>
-									<td colSpan={5} className="px-3 py-6 text-center text-[var(--text-secondary)]">
+									<td colSpan={3} className="px-3 py-6 text-center text-[var(--text-secondary)]">
 										No export logs yet.
 									</td>
 								</tr>
 							) : (
 								pagedReportLogs.map((row: any) => {
-									const asText = (value: unknown): string => {
-										if (typeof value === 'string') return value.trim();
-										if (typeof value === 'number') return String(value);
-										if (value && typeof value === 'object') {
-											const obj = value as Record<string, unknown>;
-											const candidate = [
-												obj.fullName,
-												obj.name,
-												obj.email,
-												obj.id,
-												obj._id,
-												obj.value,
-											].find((entry) => typeof entry === 'string' && entry.trim().length > 0);
-											return typeof candidate === 'string' ? candidate.trim() : '';
-										}
-										return '';
-									};
-									const firstName = asText(row.downloadedBy?.firstName);
-									const lastName = asText(row.downloadedBy?.lastName);
-									const matchedLocalLog = localExportLogs.find((localRow) => {
-										if (!localRow) return false;
-										const sameFile =
-											asText(localRow.fileName) !== '' &&
-											asText(localRow.fileName) === asText(row.fileName);
-										const sameReportType =
-											asText(localRow.reportType) !== '' &&
-											asText(localRow.reportType).toUpperCase() ===
-												asText(row.reportType).toUpperCase();
-										return sameFile && sameReportType;
-									});
-									const localName = [
-										asText(matchedLocalLog?.downloadedBy?.firstName),
-										asText(matchedLocalLog?.downloadedBy?.lastName),
-									]
-										.filter((value) => value.length > 0)
-										.join(' ')
-										.trim();
-									const localEmail = asText(matchedLocalLog?.downloadedBy?.email);
-									const fullName = [firstName, lastName]
-										.filter((value) => value.length > 0)
-										.join(' ')
-										.trim();
-									const sameAsCurrentUser =
-										!!currentUser?.id && row.downloadedById === currentUser.id;
-									const fallbackCurrentUserName =
-										sameAsCurrentUser
-											? [currentUser?.firstName, currentUser?.lastName]
-													.filter(Boolean)
-													.join(' ')
-													.trim()
-											: '';
-									const downloadedByEmail = asText(row.downloadedBy?.email);
-									const downloadedByIdValue = asText(row.downloadedById);
-									const downloadedByObjectValue = asText(row.downloadedBy);
-									const exporterDisplay =
-										fullName ||
-										localName ||
-										fallbackCurrentUserName ||
-										downloadedByEmail ||
-										localEmail ||
-										downloadedByObjectValue ||
-										downloadedByIdValue ||
-										'Unknown user';
-									const safeExporterDisplay = /^\[object Object\](\s+\[object Object\])*$/.test(
-										exporterDisplay
-									)
-										? 'Unknown user'
-										: exporterDisplay;
+									// Exported-by and role columns are intentionally hidden in the UI.
 									return (
 										<tr key={row.id} className="hover:bg-[rgba(255,255,255,0.03)]">
 											<td className="px-3 py-2 text-[var(--text-primary)]">
@@ -1650,12 +1583,8 @@ export function ReportsPage() {
 											<td className="px-3 py-2 text-[var(--text-primary)]">
 												{String(row.reportType || '').replaceAll('_', ' ')}
 											</td>
-											<td className="px-3 py-2 text-[var(--text-primary)]">
-												{safeExporterDisplay}
-											</td>
-											<td className="px-3 py-2 text-[var(--text-secondary)] uppercase">
-												{row.downloadedByRole || '-'}
-											</td>
+											{/* <td className="px-3 py-2 text-[var(--text-primary)]">{safeExporterDisplay}</td> */}
+											{/* <td className="px-3 py-2 text-[var(--text-secondary)] uppercase">{row.downloadedByRole || '-'}</td> */}
 											<td className="px-3 py-2 text-[var(--text-secondary)]">
 												{row.fileName || '-'}
 											</td>

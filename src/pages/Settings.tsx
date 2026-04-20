@@ -5,7 +5,6 @@ import {
 	Sliders,
 	Bell,
 	Shield,
-	Database,
 	Key,
 	History,
 	LogOut,
@@ -54,7 +53,7 @@ export function SettingsPage() {
 		{ id: 'notifications', label: 'Notification Settings', icon: Bell },
 		{ id: 'security', label: 'Account Security', icon: Shield },
 		// { id: 'admin', label: 'Admin Accounts', icon: UserPlus },
-		{ id: 'manageData', label: 'Manage Data', icon: Database },
+		// { id: 'manageData', label: 'Manage Data', icon: Database },
 	];
 
 	const toggleEditMode = (section: string) => {
