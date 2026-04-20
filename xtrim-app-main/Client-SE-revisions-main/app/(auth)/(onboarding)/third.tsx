@@ -149,7 +149,7 @@ const Third = () => {
 			}
 			clearData();
 			pendingIntentRef.current = null;
-			router.replace('/(member)/dashboard');
+			router.navigate('/(member)/dashboard');
 		},
 		onError: (error) => {
 			pendingIntentRef.current = null;

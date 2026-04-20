@@ -65,7 +65,7 @@ export function MemberMeSyncAndWelcome() {
 
 	const dismissWelcome = () => {
 		setShowApprovedWelcome(false);
-		router.replace('/(member)/dashboard');
+		router.navigate('/(member)/dashboard');
 	};
 
 	if (skipMe) return null;

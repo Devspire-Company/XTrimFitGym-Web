@@ -104,7 +104,7 @@ const Fourth = () => {
 						});
 				}
 				clearData();
-				router.replace('/(member)/workouts');
+				router.navigate('/(member)/workouts');
 				return;
 			}
 			const intent = data.membershipIntent;

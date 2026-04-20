@@ -374,17 +374,26 @@ export function AdminCreateSessionModal({
 					</div>
 
 					<div className="form-group">
-						<label className="flex items-center gap-2 cursor-pointer">
+						<label className="flex items-center gap-3 cursor-pointer">
 							<input
 								type="checkbox"
 								checked={isGroupClass}
-								className="mt-0.5 shrink-0 accent-[var(--primary-yellow)]"
-								style={{ width: 16, height: 16, minWidth: 16 }}
+								className="peer sr-only"
 								onChange={(e) => {
 									setIsGroupClass(e.target.checked);
 									setGoalId('');
 								}}
 							/>
+							<span
+								className={cn(
+									'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+									'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
+									'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
+								)}
+								aria-hidden
+							>
+								✓
+							</span>
 							<span>Group class</span>
 						</label>
 						<small className="block text-xs text-[var(--text-secondary)] mt-1">
@@ -425,17 +434,26 @@ export function AdminCreateSessionModal({
 										<label
 											key={u.id}
 											className={cn(
-												'flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
+												'flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
 												checked ? 'bg-[rgba(249,197,19,0.12)]' : 'hover:bg-[rgba(255,255,255,0.04)]'
 											)}
 										>
 											<input
 												type="checkbox"
 												checked={checked}
-												className="mt-1 shrink-0 accent-[var(--primary-yellow)]"
-												style={{ width: 16, height: 16, minWidth: 16 }}
+												className="peer sr-only"
 												onChange={() => toggleMember(u.id)}
 											/>
+											<span
+												className={cn(
+													'mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+													'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
+													'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
+												)}
+												aria-hidden
+											>
+												✓
+											</span>
 											<div className="min-w-0 leading-tight">
 												<span className="text-[var(--text-primary)] font-medium">{label}</span>
 												<span className="ml-1 text-[var(--text-secondary)] text-xs break-all">{u.email}</span>
