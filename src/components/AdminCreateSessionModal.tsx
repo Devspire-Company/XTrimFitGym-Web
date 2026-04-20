@@ -384,6 +384,7 @@ export function AdminCreateSessionModal({
 									setGoalId('');
 								}}
 							/>
+							<span>Group class</span>
 							<span
 								className={cn(
 									'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
@@ -394,7 +395,6 @@ export function AdminCreateSessionModal({
 							>
 								✓
 							</span>
-							<span>Group class</span>
 						</label>
 						<small className="block text-xs text-[var(--text-secondary)] mt-1">
 							Personal sessions require a goal (same as the coach app). Group classes use invites
