@@ -378,6 +378,7 @@ export function AdminCreateSessionModal({
 							<input
 								type="checkbox"
 								checked={isGroupClass}
+								className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary-yellow)]"
 								onChange={(e) => {
 									setIsGroupClass(e.target.checked);
 									setGoalId('');
@@ -423,17 +424,20 @@ export function AdminCreateSessionModal({
 										<label
 											key={u.id}
 											className={cn(
-												'flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
+												'flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
 												checked ? 'bg-[rgba(249,197,19,0.12)]' : 'hover:bg-[rgba(255,255,255,0.04)]'
 											)}
 										>
 											<input
 												type="checkbox"
 												checked={checked}
+												className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary-yellow)]"
 												onChange={() => toggleMember(u.id)}
 											/>
-											<span className="text-[var(--text-primary)]">{label}</span>
-											<span className="text-[var(--text-secondary)] text-xs truncate">{u.email}</span>
+											<div className="min-w-0 leading-tight">
+												<span className="text-[var(--text-primary)] font-medium">{label}</span>
+												<span className="ml-1 text-[var(--text-secondary)] text-xs break-all">{u.email}</span>
+											</div>
 										</label>
 									);
 								})
