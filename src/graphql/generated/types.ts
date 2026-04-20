@@ -218,6 +218,7 @@ export type CreateSessionFromTemplateInput = {
 
 export type CreateSessionInput = {
   clientsIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  coachId?: InputMaybe<Scalars['ID']['input']>;
   date: Scalars['String']['input'];
   endTime?: InputMaybe<Scalars['String']['input']>;
   goalId?: InputMaybe<Scalars['ID']['input']>;
@@ -861,7 +862,8 @@ export type Notification = {
 
 export enum NotificationType {
   Inactivity = 'INACTIVITY',
-  MembershipExpiring = 'MEMBERSHIP_EXPIRING'
+  MembershipExpiring = 'MEMBERSHIP_EXPIRING',
+  SessionScheduled = 'SESSION_SCHEDULED'
 }
 
 export type PeriodRevenue = {
@@ -1719,6 +1721,14 @@ export type LogReportDownloadMutationVariables = Exact<{
 
 export type LogReportDownloadMutation = { __typename?: 'Mutation', logReportDownload: { __typename?: 'ReportDownloadLog', id: string, reportType: ReportType, format: string, downloadedById: string, createdAt?: string | null } };
 
+export type GetGoalsForClientQueryVariables = Exact<{
+  clientId: Scalars['ID']['input'];
+  status?: InputMaybe<GoalStatus>;
+}>;
+
+
+export type GetGoalsForClientQuery = { __typename?: 'Query', getGoals: Array<{ __typename?: 'Goal', id: string, clientId: string, title: string, goalType: string, status: GoalStatus }> };
+
 export type GetAllMembershipsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -1781,6 +1791,13 @@ export type GetCoachSessionsQueryVariables = Exact<{
 
 
 export type GetCoachSessionsQuery = { __typename?: 'Query', getCoachSessions: Array<{ __typename?: 'Session', id: string, coachId: string, clientsIds: Array<string>, name: string, date: string, startTime: string, endTime?: string | null, gymArea: string, status: SessionStatus, note?: string | null, sessionKind: SessionKind, maxParticipants?: number | null, createdAt?: string | null, updatedAt?: string | null, clients?: Array<{ __typename?: 'User', id: string, firstName: string, lastName: string, email: string }> | null, enrollments: Array<{ __typename?: 'ClassEnrollment', clientId: string, status: ClassEnrollmentStatus, createdAt?: string | null, client?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string } | null }> }> };
+
+export type CreateSessionMutationVariables = Exact<{
+  input: CreateSessionInput;
+}>;
+
+
+export type CreateSessionMutation = { __typename?: 'Mutation', createSession: { __typename?: 'Session', id: string, coachId: string, clientsIds: Array<string>, name: string, date: string, startTime: string, endTime?: string | null, gymArea: string, note?: string | null, status: SessionStatus, sessionKind: SessionKind, maxParticipants?: number | null, goalId?: string | null } };
 
 export type GetCoachSessionLogsQueryVariables = Exact<{
   coachId: Scalars['ID']['input'];

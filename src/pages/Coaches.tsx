@@ -24,6 +24,7 @@ import {
 	Trophy,
 } from 'lucide-react';
 import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
+import { AdminCreateSessionModal } from '@/components/AdminCreateSessionModal';
 import { GET_USERS, GET_COACH_SESSIONS, GET_COACH_SESSION_LOGS, DELETE_USER, CREATE_USER, UPDATE_USER, USERS_UPDATED } from '@/graphql/operations/index';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
@@ -233,6 +234,7 @@ export function CoachesPage() {
 	const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isAddCoachModalOpen, setIsAddCoachModalOpen] = useState(false);
+	const [isCreateSessionModalOpen, setIsCreateSessionModalOpen] = useState(false);
 	const [isEditCoachModalOpen, setIsEditCoachModalOpen] = useState(false);
 	const [removeReason, setRemoveReason] = useState('');
 	const [removeReasonError, setRemoveReasonError] = useState('');
@@ -446,6 +448,11 @@ export function CoachesPage() {
 		});
 	}, [apiCoaches, searchTerm, statusFilter]);
 
+	const coachOptionsForSession = useMemo(
+		() => apiCoaches.map((c) => ({ id: c.id, name: c.name })),
+		[apiCoaches]
+	);
+
 	const coachExportHead = [
 		'Record Type',
 		'Coach',
@@ -574,6 +581,9 @@ export function CoachesPage() {
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
 					<ExportDownloadDropdown onExportPdf={handleExportPdf} onExportCsv={handleExportCsv} />
+					<Button type="button" variant="outline" onClick={() => setIsCreateSessionModalOpen(true)}>
+						Create session
+					</Button>
 					<Button onClick={handleAddCoach}>
 						Add New Coach
 					</Button>
@@ -950,6 +960,26 @@ export function CoachesPage() {
 							console.error('Error creating coach:', err);
 						}
 					}}
+				/>
+			</div>
+
+			{/* Admin: schedule session for a coach and members */}
+			<div
+				className={`modal-overlay ${isCreateSessionModalOpen ? 'active' : ''}`}
+				onClick={() => setIsCreateSessionModalOpen(false)}
+			>
+				<AdminCreateSessionModal
+					isOpen={isCreateSessionModalOpen}
+					onClose={() => setIsCreateSessionModalOpen(false)}
+					coaches={coachOptionsForSession}
+					onCreated={() =>
+						dispatch(
+							addToast({
+								type: 'success',
+								message: 'Session created and members notified.',
+							})
+						)
+					}
 				/>
 			</div>
 		</div>

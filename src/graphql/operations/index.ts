@@ -17,7 +17,9 @@ export {
 	GetAnalyticsDocument as GET_ANALYTICS,
 	GetAnalyticsRangeDocument as GET_ANALYTICS_RANGE,
 	GetCoachSessionsDocument as GET_COACH_SESSIONS,
+	CreateSessionDocument as CREATE_SESSION,
 	GetCoachSessionLogsDocument as GET_COACH_SESSION_LOGS,
+	GetGoalsForClientDocument as GET_GOALS_FOR_CLIENT,
 	GetMyNotificationsDocument as GET_MY_NOTIFICATIONS,
 } from '../generated/graphql';
 
