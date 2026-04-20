@@ -114,7 +114,7 @@ const MemberCoaches = () => {
 		useCallback(() => {
 			if (!hasMembership) {
 				openMembershipRequired();
-				router.replace('/(member)/workouts');
+				router.navigate('/(member)/workouts');
 				return;
 			}
 			refetchAllData();

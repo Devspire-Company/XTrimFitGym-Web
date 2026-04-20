@@ -68,7 +68,7 @@ const MemberSessionLogs = () => {
 		useCallback(() => {
 			if (!hasMembership) {
 				openMembershipRequired();
-				router.replace('/(member)/workouts');
+				router.navigate('/(member)/workouts');
 			}
 		}, [hasMembership, openMembershipRequired, router])
 	);

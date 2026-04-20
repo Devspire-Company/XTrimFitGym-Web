@@ -106,14 +106,14 @@ const MemberDashboard = () => {
 
 	const dismissPostOnboardingWelcome = () => {
 		setPostOnboardingWelcomeVisible(false);
-		router.replace('/(member)/dashboard');
+		router.navigate('/(member)/dashboard');
 	};
 
 	useFocusEffect(
 		useCallback(() => {
 			if (!hasMembership) {
 				openMembershipRequired();
-				router.replace('/(member)/workouts');
+				router.navigate('/(member)/workouts');
 			}
 		}, [hasMembership, openMembershipRequired, router])
 	);

@@ -378,7 +378,8 @@ export function AdminCreateSessionModal({
 							<input
 								type="checkbox"
 								checked={isGroupClass}
-								className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary-yellow)]"
+								className="mt-0.5 shrink-0 accent-[var(--primary-yellow)]"
+								style={{ width: 16, height: 16, minWidth: 16 }}
 								onChange={(e) => {
 									setIsGroupClass(e.target.checked);
 									setGoalId('');
@@ -431,7 +432,8 @@ export function AdminCreateSessionModal({
 											<input
 												type="checkbox"
 												checked={checked}
-												className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary-yellow)]"
+												className="mt-1 shrink-0 accent-[var(--primary-yellow)]"
+												style={{ width: 16, height: 16, minWidth: 16 }}
 												onChange={() => toggleMember(u.id)}
 											/>
 											<div className="min-w-0 leading-tight">

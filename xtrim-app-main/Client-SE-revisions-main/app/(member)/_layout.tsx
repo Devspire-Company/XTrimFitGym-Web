@@ -44,7 +44,7 @@ const MemberLayoutContent = () => {
 			currentLeaf === 'progress';
 		if (!isMembershipLockedTab) return;
 		openMembershipRequired();
-		router.replace('/(member)/workouts');
+		router.navigate('/(member)/workouts');
 	}, [hasMembership, segments, openMembershipRequired, router]);
 
 	return (
