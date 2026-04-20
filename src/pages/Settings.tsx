@@ -53,7 +53,7 @@ export function SettingsPage() {
 		{ id: 'preferences', label: 'System Preferences', icon: Sliders },
 		{ id: 'notifications', label: 'Notification Settings', icon: Bell },
 		{ id: 'security', label: 'Account Security', icon: Shield },
-		{ id: 'admin', label: 'Admin Accounts', icon: UserPlus },
+		// { id: 'admin', label: 'Admin Accounts', icon: UserPlus },
 		{ id: 'manageData', label: 'Manage Data', icon: Database },
 	];
 
