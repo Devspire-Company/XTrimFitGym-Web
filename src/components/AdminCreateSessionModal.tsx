@@ -374,7 +374,10 @@ export function AdminCreateSessionModal({
 					</div>
 
 					<div className="form-group">
-						<label className="flex items-center gap-3 cursor-pointer">
+						<label
+							className="flex items-center gap-3 cursor-pointer"
+							style={{ display: 'inline-flex', marginBottom: 0 }}
+						>
 							<input
 								type="checkbox"
 								checked={isGroupClass}
@@ -437,6 +440,7 @@ export function AdminCreateSessionModal({
 												'flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
 												checked ? 'bg-[rgba(249,197,19,0.12)]' : 'hover:bg-[rgba(255,255,255,0.04)]'
 											)}
+											style={{ display: 'flex', width: '100%', marginBottom: 0 }}
 										>
 											<input
 												type="checkbox"
