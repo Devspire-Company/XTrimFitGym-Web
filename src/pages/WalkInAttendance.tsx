@@ -39,7 +39,6 @@ import {
 } from 'lucide-react';
 import { exportTableCsv } from '@/lib/csvExport';
 import { exportTablePdf } from '@/lib/pdfExport';
-import { uploadWalkInWaiverImage } from '@/lib/uploadApi';
 
 const ACCOUNTS_PAGE_SIZE = 25;
 
@@ -170,7 +169,6 @@ export function WalkInAttendancePage() {
 
 	const dispatch = useAppDispatch();
 	const currentUser = useAppSelector((state) => state.auth.user);
-	const authToken = useAppSelector((state) => state.auth.token);
 	const apolloClient = useApolloClient();
 	const [logDate, setLogDate] = useState(() => manilaTodayYmd());
 	const [todayYmd, setTodayYmd] = useState(manilaTodayYmd);
@@ -225,8 +223,6 @@ export function WalkInAttendancePage() {
 	const [editNotes, setEditNotes] = useState('');
 	const [editWaiverUrl, setEditWaiverUrl] = useState('');
 	const [editWaiverKind, setEditWaiverKind] = useState<WaiverKind | null>(null);
-	const [editWaiverFile, setEditWaiverFile] = useState<File | null>(null);
-	const [uploadingWaiver, setUploadingWaiver] = useState(false);
 	const [ageYears, setAgeYears] = useState('');
 	const [minorWaiverAck, setMinorWaiverAck] = useState(false);
 	const [minorGuardianName, setMinorGuardianName] = useState('');
@@ -410,7 +406,6 @@ export function WalkInAttendancePage() {
 		setEditNotes(noteMeta.visibleNotes);
 		setEditWaiverUrl(noteMeta.waiverUrl);
 		setEditWaiverKind(noteMeta.waiverType);
-		setEditWaiverFile(null);
 		setEditAgeYears(c.ageYears != null ? String(c.ageYears) : '');
 		const isMinor = typeof c.ageYears === 'number' && c.ageYears < 18;
 		const hasWaiver = Boolean(c.minorWaiverAcceptedAt && c.minorWaiverGuardianName?.trim());
@@ -449,30 +444,6 @@ export function WalkInAttendancePage() {
 		},
 		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
 	});
-
-	const handleUploadWaiver = useCallback(async () => {
-		if (!editWaiverFile) {
-			dispatch(addToast({ type: 'error', message: 'Choose an image file first.' }));
-			return;
-		}
-		const isImage = editWaiverFile.type.startsWith('image/');
-		if (!isImage) {
-			dispatch(addToast({ type: 'error', message: 'Waiver must be an image file.' }));
-			return;
-		}
-
-		setUploadingWaiver(true);
-		try {
-			const url = await uploadWalkInWaiverImage(editWaiverFile, authToken ?? null);
-			setEditWaiverUrl(url);
-			setEditWaiverKind(parsedEditAge !== null && parsedEditAge < 18 ? 'minor' : 'adult');
-			dispatch(addToast({ type: 'success', message: 'Waiver uploaded successfully.' }));
-		} catch (err) {
-			dispatch(addToast({ type: 'error', message: (err as Error).message || 'Upload failed.' }));
-		} finally {
-			setUploadingWaiver(false);
-		}
-	}, [authToken, dispatch, editWaiverFile, parsedEditAge]);
 
 	const handleSubmitEdit = useCallback(
 		(e: React.FormEvent) => {
@@ -1751,46 +1722,6 @@ export function WalkInAttendancePage() {
 								onChange={(e) => setEditAgeYears(e.target.value)}
 								className="w-full max-w-[200px] rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 font-['Inter',sans-serif] text-sm tabular-nums text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(249,197,19,0.12)]"
 							/>
-						</div>
-						<div className="sm:col-span-2 space-y-3 rounded-xl border border-[rgba(249,197,19,0.28)] bg-[rgba(249,197,19,0.07)] p-4">
-							<p className="text-xs leading-relaxed text-[var(--text-secondary)]">
-								Upload the signed{' '}
-								<strong className="text-[var(--text-primary)]">
-									{parsedEditAge !== null && parsedEditAge < 18 ? 'minor waiver' : 'client waiver'}
-								</strong>{' '}
-								for this profile.
-							</p>
-							<input
-								type="file"
-								accept="image/*"
-								aria-label="Upload signed waiver image"
-								onChange={(e) => setEditWaiverFile(e.target.files?.[0] ?? null)}
-								className="w-full rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-[var(--text-primary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--primary-yellow)] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-[#1a1a1a]"
-							/>
-							<div className="flex flex-wrap items-center gap-2">
-								<Button
-									type="button"
-									variant="outline"
-									className="btn-secondary gap-2"
-									onClick={() => void handleUploadWaiver()}
-									disabled={!editWaiverFile || uploadingWaiver}
-								>
-									{uploadingWaiver ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-									{uploadingWaiver ? 'Uploading...' : 'Upload waiver image'}
-								</Button>
-								{editWaiverUrl ? (
-									<a
-										href={editWaiverUrl}
-										target="_blank"
-										rel="noreferrer"
-										className="text-sm text-[var(--primary-yellow)] underline underline-offset-2"
-									>
-										View uploaded waiver
-									</a>
-								) : (
-									<span className="text-xs text-[var(--text-secondary)]">No waiver uploaded yet</span>
-								)}
-							</div>
 						</div>
 						{showEditMinorBlock && (
 							<div className="sm:col-span-2 space-y-3 rounded-xl border border-[rgba(249,197,19,0.28)] bg-[rgba(249,197,19,0.07)] p-4">
