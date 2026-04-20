@@ -64,7 +64,14 @@ interface Coach {
 	clientLimit: number;
 }
 
-type CoachStatus = 'Active' | 'Inactive' | 'On Leave';
+type CoachStatus = 'Active' | 'Inactive';
+
+/** Legacy stored/API values may still say "On Leave"; treat as inactive for display and forms. */
+function normalizeCoachStatus(status: string | undefined): CoachStatus {
+	if (status === 'Inactive' || status === 'On Leave') return 'Inactive';
+	return 'Active';
+}
+
 type CoachStatusMeta = {
 	status: CoachStatus;
 	reason: string;
@@ -89,8 +96,19 @@ function readCoachStatusMeta(): Record<string, CoachStatusMeta> {
 	try {
 		const raw = localStorage.getItem(COACH_STATUS_KEY);
 		if (!raw) return {};
-		const parsed = JSON.parse(raw) as Record<string, CoachStatusMeta>;
-		return parsed && typeof parsed === 'object' ? parsed : {};
+		const parsed = JSON.parse(raw) as Record<string, CoachStatusMeta & { status?: string }>;
+		if (!parsed || typeof parsed !== 'object') return {};
+		let migrated = false;
+		const next: Record<string, CoachStatusMeta> = {};
+		for (const [id, meta] of Object.entries(parsed)) {
+			if (!meta || typeof meta !== 'object') continue;
+			const prev = meta.status as string;
+			const status = normalizeCoachStatus(prev);
+			if (prev === 'On Leave') migrated = true;
+			next[id] = { ...meta, status };
+		}
+		if (migrated) writeCoachStatusMeta(next);
+		return next;
 	} catch {
 		return {};
 	}
@@ -416,7 +434,7 @@ export function CoachesPage() {
 				specialization,
 				allSpecializations, // Store all specializations for editing
 				yearsExperience,
-				status: statusMeta?.status || 'Active',
+				status: normalizeCoachStatus(statusMeta?.status),
 				statusReason: statusMeta?.reason || '',
 				statusUpdatedAt: statusMeta?.updatedAt || '',
 				avatar: `${c.firstName?.[0] || ''}${c.lastName?.[0] || ''}`,
@@ -477,7 +495,7 @@ export function CoachesPage() {
 			coach.teachingTime?.join(', ') || 'N/A',
 			`${coach.totalClients}/${coach.clientLimit > 0 ? coach.clientLimit : '∞'}`,
 			coach.status,
-			coach.status === 'On Leave' ? coach.statusReason || 'No reason provided' : '—',
+			coach.statusReason?.trim() ? coach.statusReason : '—',
 			coach.statusUpdatedAt
 				? new Date(coach.statusUpdatedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
 				: '—',
@@ -611,7 +629,6 @@ export function CoachesPage() {
 						<option value="all">All Status</option>
 						<option value="Active">Active</option>
 						<option value="Inactive">Inactive</option>
-						<option value="On Leave">On Leave</option>
 					</select>
 				</div>
 			</div>
@@ -695,9 +712,7 @@ export function CoachesPage() {
 											className={`status-badge px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
 												coach.status === 'Active'
 													? 'active bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
-													: coach.status === 'On Leave'
-														? 'on-leave bg-[rgba(245,158,11,0.15)] text-[#F59E0B] border border-[rgba(245,158,11,0.3)]'
-														: 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
+													: 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
 											}`}
 										>
 											{coach.status}
@@ -829,11 +844,7 @@ export function CoachesPage() {
 								});
 
 								if (result.data?.updateUser) {
-									setCoachStatus(
-										selectedCoach.id,
-										formData.status,
-										formData.status === 'On Leave' ? formData.statusReason || '' : ''
-									);
+									setCoachStatus(selectedCoach.id, formData.status, '');
 									dispatch(
 										addToast({
 											type: 'success',
@@ -943,11 +954,7 @@ export function CoachesPage() {
 
 							if (result.data?.createUser) {
 								const createdCoachId = result.data.createUser.user.id;
-								setCoachStatus(
-									createdCoachId,
-									formData.status,
-									formData.status === 'On Leave' ? formData.statusReason || '' : ''
-								);
+								setCoachStatus(createdCoachId, formData.status, '');
 								dispatch(
 									addToast({
 										type: 'success',
@@ -1615,7 +1622,6 @@ function AddCoachModal({
 		gender?: string;
 		dateOfBirth?: string;
 		status: CoachStatus;
-		statusReason?: string;
 		teachingDays?: string[];
 		teachingTime?: string;
 		clientLimit?: string;
@@ -1643,7 +1649,6 @@ function AddCoachModal({
 		gender: '',
 		dateOfBirth: '',
 		status: 'Active' as CoachStatus,
-		statusReason: '',
 		teachingDays: [] as string[],
 		teachingTimeStartHour: '9',
 		teachingTimeStartMinute: '00',
@@ -1661,10 +1666,6 @@ function AddCoachModal({
 		try {
 			if (!isAtLeast18(formData.dateOfBirth)) {
 				dispatch(addToast({ type: 'error', message: 'Coach must be 18 years old or above.' }));
-				return;
-			}
-			if (formData.status === 'On Leave' && !formData.statusReason.trim()) {
-				dispatch(addToast({ type: 'error', message: 'Reason is required when status is On Leave.' }));
 				return;
 			}
 			// Format teaching time range (start - end) with AM/PM before submitting
@@ -1722,7 +1723,6 @@ function AddCoachModal({
 				gender: '',
 				dateOfBirth: '',
 				status: 'Active',
-				statusReason: '',
 				teachingDays: [],
 				teachingTimeStartHour: '9',
 				teachingTimeStartMinute: '00',
@@ -1902,22 +1902,9 @@ function AddCoachModal({
 							<label htmlFor="status">Status</label>
 							<select id="status" name="status" value={formData.status} onChange={handleChange}>
 								<option value="Active">Active</option>
-								<option value="On Leave">On Leave</option>
+								<option value="Inactive">Inactive</option>
 							</select>
 						</div>
-						{formData.status === 'On Leave' ? (
-							<div className="form-group">
-								<label htmlFor="statusReason">On-leave reason</label>
-								<input
-									type="text"
-									id="statusReason"
-									name="statusReason"
-									value={formData.statusReason}
-									onChange={handleChange}
-									placeholder="Required reason"
-								/>
-							</div>
-						) : null}
 						<div className="form-group" style={{ gridColumn: '1 / -1' }}>
 							<label>Teaching Days</label>
 							<div
@@ -2174,7 +2161,6 @@ function EditCoachModal({
 		gender?: string;
 		dateOfBirth?: string;
 		status: CoachStatus;
-		statusReason?: string;
 		teachingDays?: string[];
 		teachingTime?: string;
 		clientLimit?: string;
@@ -2249,8 +2235,7 @@ function EditCoachModal({
 		yearsExperience: coach.yearsExperience || '',
 		gender: coach.gender !== 'N/A' ? coach.gender : '',
 		dateOfBirth: coach.dateOfBirth && coach.dateOfBirth !== 'N/A' ? coach.dateOfBirth : '',
-		status: (coach.status as CoachStatus) || 'Active',
-		statusReason: coach.statusReason || '',
+		status: normalizeCoachStatus(coach.status),
 		teachingDays: coach.teachingDate || [],
 		teachingTimeStartHour: teachingTimeParsed.startHour,
 		teachingTimeStartMinute: teachingTimeParsed.startMinute,
@@ -2268,10 +2253,6 @@ function EditCoachModal({
 		try {
 			if (!isAtLeast18(formData.dateOfBirth)) {
 				dispatch(addToast({ type: 'error', message: 'Coach must be 18 years old or above.' }));
-				return;
-			}
-			if (formData.status === 'On Leave' && !formData.statusReason.trim()) {
-				dispatch(addToast({ type: 'error', message: 'Reason is required when status is On Leave.' }));
 				return;
 			}
 			// Format teaching time range (start - end) with AM/PM before submitting
@@ -2455,22 +2436,8 @@ function EditCoachModal({
 							<select id="status" name="status" value={formData.status} onChange={handleChange}>
 								<option value="Active">Active</option>
 								<option value="Inactive">Inactive</option>
-								<option value="On Leave">On Leave</option>
 							</select>
 						</div>
-						{formData.status === 'On Leave' ? (
-							<div className="form-group">
-								<label htmlFor="statusReason">On-leave reason</label>
-								<input
-									type="text"
-									id="statusReason"
-									name="statusReason"
-									value={formData.statusReason}
-									onChange={handleChange}
-									placeholder="Required reason"
-								/>
-							</div>
-						) : null}
 						<div className="form-group" style={{ gridColumn: '1 / -1' }}>
 							<label>Teaching Days</label>
 							<div

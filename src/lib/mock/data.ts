@@ -25,7 +25,7 @@ export interface MockCoach {
 	phone: string;
 	specialization: string;
 	yearsExperience: string;
-	status: 'Active' | 'Inactive' | 'On Leave';
+	status: 'Active' | 'Inactive';
 	avatar: string;
 	totalClients: number;
 	rating: number;

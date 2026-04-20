@@ -1,21 +1,12 @@
 import { useMemo, useEffect, useState } from 'react';
-import { useApolloClient, useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { X, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-	CREATE_SESSION,
-	GET_GOALS_FOR_CLIENT,
-	GET_USERS,
-} from '@/graphql/operations/index';
+import { CREATE_SESSION, GET_USERS } from '@/graphql/operations/index';
 import type { GetUsersQuery } from '@/graphql/generated/graphql';
-import {
-	GoalStatus,
-	RoleType,
-	SessionKind,
-	TransactionStatus,
-} from '@/graphql/generated/graphql';
+import { RoleType, SessionKind, TransactionStatus } from '@/graphql/generated/graphql';
 const GYM_AREAS = [
 	{ label: 'Main Training Area', value: 'Main Training Area' },
 	{ label: 'Cardio Zone', value: 'Cardio Zone' },
@@ -81,19 +72,12 @@ export function AdminCreateSessionModal({
 	const [note, setNote] = useState('');
 	const [isGroupClass, setIsGroupClass] = useState(false);
 	const [maxParticipants, setMaxParticipants] = useState('20');
-	const [goalId, setGoalId] = useState('');
 	const [formError, setFormError] = useState('');
-
-	const apollo = useApolloClient();
 
 	const { data: membersData } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Member, includeDisabled: false },
 		skip: !isOpen,
 	});
-
-	const [fetchedGoals, setFetchedGoals] = useState<
-		Array<{ id: string; clientId: string; title: string }>
-	>([]);
 
 	const resetForm = () => {
 		setCoachId('');
@@ -107,10 +91,9 @@ export function AdminCreateSessionModal({
 		setNote('');
 		setIsGroupClass(false);
 		setMaxParticipants('20');
-		setGoalId('');
 		setFormError('');
 	};
-/*fdsf8*/
+
 	const [createSession, { loading: submitting }] = useMutation(CREATE_SESSION, {
 		onCompleted: () => {
 			onCreated?.();
@@ -143,80 +126,10 @@ export function AdminCreateSessionModal({
 		});
 	}, [memberSearch, membersWithMembership]);
 
-	const selectedMemberIdsKey = useMemo(
-		() => [...selectedMemberIds].sort().join(','),
-		[selectedMemberIds]
-	);
-
-	useEffect(() => {
-		if (!isOpen || isGroupClass || !selectedMemberIdsKey) {
-			setFetchedGoals([]);
-			return;
-		}
-		const ids = selectedMemberIdsKey.split(',').filter(Boolean);
-		let cancelled = false;
-		(async () => {
-			try {
-				const results = await Promise.all(
-					ids.map((clientId) =>
-						apollo.query({
-							query: GET_GOALS_FOR_CLIENT,
-							variables: { clientId, status: GoalStatus.Active },
-							fetchPolicy: 'network-only',
-						})
-					)
-				);
-				if (cancelled) return;
-				const merged: Array<{ id: string; clientId: string; title: string }> = [];
-				const seen = new Set<string>();
-				for (const r of results) {
-					for (const g of r.data?.getGoals ?? []) {
-						if (seen.has(g.id)) continue;
-						seen.add(g.id);
-						merged.push({
-							id: g.id,
-							clientId: g.clientId,
-							title: g.title,
-						});
-					}
-				}
-				setFetchedGoals(merged);
-			} catch {
-				if (!cancelled) setFetchedGoals([]);
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [apollo, isOpen, isGroupClass, selectedMemberIdsKey]);
-
-	const goalOptions = useMemo(() => {
-		const rows: { id: string; label: string; clientId: string }[] = [];
-		for (const g of fetchedGoals) {
-			if (!selectedMemberIds.includes(g.clientId)) continue;
-			const m = membersWithMembership.find((u) => u.id === g.clientId);
-			const memberLabel = m
-				? [m.firstName, m.lastName].filter(Boolean).join(' ')
-				: g.clientId;
-			rows.push({
-				id: g.id,
-				clientId: g.clientId,
-				label: `${g.title} — ${memberLabel}`,
-			});
-		}
-		return rows;
-	}, [fetchedGoals, selectedMemberIds, membersWithMembership]);
-
 	useEffect(() => {
 		if (!isOpen) return;
 		setFormError('');
 	}, [isOpen]);
-
-	useEffect(() => {
-		if (!goalId) return;
-		const ok = goalOptions.some((g) => g.id === goalId);
-		if (!ok) setGoalId('');
-	}, [goalId, goalOptions]);
 
 	const toggleMember = (id: string) => {
 		setSelectedMemberIds((prev) =>
@@ -289,10 +202,6 @@ export function AdminCreateSessionModal({
 			setFormError('Select at least one member with an active membership.');
 			return;
 		}
-		if (!goalId) {
-			setFormError('Select a goal for this session.');
-			return;
-		}
 
 		await createSession({
 			variables: {
@@ -305,7 +214,6 @@ export function AdminCreateSessionModal({
 					endTime: endTimeString,
 					gymArea,
 					note: note.trim() || undefined,
-					goalId,
 					sessionKind: SessionKind.Personal,
 				},
 			},
@@ -384,7 +292,6 @@ export function AdminCreateSessionModal({
 								className="peer sr-only"
 								onChange={(e) => {
 									setIsGroupClass(e.target.checked);
-									setGoalId('');
 								}}
 							/>
 							<span>Group class</span>
@@ -400,8 +307,8 @@ export function AdminCreateSessionModal({
 							</span>
 						</label>
 						<small className="block text-xs text-[var(--text-secondary)] mt-1">
-							Personal sessions require a goal (same as the coach app). Group classes use invites
-							optionally.
+							Group classes can optionally invite members; personal sessions require at least one
+							member with an active membership.
 						</small>
 					</div>
 
@@ -472,29 +379,7 @@ export function AdminCreateSessionModal({
 						</small>
 					</div>
 
-					{!isGroupClass ? (
-						<div className="form-group">
-							<label htmlFor="admin-session-goal">
-								Goal <span className="required">*</span>
-							</label>
-							<select
-								id="admin-session-goal"
-								value={goalId}
-								onChange={(e) => setGoalId(e.target.value)}
-								className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)]"
-								disabled={selectedMemberIds.length === 0}
-							>
-								<option value="">
-									{selectedMemberIds.length ? 'Select a goal' : 'Select members first'}
-								</option>
-								{goalOptions.map((g) => (
-									<option key={g.id} value={g.id}>
-										{g.label}
-									</option>
-								))}
-							</select>
-						</div>
-					) : (
+					{isGroupClass ? (
 						<div className="form-group">
 							<label htmlFor="admin-session-max-p">
 								Max participants <span className="required">*</span>
@@ -508,7 +393,7 @@ export function AdminCreateSessionModal({
 								className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm"
 							/>
 						</div>
-					)}
+					) : null}
 
 					<div className="form-group">
 						<label htmlFor="admin-session-name">
