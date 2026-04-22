@@ -293,10 +293,11 @@ export function AdminCreateSessionModal({
 
 					<div className="form-group">
 						<label
-							className="inline-flex items-center gap-3 cursor-pointer mb-0"
+							className="!inline-flex !items-center gap-3 cursor-pointer mb-0 select-none"
 						>
 							<input
 								type="checkbox"
+								id="admin-session-group-class"
 								checked={isGroupClass}
 								className="peer sr-only"
 								onChange={(e) => {
@@ -306,7 +307,7 @@ export function AdminCreateSessionModal({
 							<span>Group class</span>
 							<span
 								className={cn(
-									'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+									'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
 									'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
 									'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
 								)}
@@ -328,6 +329,7 @@ export function AdminCreateSessionModal({
 						</label>
 						<input
 							type="search"
+							id="admin-session-member-search"
 							placeholder="Search members..."
 							value={memberSearch}
 							onChange={(e) => setMemberSearch(e.target.value)}
@@ -353,7 +355,7 @@ export function AdminCreateSessionModal({
 										<label
 											key={u.id}
 											className={cn(
-												'flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer w-full mb-0',
+												'!flex !items-center gap-2.5 rounded-lg px-2 py-2 text-sm cursor-pointer w-full mb-0',
 												checked ? 'bg-[rgba(249,197,19,0.12)]' : 'hover:bg-[rgba(255,255,255,0.04)]'
 											)}
 										>
@@ -365,7 +367,7 @@ export function AdminCreateSessionModal({
 											/>
 											<span
 												className={cn(
-													'mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+													'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
 													'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
 													'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
 												)}
@@ -374,8 +376,8 @@ export function AdminCreateSessionModal({
 												✓
 											</span>
 											<div className="min-w-0 leading-tight">
-												<span className="text-[var(--text-primary)] font-medium">{label}</span>
-												<span className="ml-1 text-[var(--text-secondary)] text-xs break-all">{u.email}</span>
+												<div className="text-[var(--text-primary)] font-medium truncate">{label}</div>
+												<div className="text-[var(--text-secondary)] text-xs break-all">{u.email}</div>
 											</div>
 										</label>
 									);
