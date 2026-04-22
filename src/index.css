@@ -1448,7 +1448,7 @@
 
 .admin-session-modal {
 	max-height: 90vh;
-	height: min(90vh, 920px);
+	height: auto;
 }
 
 .admin-session-modal .admin-session-modal-header {
