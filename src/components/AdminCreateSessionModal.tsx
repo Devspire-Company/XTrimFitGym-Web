@@ -261,11 +261,10 @@ export function AdminCreateSessionModal({
 
 	return (
 		<div
-			className="modal modal-large"
+			className="modal modal-large admin-session-modal"
 			onClick={(e) => e.stopPropagation()}
-			style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}
 		>
-			<div className="modal-header" style={{ flexShrink: 0 }}>
+			<div className="modal-header admin-session-modal-header">
 				<h3>
 					<CalendarIcon className="w-5 h-5" />
 					Create session
@@ -281,14 +280,8 @@ export function AdminCreateSessionModal({
 					<X className="w-5 h-5" />
 				</button>
 			</div>
-			<form
-				onSubmit={handleSubmit}
-				style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
-			>
-				<div
-					className="modal-body"
-					style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingBottom: '1.25rem' }}
-				>
+			<form onSubmit={handleSubmit} className="admin-session-modal-form">
+				<div className="modal-body admin-session-modal-body">
 					{formError ? (
 						<p className="text-sm text-red-500 mb-3" role="alert">
 							{formError}
@@ -317,8 +310,7 @@ export function AdminCreateSessionModal({
 
 					<div className="form-group">
 						<label
-							className="flex items-center gap-3 cursor-pointer"
-							style={{ display: 'inline-flex', marginBottom: 0 }}
+							className="inline-flex items-center gap-3 cursor-pointer mb-0"
 						>
 							<input
 								type="checkbox"
@@ -378,10 +370,9 @@ export function AdminCreateSessionModal({
 										<label
 											key={u.id}
 											className={cn(
-												'flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
+												'flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer w-full mb-0',
 												checked ? 'bg-[rgba(249,197,19,0.12)]' : 'hover:bg-[rgba(255,255,255,0.04)]'
 											)}
-											style={{ display: 'flex', width: '100%', marginBottom: 0 }}
 										>
 											<input
 												type="checkbox"
@@ -500,7 +491,7 @@ export function AdminCreateSessionModal({
 						</select>
 					</div>
 
-					<div className="form-group mb-4">
+					<div className="form-group mb-6">
 						<label>
 							Schedule days <span className="required">*</span>
 						</label>
@@ -549,7 +540,7 @@ export function AdminCreateSessionModal({
 							</label>
 						</div>
 
-						<div className="mt-2 min-h-[132px]">
+						<div className="mt-2 min-h-[148px]">
 							{scheduleMode === 'one_day' ? (
 								<div className="max-w-xs">
 									<label htmlFor="admin-single-day" className="block text-xs text-[var(--text-secondary)] mb-1">
@@ -576,12 +567,11 @@ export function AdminCreateSessionModal({
 										<label
 											key={day.value}
 											className={cn(
-												'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
+												'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer mb-0',
 												checked
 													? 'bg-[rgba(249,197,19,0.12)]'
 													: 'hover:bg-[rgba(255,255,255,0.04)]'
 											)}
-											style={{ display: 'flex', marginBottom: 0 }}
 										>
 											<input
 												type="checkbox"
@@ -623,16 +613,7 @@ export function AdminCreateSessionModal({
 						/>
 					</div>
 				</div>
-				<div
-					className="modal-footer"
-					style={{
-						flexShrink: 0,
-						borderTop: '1px solid var(--card-border)',
-						padding: '1rem',
-						position: 'relative',
-						zIndex: 2,
-					}}
-				>
+				<div className="modal-footer admin-session-modal-footer">
 					<div className="flex justify-end gap-2">
 						<Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
 							Cancel
