@@ -193,6 +193,7 @@ export type CreateMembershipInput = {
   monthlyPrice: Scalars['Float']['input'];
   name: Scalars['String']['input'];
   status: MembershipStatus;
+  statusEffectiveAt?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CreateProgressRatingInput = {
@@ -428,6 +429,7 @@ export type Membership = {
   monthlyPrice: Scalars['Float']['output'];
   name: Scalars['String']['output'];
   status: MembershipStatus;
+  statusEffectiveAt?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
@@ -1394,6 +1396,7 @@ export type UpdateMembershipInput = {
   monthlyPrice?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<MembershipStatus>;
+  statusEffectiveAt?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateMembershipTransactionDurationInput = {
@@ -1732,12 +1735,12 @@ export type GetGoalsForClientQuery = { __typename?: 'Query', getGoals: Array<{ _
 export type GetAllMembershipsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAllMembershipsQuery = { __typename?: 'Query', getMemberships: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
+export type GetAllMembershipsQuery = { __typename?: 'Query', getMemberships: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, statusEffectiveAt?: string | null, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
 
 export type GetActiveMembershipsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetActiveMembershipsQuery = { __typename?: 'Query', getMemberships: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
+export type GetActiveMembershipsQuery = { __typename?: 'Query', getMemberships: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, statusEffectiveAt?: string | null, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
 
 export type GetCurrentMembershipQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1761,7 +1764,7 @@ export type UpdateMembershipTransactionDurationMutation = { __typename?: 'Mutati
 export type MembershipsUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MembershipsUpdatedSubscription = { __typename?: 'Subscription', membershipsUpdated: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
+export type MembershipsUpdatedSubscription = { __typename?: 'Subscription', membershipsUpdated: Array<{ __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, statusEffectiveAt?: string | null, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null }> };
 
 export type GetMyNotificationsQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -1906,7 +1909,7 @@ export type CreateMembershipMutationVariables = Exact<{
 }>;
 
 
-export type CreateMembershipMutation = { __typename?: 'Mutation', createMembership: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null } };
+export type CreateMembershipMutation = { __typename?: 'Mutation', createMembership: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, statusEffectiveAt?: string | null, durationType: DurationType, monthDuration: number, createdAt?: string | null, updatedAt?: string | null } };
 
 export type UpdateMembershipMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1914,7 +1917,7 @@ export type UpdateMembershipMutationVariables = Exact<{
 }>;
 
 
-export type UpdateMembershipMutation = { __typename?: 'Mutation', updateMembership: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, durationType: DurationType, monthDuration: number, updatedAt?: string | null } };
+export type UpdateMembershipMutation = { __typename?: 'Mutation', updateMembership: { __typename?: 'Membership', id: string, name: string, monthlyPrice: number, description?: string | null, features: Array<string>, status: MembershipStatus, statusEffectiveAt?: string | null, durationType: DurationType, monthDuration: number, updatedAt?: string | null } };
 
 export type DeleteMembershipMutationVariables = Exact<{
   id: Scalars['ID']['input'];

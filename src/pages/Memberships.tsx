@@ -142,6 +142,7 @@ export function MembershipsPage() {
 		// Map status from form format to API format
 		const statusMap: Record<string, MembershipStatus> = {
 			'Active': MembershipStatus.Active,
+			'Inactive': MembershipStatus.Inactive,
 			'Coming Soon': MembershipStatus.ComingSoon,
 		};
 
@@ -167,6 +168,7 @@ export function MembershipsPage() {
 						description: formData.description,
 						features: formData.features,
 						status,
+						statusEffectiveAt: formData.statusEffectiveAt,
 						durationType,
 						monthDuration: formData.monthDuration,
 					},
@@ -182,6 +184,7 @@ export function MembershipsPage() {
 						description: formData.description,
 						features: formData.features,
 						status,
+						statusEffectiveAt: formData.statusEffectiveAt,
 						durationType,
 						monthDuration: formData.monthDuration,
 					},
@@ -244,6 +247,16 @@ export function MembershipsPage() {
 	}
 
 	const plans: Membership[] = membershipsData;
+	const formatStatusEffectiveDate = (iso?: string | null) => {
+		if (!iso) return 'Effective immediately';
+		const d = new Date(iso);
+		if (Number.isNaN(d.getTime())) return 'Effective immediately';
+		return `Effective ${d.toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+		})}`;
+	};
 	const durationMap: Record<string, string> = {
 		MONTHLY: 'month',
 		QUARTERLY: 'quarter',
@@ -260,10 +273,11 @@ export function MembershipsPage() {
 				user: currentUser,
 				filterSummary: 'tab=active',
 				subtitle: `Total active plans: ${plans.length}`,
-				head: ['Plan Name', 'Status', 'Price', 'Duration', 'Description', 'Features'],
+				head: ['Plan Name', 'Status', 'Status Effective', 'Price', 'Duration', 'Description', 'Features'],
 				rows: plans.map((plan) => [
 					plan.name,
 					plan.status,
+					formatStatusEffectiveDate((plan as Membership & { statusEffectiveAt?: string | null }).statusEffectiveAt),
 					`PHP ${Number(plan.monthlyPrice || 0).toLocaleString()}`,
 					durationMap[plan.durationType] || plan.durationType || '-',
 					plan.description || '-',
@@ -299,10 +313,11 @@ export function MembershipsPage() {
 				reportType: 'MEMBERSHIP_MANAGEMENT',
 				user: currentUser,
 				filterSummary: 'tab=active;format=csv',
-				head: ['Plan Name', 'Status', 'Price', 'Duration', 'Description', 'Features'],
+				head: ['Plan Name', 'Status', 'Status Effective', 'Price', 'Duration', 'Description', 'Features'],
 				rows: plans.map((plan) => [
 					plan.name,
 					plan.status,
+					formatStatusEffectiveDate((plan as Membership & { statusEffectiveAt?: string | null }).statusEffectiveAt),
 					`PHP ${Number(plan.monthlyPrice || 0).toLocaleString()}`,
 					durationMap[plan.durationType] || plan.durationType || '-',
 					plan.description || '-',
@@ -419,6 +434,9 @@ export function MembershipsPage() {
 								>
 									{statusMap[plan.status] || plan.status}
 								</span>
+								<p className="mt-2 text-[11px] font-medium text-[var(--text-secondary)]">
+									{formatStatusEffectiveDate((plan as Membership & { statusEffectiveAt?: string | null }).statusEffectiveAt)}
+								</p>
 							</div>
 							<div className="plan-price flex items-baseline gap-2 mb-4">
 								<span className="plan-price-value text-[2.5rem] font-bold text-[var(--primary-yellow)] font-['Inter',ui-sans-serif,system-ui,sans-serif]">

@@ -7,6 +7,7 @@ query GetAllMemberships {
 		description
 		features
 		status
+		statusEffectiveAt
 		durationType
 		monthDuration
 		createdAt
@@ -22,6 +23,7 @@ query GetActiveMemberships {
 		description
 		features
 		status
+		statusEffectiveAt
 		durationType
 		monthDuration
 		createdAt
@@ -105,6 +107,7 @@ subscription MembershipsUpdated {
 		description
 		features
 		status
+		statusEffectiveAt
 		durationType
 		monthDuration
 		createdAt

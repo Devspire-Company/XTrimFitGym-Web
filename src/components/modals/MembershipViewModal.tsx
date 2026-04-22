@@ -33,6 +33,13 @@ export function MembershipViewModal({
 
 	const displayStatus = statusMap[membership.status] || membership.status;
 	const displayDuration = durationMap[membership.durationType] || membership.durationType;
+	const statusEffectiveLabel = (() => {
+		const iso = (membership as Membership & { statusEffectiveAt?: string | null }).statusEffectiveAt;
+		if (!iso) return 'Effective immediately';
+		const d = new Date(iso);
+		if (Number.isNaN(d.getTime())) return 'Effective immediately';
+		return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+	})();
 
 	return (
 		<div className={`modal-overlay ${isOpen ? 'active' : ''}`} onClick={onClose}>
@@ -90,6 +97,10 @@ export function MembershipViewModal({
 									>
 										{displayStatus}
 									</span>
+								</div>
+								<div className="detail-item">
+									<label>Status Effective Date</label>
+									<p>{statusEffectiveLabel}</p>
 								</div>
 								<div className="detail-item" style={{ gridColumn: '1 / -1' }}>
 									<label>Description</label>

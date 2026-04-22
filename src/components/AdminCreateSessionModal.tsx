@@ -683,9 +683,6 @@ export function AdminCreateSessionModal({
 									);
 								})}
 							</div>
-							<small className="block text-xs text-[var(--text-secondary)] mt-3">
-								Select one or more recurring days. You can use presets for faster setup.
-							</small>
 							<div className="mt-1 text-xs text-[var(--text-secondary)]">
 								{scheduleDays.length > 0
 									? `Selected: ${scheduleDays

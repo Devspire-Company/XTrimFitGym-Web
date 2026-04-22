@@ -280,6 +280,7 @@ mutation CreateMembership($input: CreateMembershipInput!) {
 		description
 		features
 		status
+		statusEffectiveAt
 		durationType
 		monthDuration
 		createdAt
@@ -295,6 +296,7 @@ mutation UpdateMembership($id: ID!, $input: UpdateMembershipInput!) {
 		description
 		features
 		status
+		statusEffectiveAt
 		durationType
 		monthDuration
 		updatedAt

@@ -15,7 +15,8 @@ export interface MembershipFormData {
 	monthlyPrice: number;
 	description: string;
 	features: string[];
-	status: 'Active' | 'Coming Soon';
+	status: 'Active' | 'Inactive' | 'Coming Soon';
+	statusEffectiveAt: string;
 	durationType: 'Monthly' | 'Quarterly' | 'Yearly' | 'Daily';
 	monthDuration: number;
 }
@@ -31,6 +32,7 @@ export function MembershipFormModal({
 	const [planLengthInput, setPlanLengthInput] = useState('1');
 	const [featureInputs, setFeatureInputs] = useState<string[]>(['']);
 	const [featuresError, setFeaturesError] = useState('');
+	const [statusEffectiveAtInput, setStatusEffectiveAtInput] = useState('');
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -38,6 +40,11 @@ export function MembershipFormModal({
 			membership?.monthlyPrice != null ? String(Math.round(Number(membership.monthlyPrice))) : ''
 		);
 		setPlanLengthInput(String(membership?.monthDuration || 1));
+		const effectiveDateIso = membership?.statusEffectiveAt || '';
+		const effectiveDateValue = effectiveDateIso
+			? new Date(effectiveDateIso).toISOString().slice(0, 10)
+			: new Date().toISOString().slice(0, 10);
+		setStatusEffectiveAtInput(effectiveDateValue);
 		const initialFeatures =
 			membership?.features && membership.features.length > 0 ? membership.features : [''];
 		setFeatureInputs(initialFeatures);
@@ -85,6 +92,7 @@ export function MembershipFormModal({
 			description: formData.get('description') as string,
 			features,
 			status: formData.get('status') as MembershipFormData['status'],
+			statusEffectiveAt: statusEffectiveAtInput,
 			durationType: formData.get('durationType') as MembershipFormData['durationType'],
 			monthDuration: Math.max(1, parseNumericInput(planLengthInput, 1)),
 		};
@@ -103,6 +111,8 @@ export function MembershipFormModal({
 	const defaultStatus =
 		membership?.status === 'COMING_SOON'
 			? 'Coming Soon'
+			: membership?.status === 'INACTIVE'
+				? 'Inactive'
 			: membership?.status === 'ACTIVE'
 				? 'Active'
 				: 'Active';
@@ -203,8 +213,23 @@ export function MembershipFormModal({
 								<label htmlFor="status">Status *</label>
 								<select id="status" name="status" defaultValue={defaultStatus} required>
 									<option value="Active">Active</option>
+									<option value="Inactive">Inactive</option>
 									<option value="Coming Soon">Coming Soon</option>
 								</select>
+							</div>
+							<div className="form-group">
+								<label htmlFor="statusEffectiveAt">Status effective date *</label>
+								<input
+									type="date"
+									id="statusEffectiveAt"
+									name="statusEffectiveAt"
+									value={statusEffectiveAtInput}
+									onChange={(e) => setStatusEffectiveAtInput(e.target.value)}
+									required
+								/>
+								<small style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'block' }}>
+									When this status starts applying for new avails.
+								</small>
 							</div>
 
 							<div className="form-group" style={{ gridColumn: '1 / -1' }}>
