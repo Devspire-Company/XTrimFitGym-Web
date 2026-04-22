@@ -270,6 +270,8 @@ const ARCHIVE_REASON_OPTIONS = [
 	'Other',
 ] as const;
 
+type StockDirection = 'IN' | 'OUT';
+
 export function EquipmentPage() {
 	useEffect(() => {
 		document.title = 'Equipment - X-TRIM FIT GYM';
@@ -297,6 +299,11 @@ export function EquipmentPage() {
 		'Damaged beyond repair'
 	);
 	const [archiveReasonOther, setArchiveReasonOther] = useState('');
+	const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+	const [stockTarget, setStockTarget] = useState<any | null>(null);
+	const [stockDirection, setStockDirection] = useState<StockDirection>('IN');
+	const [stockAmount, setStockAmount] = useState('1');
+	const [stockReason, setStockReason] = useState('');
 	const [equipmentActionLogs, setEquipmentActionLogs] = useState<EquipmentActionLog[]>(() =>
 		typeof window === 'undefined' ? [] : readEquipmentActionLogs()
 	);
@@ -745,31 +752,79 @@ export function EquipmentPage() {
 		}
 	};
 
-	const handleAdjustStock = async (item: any, change: number) => {
+	const handleAdjustStock = async (item: any, change: number, customReason?: string) => {
 		if (!Number.isInteger(change) || change === 0) return;
-		if (change < 0 && Number(item.quantity ?? 0) <= 0) {
+		const currentQuantity = Math.max(0, Number(item.quantity ?? 0));
+		if (change < 0 && currentQuantity <= 0) {
 			dispatch(addToast({ type: 'error', message: 'Quantity is already 0.' }));
 			return;
 		}
+		const nextQuantity = currentQuantity + change;
+		if (nextQuantity < 0) {
+			dispatch(addToast({ type: 'error', message: 'Quantity cannot go below zero.' }));
+			return;
+		}
 		try {
+			if (useLegacyApi) {
+				await updateEquipment({
+					variables: {
+						id: item.id,
+						input: {
+							name: item.name,
+							imageUrl: item.imageUrl,
+							description: item.description || undefined,
+							notes: item.notes || undefined,
+							acquiredAt: item.acquiredAt || undefined,
+							status: item.status,
+							quantity: nextQuantity,
+							maintenanceStartedAt: item.maintenanceStartedAt || undefined,
+						},
+					},
+				});
+				await refreshEquipmentList();
+			} else {
 			await adjustEquipmentStock({
 				variables: {
 					input: {
 						id: item.id,
 						change,
-						reason: change > 0 ? 'Stock in (quick action)' : 'Stock out (quick action)',
+						reason:
+							customReason?.trim() ||
+							(change > 0 ? 'Stock in (quick action)' : 'Stock out (quick action)'),
 					},
 				},
 			});
+			}
 			dispatch(
 				addToast({
 					type: 'success',
-					message: `Stock ${change > 0 ? 'added' : 'deducted'} for ${item.name}.`,
+					message: `${item.name}: quantity is now ${Math.max(0, nextQuantity)}.`,
 				})
 			);
 		} catch {
 			// handled by mutation onError
 		}
+	};
+
+	const openStockAdjustmentModal = (item: any, direction: StockDirection) => {
+		setStockTarget(item);
+		setStockDirection(direction);
+		setStockAmount('1');
+		setStockReason('');
+		setIsStockModalOpen(true);
+	};
+
+	const handleStockAdjustmentSubmit = async () => {
+		if (!stockTarget) return;
+		const parsedAmount = Number.parseInt(stockAmount.trim(), 10);
+		if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+			dispatch(addToast({ type: 'error', message: 'Enter a valid quantity adjustment.' }));
+			return;
+		}
+		const signedChange = stockDirection === 'IN' ? parsedAmount : -parsedAmount;
+		await handleAdjustStock(stockTarget, signedChange, stockReason);
+		setIsStockModalOpen(false);
+		setStockTarget(null);
 	};
 
 	const handleConfirmDelete = async () => {
@@ -1127,7 +1182,7 @@ export function EquipmentPage() {
 				{visibleList.map((item) => (
 					<div
 						key={item.id}
-						className="flex h-full min-h-[31rem] flex-col overflow-hidden rounded-[20px] border border-[var(--card-border)] bg-[var(--card-bg)] backdrop-blur-md transition hover:border-[rgba(249,197,19,0.35)]"
+						className="group flex h-full min-h-[31rem] flex-col overflow-hidden rounded-[22px] border border-[rgba(249,197,19,0.22)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-[rgba(249,197,19,0.45)]"
 					>
 						<div
 							className="h-52 cursor-pointer bg-[var(--bg-darker)] md:h-56"
@@ -1154,17 +1209,25 @@ export function EquipmentPage() {
 									{statusLabel(item.status)}
 								</span>
 								</div>
-								<div className="mt-2 flex items-center justify-between text-xs text-[var(--text-secondary)]">
-									<span>Qty: {Math.max(0, Number(item.quantity ?? 0))}</span>
+								<div className="mt-3 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
+									<div className="flex items-center justify-between text-xs">
+										<span className="text-[var(--text-secondary)]">Quantity</span>
+										<span className="text-sm font-semibold text-[var(--text-primary)]">
+											{Math.max(0, Number(item.quantity ?? 0))}
+										</span>
+									</div>
+									<div className="mt-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+										<span>Availability</span>
 									<span
 										className={
 											Math.max(0, Number(item.quantity ?? 0)) > 0
-												? 'text-[#10B981]'
-												: 'text-[#EF4444]'
+													? 'font-semibold text-[#34D399]'
+													: 'font-semibold text-[#F87171]'
 										}
 									>
 										{availabilityLabel(Math.max(0, Number(item.quantity ?? 0)))}
 									</span>
+									</div>
 								</div>
 							</div>
 							{(item.description || item.notes) && (
@@ -1232,23 +1295,23 @@ export function EquipmentPage() {
 												type="button"
 												onClick={(e) => {
 													e.stopPropagation();
-													void handleAdjustStock(item, -1);
+													openStockAdjustmentModal(item, 'OUT');
 												}}
-												disabled={adjustingStock || Number(item.quantity ?? 0) <= 0}
-												className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.12)] text-xs font-semibold text-[#F87171] disabled:opacity-50"
+												disabled={adjustingStock}
+												className="flex h-10 flex-1 items-center justify-center rounded-xl border border-[rgba(239,68,68,0.35)] bg-[linear-gradient(180deg,rgba(239,68,68,0.2),rgba(239,68,68,0.08))] text-xs font-semibold text-[#F87171] transition hover:bg-[rgba(239,68,68,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
 											>
-												Stock out (-1)
+												Stock out
 											</button>
 											<button
 												type="button"
 												onClick={(e) => {
 													e.stopPropagation();
-													void handleAdjustStock(item, 1);
+													openStockAdjustmentModal(item, 'IN');
 												}}
 												disabled={adjustingStock}
-												className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.12)] text-xs font-semibold text-[#34D399] disabled:opacity-50"
+												className="flex h-10 flex-1 items-center justify-center rounded-xl border border-[rgba(16,185,129,0.35)] bg-[linear-gradient(180deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))] text-xs font-semibold text-[#34D399] transition hover:bg-[rgba(16,185,129,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
 											>
-												Stock in (+1)
+												Stock in
 											</button>
 										</div>
 										<div className="flex gap-3">
@@ -1280,6 +1343,15 @@ export function EquipmentPage() {
 					</div>
 				))}
 			</div>
+
+			{useLegacyApi ? (
+				<div className="rounded-xl border border-[rgba(245,158,11,0.35)] bg-[rgba(245,158,11,0.1)] px-4 py-3">
+					<p className="text-sm text-[#FCD34D]">
+						Compatibility mode is active for your current API schema. Quantity updates use fallback
+						mutation logic.
+					</p>
+				</div>
+			) : null}
 
 			{viewTab === 'ARCHIVED' && (
 				<div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
@@ -1416,6 +1488,121 @@ export function EquipmentPage() {
 					</div>
 				</div>
 			)}
+
+			{isStockModalOpen && stockTarget ? (
+				<div
+					className="modal-overlay active"
+					onClick={() => {
+						if (adjustingStock) return;
+						setIsStockModalOpen(false);
+						setStockTarget(null);
+					}}
+				>
+					<div className="modal modal-center max-w-[480px]" onClick={(e) => e.stopPropagation()}>
+						<div className="modal-body">
+							<h2 className="text-xl font-semibold text-[var(--text-primary)]">Adjust stock</h2>
+							<p className="mt-1 text-sm text-[var(--text-secondary)]">
+								{stockTarget.name} - current quantity: {Math.max(0, Number(stockTarget.quantity ?? 0))}
+							</p>
+
+							<div className="mt-4 rounded-xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] p-3">
+								<div className="mb-3 inline-flex w-full items-center rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-1">
+									<button
+										type="button"
+										onClick={() => setStockDirection('OUT')}
+										className={`h-9 flex-1 rounded-md text-sm font-semibold transition ${
+											stockDirection === 'OUT'
+												? 'bg-[rgba(239,68,68,0.16)] text-[#F87171]'
+												: 'text-[var(--text-secondary)]'
+										}`}
+									>
+										Stock out
+									</button>
+									<button
+										type="button"
+										onClick={() => setStockDirection('IN')}
+										className={`h-9 flex-1 rounded-md text-sm font-semibold transition ${
+											stockDirection === 'IN'
+												? 'bg-[rgba(16,185,129,0.16)] text-[#34D399]'
+												: 'text-[var(--text-secondary)]'
+										}`}
+									>
+										Stock in
+									</button>
+								</div>
+								<div className="grid grid-cols-1 gap-3">
+									<div>
+										<label
+											htmlFor="equipment-stock-adjust-amount"
+											className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]"
+										>
+											Amount
+										</label>
+										<input
+											id="equipment-stock-adjust-amount"
+											type="number"
+											min={1}
+											step={1}
+											value={stockAmount}
+											onChange={(e) => setStockAmount(e.target.value)}
+											className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--bg-darker)] px-3 py-2 text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none"
+										/>
+									</div>
+									<div>
+										<label
+											htmlFor="equipment-stock-adjust-reason"
+											className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]"
+										>
+											Reason (optional)
+										</label>
+										<textarea
+											id="equipment-stock-adjust-reason"
+											rows={2}
+											value={stockReason}
+											onChange={(e) => setStockReason(e.target.value)}
+											placeholder="e.g. New shipment arrived"
+											className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--bg-darker)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none"
+										/>
+									</div>
+								</div>
+							</div>
+
+							<div className="mt-3 rounded-lg border border-[rgba(249,197,19,0.3)] bg-[rgba(249,197,19,0.1)] px-3 py-2 text-xs text-[var(--text-primary)]">
+								Preview quantity:{' '}
+								{Math.max(
+									0,
+									Math.max(0, Number(stockTarget.quantity ?? 0)) +
+										(stockDirection === 'IN' ? 1 : -1) *
+											Math.max(0, Number.parseInt(stockAmount || '0', 10) || 0)
+								)}
+							</div>
+
+							<div className="mt-4 flex items-center gap-3">
+								<button
+									type="button"
+									className="btn-secondary h-11 flex-1 rounded-xl"
+									onClick={() => {
+										if (adjustingStock) return;
+										setIsStockModalOpen(false);
+										setStockTarget(null);
+									}}
+									disabled={adjustingStock}
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									className="btn-primary h-11 flex-1 rounded-xl"
+									onClick={() => void handleStockAdjustmentSubmit()}
+									disabled={adjustingStock}
+								>
+									{adjustingStock ? 'Saving...' : 'Apply adjustment'}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			) : null}
 
 			<SuccessModal
 				isOpen={isSuccessOpen}
