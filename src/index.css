@@ -1448,32 +1448,35 @@
 
 .admin-session-modal {
 	max-height: 90vh;
-	height: auto;
+	height: min(90vh, 920px);
 }
 
-.admin-session-modal-header {
+.admin-session-modal .admin-session-modal-header {
 	flex-shrink: 0;
 }
 
-.admin-session-modal-form {
+.admin-session-modal .admin-session-modal-form {
 	display: flex;
+	flex: 1 1 auto;
 	flex-direction: column;
 	min-height: 0;
+	overflow: hidden;
 }
 
-.admin-session-modal-body {
+.admin-session-modal .admin-session-modal-body {
 	flex: 1 1 auto;
 	overflow-y: auto;
 	min-height: 0;
-	max-height: calc(90vh - 220px);
+	max-height: none;
 	padding-bottom: 1.25rem;
 }
 
-.admin-session-modal-footer {
+.admin-session-modal .admin-session-modal-footer {
 	flex-shrink: 0;
 	margin-top: auto;
 	border-top: 1px solid var(--card-border);
-	padding: 1rem;
+	padding: 1rem 2rem;
+	background: rgba(255, 255, 255, 0.02);
 }
 
 .modal-header {
