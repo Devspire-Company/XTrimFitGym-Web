@@ -1465,7 +1465,8 @@
 	flex: 1;
 	overflow-y: auto;
 	min-height: 0;
-	padding-bottom: 5.5rem;
+	max-height: none;
+	padding-bottom: 1.25rem;
 }
 
 .admin-session-modal-footer {
