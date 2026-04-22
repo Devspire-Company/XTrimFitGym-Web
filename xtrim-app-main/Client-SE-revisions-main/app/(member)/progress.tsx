@@ -15,6 +15,7 @@ import {
 	DELETE_GOAL_MUTATION,
 } from '@/graphql/mutations';
 import { normalizePhysiqueGoalTypeForApi } from '@/constants/onboarding-options';
+import { progressRatingIncludesSessionLog } from '@/utils/progress-rating-match';
 import {
 	GET_GOALS_QUERY,
 	GET_PROGRESS_RATINGS_QUERY,
@@ -391,7 +392,7 @@ const MemberProgress = () => {
 	const recapRatingsForLog = useMemo(() => {
 		if (!selectedSessionLog?.id) return [];
 		const list = recapProgressRatingsData?.getProgressRatings || [];
-		return list.filter((r: any) => (r.sessionLogIds || []).includes(selectedSessionLog.id));
+		return list.filter((r: any) => progressRatingIncludesSessionLog(r, selectedSessionLog.id));
 	}, [recapProgressRatingsData, selectedSessionLog?.id]);
 
 	const memberCoachRatingForLog = useMemo(() => {
@@ -2074,7 +2075,7 @@ const MemberProgress = () => {
 													style={{ borderWidth: 0.5 }}
 												>
 													<View className='flex-row justify-between items-start mb-2'>
-														<View className='flex-1'>
+														<View className='flex-1 pr-2'>
 															<Text className='text-text-primary font-semibold text-base mb-1'>
 																{startDate.toLocaleDateString()} —{' '}
 																{endDate.toLocaleDateString()}
@@ -2085,19 +2086,26 @@ const MemberProgress = () => {
 																</Text>
 															) : null}
 														</View>
-														<View
-															className='px-3 py-1 rounded-full'
-															style={{
-																backgroundColor: PROGRESS_VERDICT_COLORS[vk] || '#8E8E93',
-															}}
-														>
-															<Text className='text-white text-xs font-semibold'>
-																{PROGRESS_VERDICT_LABELS[vk] || rating.verdict}
+														<View className='items-end'>
+															<Text className='text-text-secondary text-xs mb-1'>
+																Final verdict
 															</Text>
+															<View
+																className='px-3 py-1 rounded-full'
+																style={{
+																	backgroundColor: PROGRESS_VERDICT_COLORS[vk] || '#8E8E93',
+																}}
+															>
+																<Text className='text-white text-xs font-semibold'>
+																	{PROGRESS_VERDICT_LABELS[vk] || rating.verdict}
+																</Text>
+															</View>
 														</View>
 													</View>
 													<View className='flex-row items-center mb-2'>
-														<Text className='text-text-secondary text-sm mr-2'>Rating:</Text>
+														<Text className='text-text-secondary text-sm mr-2'>
+															Coach rating:
+														</Text>
 														<View className='flex-row items-center'>
 															{Array.from({ length: 5 }).map((_, index) => (
 																<Ionicons
@@ -2117,7 +2125,7 @@ const MemberProgress = () => {
 													{rating.comment ? (
 														<View className='mt-2'>
 															<Text className='text-text-secondary text-xs mb-1'>
-																Coach comment
+																Coach feedback
 															</Text>
 															<Text className='text-text-primary text-sm'>
 																{rating.comment}

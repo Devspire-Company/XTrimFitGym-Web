@@ -1,6 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 
 export type SessionKindType = 'personal' | 'group_class';
+export type SessionFrequencyType = 'once' | 'm_w_f' | 't_th_s' | 'daily';
 export type ClassEnrollmentStatusType =
 	| 'invited'
 	| 'pending'
@@ -31,6 +32,7 @@ export interface ISession {
 	goalId?: mongoose.Types.ObjectId; // Link to goal this session is helping achieve
 	isTemplate?: boolean; // Whether this session is a reusable template
 	sessionKind?: SessionKindType;
+	scheduleFrequency?: SessionFrequencyType;
 	maxParticipants?: number;
 	enrollments?: IClassEnrollment[];
 	createdAt?: Date;
@@ -119,6 +121,11 @@ const sessionSchema = new Schema(
 			type: String,
 			enum: ['personal', 'group_class'],
 			default: 'personal',
+		},
+		scheduleFrequency: {
+			type: String,
+			enum: ['once', 'm_w_f', 't_th_s', 'daily'],
+			default: 'once',
 		},
 		maxParticipants: {
 			type: Number,

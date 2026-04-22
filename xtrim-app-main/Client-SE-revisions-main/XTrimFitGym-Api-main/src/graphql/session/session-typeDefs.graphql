@@ -19,6 +19,7 @@ type Session {
 	goal: Goal # Populated goal details
 	isTemplate: Boolean # Whether this session is a reusable template
 	sessionKind: SessionKind!
+	scheduleFrequency: SessionFrequency!
 	maxParticipants: Int
 	enrollments: [ClassEnrollment!]!
 	createdAt: String
@@ -28,6 +29,13 @@ type Session {
 enum SessionKind {
 	personal
 	group_class
+}
+
+enum SessionFrequency {
+	once
+	m_w_f
+	t_th_s
+	daily
 }
 
 enum ClassEnrollmentStatus {
@@ -65,6 +73,7 @@ input CreateSessionInput {
 	goalId: ID # Link to goal this session is helping achieve
 	isTemplate: Boolean # Whether to create as a reusable template
 	sessionKind: SessionKind # Defaults to personal
+	scheduleFrequency: SessionFrequency # Defaults to once
 	maxParticipants: Int # Required for group_class (defaults to 20)
 	invitedClientIds: [ID!] # Optional invites when creating a group_class
 }
@@ -78,6 +87,7 @@ input UpdateSessionInput {
 	gymArea: String
 	note: String
 	status: SessionStatus
+	scheduleFrequency: SessionFrequency
 	maxParticipants: Int
 }
 

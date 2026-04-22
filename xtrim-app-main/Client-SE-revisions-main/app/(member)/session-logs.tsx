@@ -11,6 +11,7 @@ import {
 	GET_COACH_RATING_BY_SESSION_LOG_QUERY,
 	GET_PROGRESS_RATINGS_QUERY,
 } from '@/graphql/queries';
+import { progressRatingIncludesSessionLog } from '@/utils/progress-rating-match';
 import { formatTimeTo12Hour } from '@/utils/time-utils';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
@@ -151,7 +152,7 @@ const MemberSessionLogs = () => {
 	const detailsRecapRatings = useMemo(() => {
 		if (!selectedLog?.id) return [];
 		const list = detailsProgressRatingsData?.getProgressRatings || [];
-		return list.filter((r: any) => (r.sessionLogIds || []).includes(selectedLog.id));
+		return list.filter((r: any) => progressRatingIncludesSessionLog(r, selectedLog.id));
 	}, [detailsProgressRatingsData, selectedLog?.id]);
 
 	const detailsMemberCoachRating = useMemo(() => {
@@ -891,7 +892,7 @@ const MemberSessionLogs = () => {
 														style={{ borderWidth: 0.5 }}
 													>
 														<View className='flex-row justify-between items-start mb-2'>
-															<View className='flex-1'>
+															<View className='flex-1 pr-2'>
 																<Text className='text-text-primary font-semibold text-base mb-1'>
 																	{startDate.toLocaleDateString()} —{' '}
 																	{endDate.toLocaleDateString()}
@@ -903,18 +904,23 @@ const MemberSessionLogs = () => {
 																	</Text>
 																) : null}
 															</View>
-															<View
-																className='px-3 py-1 rounded-full'
-																style={{ backgroundColor: vColors[vk] || '#8E8E93' }}
-															>
-																<Text className='text-white text-xs font-semibold'>
-																	{vLabels[vk] || rating.verdict}
+															<View className='items-end'>
+																<Text className='text-text-secondary text-xs mb-1'>
+																	Final verdict
 																</Text>
+																<View
+																	className='px-3 py-1 rounded-full'
+																	style={{ backgroundColor: vColors[vk] || '#8E8E93' }}
+																>
+																	<Text className='text-white text-xs font-semibold'>
+																		{vLabels[vk] || rating.verdict}
+																	</Text>
+																</View>
 															</View>
 														</View>
 														<View className='flex-row items-center mb-2'>
 															<Text className='text-text-secondary text-sm mr-2'>
-																Rating:
+																Coach rating:
 															</Text>
 															<View className='flex-row items-center'>
 																{Array.from({ length: 5 }).map((_, index) => (
@@ -935,7 +941,7 @@ const MemberSessionLogs = () => {
 														{rating.comment ? (
 															<View className='mt-2'>
 																<Text className='text-text-secondary text-xs mb-1'>
-																	Coach comment
+																	Coach feedback
 																</Text>
 																<Text className='text-text-primary text-sm'>
 																	{rating.comment}

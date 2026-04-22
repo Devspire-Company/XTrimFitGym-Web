@@ -18,6 +18,13 @@ const sessionPopulatePaths = [
 	{ path: 'goalId', select: GOAL_SELECT_FOR_SESSION },
 ] as const;
 
+const ALLOWED_SCHEDULE_FREQUENCIES = new Set([
+	'once',
+	'm_w_f',
+	't_th_s',
+	'daily',
+] as const);
+
 async function fetchSessionDocument(sessionId: string) {
 	return Session.findById(sessionId)
 		.populate([...sessionPopulatePaths])
@@ -217,6 +224,11 @@ const mapSessionToGraphQL = (session: any) => {
 
 	const sessionKind =
 		session.sessionKind === 'group_class' ? 'group_class' : 'personal';
+	const scheduleFrequency = ALLOWED_SCHEDULE_FREQUENCIES.has(
+		session.scheduleFrequency,
+	)
+		? session.scheduleFrequency
+		: 'once';
 	const enrollRank: Record<string, number> = {
 		accepted: 5,
 		invited: 4,
@@ -257,6 +269,7 @@ const mapSessionToGraphQL = (session: any) => {
 		goal: goal, // Use the properly mapped goal object
 		isTemplate: session.isTemplate || false,
 		sessionKind,
+		scheduleFrequency,
 		maxParticipants:
 			sessionKind === 'group_class' && session.maxParticipants != null
 				? session.maxParticipants
@@ -880,6 +893,12 @@ export default {
 				throw new Error('maxParticipants must be at least 1');
 			}
 
+			const scheduleFrequency =
+				typeof input.scheduleFrequency === 'string' &&
+				ALLOWED_SCHEDULE_FREQUENCIES.has(input.scheduleFrequency)
+					? input.scheduleFrequency
+					: 'once';
+
 			const invitedIds: string[] = (input.invitedClientIds || []).map(
 				(x: string) => String(x),
 			);
@@ -927,6 +946,7 @@ export default {
 				isTemplate: input.isTemplate === true, // Explicitly check for true
 				status: input.isTemplate ? 'scheduled' : 'scheduled',
 				sessionKind,
+				scheduleFrequency,
 				maxParticipants: isGroupClass
 					? (input.maxParticipants ?? 20)
 					: undefined,
@@ -1194,6 +1214,14 @@ export default {
 			if (input.gymArea !== undefined) updateData.gymArea = input.gymArea;
 			if (input.note !== undefined) updateData.note = input.note;
 			if (input.status !== undefined) updateData.status = input.status;
+			if (input.scheduleFrequency !== undefined) {
+				if (!ALLOWED_SCHEDULE_FREQUENCIES.has(input.scheduleFrequency)) {
+					throw new Error(
+						'Invalid scheduleFrequency. Allowed values: once, m_w_f, t_th_s, daily',
+					);
+				}
+				updateData.scheduleFrequency = input.scheduleFrequency;
+			}
 			if (input.maxParticipants !== undefined) {
 				if (session.sessionKind !== 'group_class') {
 					throw new Error(

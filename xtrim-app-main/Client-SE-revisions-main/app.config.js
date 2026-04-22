@@ -1,9 +1,9 @@
-const EAS_PROJECT_ID = '8cee07cd-6b07-4839-84d0-ae905b4b87fd';
+const EAS_PROJECT_ID = '58bfbc8c-441f-46be-992a-8b8965a95106';
 
 module.exports = () => {
 	const expo = {
 		name: 'XTrimFitGym',
-		slug: 'XTrimFitGym',
+		slug: 'xtrimfitgym20',
 		version: '1.0.0',
 		orientation: 'portrait',
 		icon: './assets/logos/XTFG_icon_square_1025.png',

@@ -35,6 +35,14 @@ import {
 
 const { width } = Dimensions.get('window');
 
+function formatKgDisplay(value: number | null | undefined): string | null {
+	if (value == null) return null;
+	const n = Number(value);
+	if (Number.isNaN(n)) return null;
+	const rounded = Math.round(n * 10) / 10;
+	return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
 const verdictOptions = [
 	{ label: 'Progressive', value: 'progressive' },
 	{ label: 'Close to Achievement', value: 'close_to_achievement' },
@@ -547,6 +555,54 @@ const CoachProgress = () => {
 									<Ionicons name='close' size={28} color='#8E8E93' />
 								</TouchableOpacity>
 							</View>
+
+							{selectedGoal ? (
+								<View
+									className='mb-6 rounded-lg border border-[#F9C513]/40 bg-bg-darker p-4'
+									style={{ borderWidth: 0.5 }}
+								>
+									<Text className='text-text-primary font-semibold mb-1'>Goal reference</Text>
+									<Text className='text-text-secondary text-xs mb-3'>
+										What your client sees on their session recap for this goal — use it to
+										contextualize your rating.
+									</Text>
+									{selectedGoal.title ? (
+										<Text className='text-text-secondary text-sm mb-2'>
+											Goal:{' '}
+											<Text className='text-text-primary font-medium'>{selectedGoal.title}</Text>
+											{selectedGoal.goalType ? (
+												<Text className='text-text-secondary'>
+													{' '}
+													· {selectedGoal.goalType}
+												</Text>
+											) : null}
+										</Text>
+									) : null}
+									{formatKgDisplay(selectedGoal.currentWeight) ? (
+										<Text className='text-text-primary text-sm mb-1'>
+											Starting weight (goal):{' '}
+											<Text className='font-bold text-[#F9C513]'>
+												{formatKgDisplay(selectedGoal.currentWeight)} kg
+											</Text>
+										</Text>
+									) : null}
+									{formatKgDisplay(selectedGoal.targetWeight) ? (
+										<Text className='text-text-primary text-sm mb-1'>
+											Target:{' '}
+											<Text className='font-semibold text-text-primary'>
+												{formatKgDisplay(selectedGoal.targetWeight)} kg
+											</Text>
+										</Text>
+									) : null}
+									{!formatKgDisplay(selectedGoal.currentWeight) &&
+									!formatKgDisplay(selectedGoal.targetWeight) ? (
+										<Text className='text-text-secondary text-sm'>
+											No weight baseline is set on this goal yet. Non-weight goals may only show
+											the title above.
+										</Text>
+									) : null}
+								</View>
+							) : null}
 
 							{/* Date Range Summary (fixed, not editable) */}
 							<View className='mb-6'>

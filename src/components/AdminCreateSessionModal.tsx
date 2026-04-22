@@ -7,6 +7,13 @@ import { cn } from '@/lib/utils';
 import { CREATE_SESSION, GET_USERS } from '@/graphql/operations/index';
 import type { GetUsersQuery } from '@/graphql/generated/graphql';
 import { RoleType, SessionKind, TransactionStatus } from '@/graphql/generated/graphql';
+
+const SCHEDULE_FREQUENCY_OPTIONS = [
+	{ label: 'One-time', value: 'once' },
+	{ label: 'M-W-F', value: 'm_w_f' },
+	{ label: 'T-TH-S', value: 't_th_s' },
+	{ label: 'Daily', value: 'daily' },
+] as const;
 const GYM_AREAS = [
 	{ label: 'Main Training Area', value: 'Main Training Area' },
 	{ label: 'Cardio Zone', value: 'Cardio Zone' },
@@ -69,6 +76,9 @@ export function AdminCreateSessionModal({
 	const [startTimeStr, setStartTimeStr] = useState('09:00');
 	const [endTimeStr, setEndTimeStr] = useState('');
 	const [gymArea, setGymArea] = useState('');
+	const [scheduleFrequency, setScheduleFrequency] = useState<
+		'once' | 'm_w_f' | 't_th_s' | 'daily'
+	>('once');
 	const [note, setNote] = useState('');
 	const [isGroupClass, setIsGroupClass] = useState(false);
 	const [maxParticipants, setMaxParticipants] = useState('20');
@@ -88,6 +98,7 @@ export function AdminCreateSessionModal({
 		setStartTimeStr('09:00');
 		setEndTimeStr('');
 		setGymArea('');
+		setScheduleFrequency('once');
 		setNote('');
 		setIsGroupClass(false);
 		setMaxParticipants('20');
@@ -187,12 +198,13 @@ export function AdminCreateSessionModal({
 						startTime: startTimeString,
 						endTime: endTimeString,
 						gymArea,
+						scheduleFrequency,
 						note: note.trim() || undefined,
 						sessionKind: SessionKind.GroupClass,
 						maxParticipants: mp,
 						invitedClientIds:
 							selectedMemberIds.length > 0 ? selectedMemberIds : undefined,
-					},
+					} as any,
 				},
 			});
 			return;
@@ -213,9 +225,10 @@ export function AdminCreateSessionModal({
 					startTime: startTimeString,
 					endTime: endTimeString,
 					gymArea,
+					scheduleFrequency,
 					note: note.trim() || undefined,
 					sessionKind: SessionKind.Personal,
-				},
+				} as any,
 			},
 		});
 	};
@@ -464,6 +477,32 @@ export function AdminCreateSessionModal({
 								</option>
 							))}
 						</select>
+					</div>
+
+					<div className="form-group">
+						<label htmlFor="admin-session-frequency">
+							Schedule frequency <span className="required">*</span>
+						</label>
+						<select
+							id="admin-session-frequency"
+							value={scheduleFrequency}
+							onChange={(e) =>
+								setScheduleFrequency(
+									e.target.value as 'once' | 'm_w_f' | 't_th_s' | 'daily'
+								)
+							}
+							className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm"
+							required
+						>
+							{SCHEDULE_FREQUENCY_OPTIONS.map((option) => (
+								<option key={option.value} value={option.value}>
+									{option.label}
+								</option>
+							))}
+						</select>
+						<small className="block text-xs text-[var(--text-secondary)] mt-1">
+							Use this for recurring patterns like M-W-F, T-TH-S, or daily.
+						</small>
 					</div>
 
 					<div className="form-group">
