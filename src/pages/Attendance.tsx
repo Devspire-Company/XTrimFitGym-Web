@@ -7,6 +7,7 @@ import {
 	UserCog,
 	Fingerprint,
 	CalendarRange,
+	ChevronDown,
 } from 'lucide-react';
 import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -195,6 +196,7 @@ export function AttendancePage() {
 	const [roleFilter, setRoleFilter] = useState<'all' | 'coach' | 'client'>('all');
 	const [rangeStartDate, setRangeStartDate] = useState<string>(() => getTodayYmdManila());
 	const [rangeEndDate, setRangeEndDate] = useState<string>(() => getTodayYmdManila());
+	const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
 	const [currentPage, setCurrentPage] = useState(1);
 	const [subscriptionConnected, setSubscriptionConnected] = useState(false);
 	const [, setLastUpdateTime] = useState<Date | null>(null);
@@ -887,7 +889,7 @@ export function AttendancePage() {
 
 			{/* Filters */}
 			<div className="bg-[var(--bg-secondary)] rounded-lg p-4 space-y-4">
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+				<div className="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_minmax(160px,1fr)_auto] gap-3">
 					{/* Search */}
 					<div className="w-full flex items-center gap-2 px-3 py-2.5 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-[12px] text-[var(--text-primary)] text-sm transition-all duration-300 focus-within:border-[var(--primary-yellow)] focus-within:ring-2 focus-within:ring-[rgba(249,197,19,0.1)]">
 						<Search className="w-4 h-4 text-[var(--text-secondary)] shrink-0" />
@@ -915,7 +917,21 @@ export function AttendancePage() {
 						</select>
 					</div>
 
-					{/* Date Range Filter */}
+					<button
+						type="button"
+						onClick={() => setIsDateRangeOpen((prev) => !prev)}
+						className="inline-flex h-[42px] items-center justify-center gap-2 rounded-[12px] border border-[rgba(249,197,19,0.3)] bg-[rgba(249,197,19,0.08)] px-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-primary)] transition hover:border-[var(--primary-yellow)] hover:text-[var(--primary-yellow)]"
+					>
+						<CalendarRange className="h-4 w-4 text-[var(--primary-yellow)]" />
+						Date range
+						<ChevronDown
+							className={`h-4 w-4 text-[var(--text-secondary)] transition-transform ${
+								isDateRangeOpen ? 'rotate-180' : ''
+							}`}
+						/>
+					</button>
+				</div>
+				{isDateRangeOpen ? (
 					<div className="rounded-xl border border-[rgba(249,197,19,0.24)] bg-[linear-gradient(180deg,rgba(249,197,19,0.08),rgba(255,255,255,0.02))] p-3 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
 						<div className="mb-2 flex items-center justify-between gap-2">
 							<div className="flex items-center gap-2">
@@ -978,7 +994,7 @@ export function AttendancePage() {
 							</div>
 						</div>
 					</div>
-				</div>
+				) : null}
 				{selectedRange ? (
 					<div className="rounded-xl border border-[rgba(249,197,19,0.32)] bg-[rgba(249,197,19,0.08)] px-3 py-2 text-xs font-medium text-[var(--text-primary)]">
 						Applied date range: <span className="text-[var(--primary-yellow)]">{selectedRange.label}</span>
