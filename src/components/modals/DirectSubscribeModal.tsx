@@ -5,6 +5,7 @@ import { GET_ACTIVE_MEMBERSHIPS, DIRECT_SUBSCRIBE_MEMBER, GET_USERS } from '@/gr
 import { DurationType } from '@/graphql/generated/graphql';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface DirectSubscribeModalProps {
 	isOpen: boolean;
@@ -24,8 +25,7 @@ export function DirectSubscribeModal({
 	const [selectedMembershipId, setSelectedMembershipId] = useState<string>('');
 	/** Empty = use plan default on submit */
 	const [customMonthDuration, setCustomMonthDuration] = useState('');
-	/** YYYY-MM-DD; empty = start now */
-	const [subscriptionStartDate, setSubscriptionStartDate] = useState('');
+	const [subscriptionStartDate, setSubscriptionStartDate] = useState<Date | undefined>();
 	const dispatch = useAppDispatch();
 
 	const { data: membershipsData, loading: membershipsLoading } = useQuery(GET_ACTIVE_MEMBERSHIPS, {
@@ -44,7 +44,7 @@ export function DirectSubscribeModal({
 		} else {
 			setCustomMonthDuration('1');
 		}
-		setSubscriptionStartDate('');
+		setSubscriptionStartDate(undefined);
 	}, [selectedMembershipId, selectedPlan]);
 
 	const [directSubscribe, { loading: subscribing }] = useMutation(DIRECT_SUBSCRIBE_MEMBER, {
@@ -64,7 +64,7 @@ export function DirectSubscribeModal({
 			onClose();
 			setSelectedMembershipId('');
 			setCustomMonthDuration('');
-			setSubscriptionStartDate('');
+			setSubscriptionStartDate(undefined);
 		},
 		onError: (error) => {
 			console.error('❌ Subscription mutation error:', error);
@@ -119,11 +119,17 @@ export function DirectSubscribeModal({
 			}
 		}
 
-		if (subscriptionStartDate.trim()) {
-			const d = new Date(`${subscriptionStartDate}T12:00:00`);
-			if (!Number.isNaN(d.getTime())) {
-				input.startedAt = d.toISOString();
-			}
+		if (subscriptionStartDate) {
+			const d = new Date(
+				subscriptionStartDate.getFullYear(),
+				subscriptionStartDate.getMonth(),
+				subscriptionStartDate.getDate(),
+				12,
+				0,
+				0,
+				0
+			);
+			if (!Number.isNaN(d.getTime())) input.startedAt = d.toISOString();
 		}
 
 		directSubscribe({
@@ -138,7 +144,15 @@ export function DirectSubscribeModal({
 			(m: { id: string }) => m.id === selectedMembershipId
 		) as { monthDuration?: number; durationType?: string } | undefined;
 		const start = subscriptionStartDate
-			? new Date(`${subscriptionStartDate}T12:00:00`)
+			? new Date(
+					subscriptionStartDate.getFullYear(),
+					subscriptionStartDate.getMonth(),
+					subscriptionStartDate.getDate(),
+					12,
+					0,
+					0,
+					0
+			  )
 			: new Date();
 		if (Number.isNaN(start.getTime())) return null;
 
@@ -290,15 +304,14 @@ export function DirectSubscribeModal({
 								/>
 							</div>
 							<div>
-								<label className="text-xs text-[var(--text-secondary)] block mb-1" htmlFor="sub-start">
+								<label className="text-xs text-[var(--text-secondary)] block mb-1">
 									Subscription start date
 								</label>
-								<input
-									id="sub-start"
-									type="date"
-									value={subscriptionStartDate}
-									onChange={(e) => setSubscriptionStartDate(e.target.value)}
-									className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] text-[var(--text-primary)] text-sm"
+								<DatePicker
+									date={subscriptionStartDate}
+									onDateChange={setSubscriptionStartDate}
+									placeholder="Pick a start date"
+									className="w-full"
 								/>
 							</div>
 							{previewExpiryLabel() && (

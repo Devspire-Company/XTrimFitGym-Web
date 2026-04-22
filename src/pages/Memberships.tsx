@@ -418,7 +418,7 @@ export function MembershipsPage() {
 									: ''
 							}`}
 						>
-							<div className="plan-header flex items-center justify-between mb-6">
+							<div className="plan-header flex items-start justify-between mb-6">
 								<div className="plan-name-section flex-1">
 									{isFeatured && (
 										<span className="plan-badge inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider mb-3 bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]">
@@ -430,20 +430,22 @@ export function MembershipsPage() {
 										{plan.name}
 									</h3>
 								</div>
-								<span
-									className={`plan-status-badge px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
-										plan.status === 'ACTIVE'
-											? 'active bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
-											: 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
-									}`}
-								>
-									{statusMap[plan.status] || plan.status}
-								</span>
-								{getCardStatusEffectiveLabel(plan) ? (
-									<p className="mt-2 text-[11px] font-medium text-[var(--text-secondary)]">
-										{getCardStatusEffectiveLabel(plan)}
-									</p>
-								) : null}
+								<div className="flex flex-col items-end">
+									<span
+										className={`plan-status-badge px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
+											plan.status === 'ACTIVE'
+												? 'active bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
+												: 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
+										}`}
+									>
+										{statusMap[plan.status] || plan.status}
+									</span>
+									{getCardStatusEffectiveLabel(plan) ? (
+										<p className="mt-1 text-[11px] font-medium text-[rgba(184,188,200,0.78)]">
+											{getCardStatusEffectiveLabel(plan)}
+										</p>
+									) : null}
+								</div>
 							</div>
 							<div className="plan-price flex items-baseline gap-2 mb-4">
 								<span className="plan-price-value text-[2.5rem] font-bold text-[var(--primary-yellow)] font-['Inter',ui-sans-serif,system-ui,sans-serif]">
