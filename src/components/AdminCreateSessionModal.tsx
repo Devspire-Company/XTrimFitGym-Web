@@ -287,7 +287,7 @@ export function AdminCreateSessionModal({
 			>
 				<div
 					className="modal-body"
-					style={{ flex: 1, overflowY: 'auto', minHeight: 0, maxHeight: 'calc(90vh - 128px)' }}
+					style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingBottom: '1.25rem' }}
 				>
 					{formError ? (
 						<p className="text-sm text-red-500 mb-3" role="alert">
@@ -549,7 +549,7 @@ export function AdminCreateSessionModal({
 							</label>
 						</div>
 
-						<div className="mt-2 min-h-[112px]">
+						<div className="mt-2 min-h-[132px]">
 							{scheduleMode === 'one_day' ? (
 								<div className="max-w-xs">
 									<label htmlFor="admin-single-day" className="block text-xs text-[var(--text-secondary)] mb-1">
@@ -625,7 +625,13 @@ export function AdminCreateSessionModal({
 				</div>
 				<div
 					className="modal-footer"
-					style={{ flexShrink: 0, borderTop: '1px solid var(--card-border)', padding: '1rem' }}
+					style={{
+						flexShrink: 0,
+						borderTop: '1px solid var(--card-border)',
+						padding: '1rem',
+						position: 'relative',
+						zIndex: 2,
+					}}
 				>
 					<div className="flex justify-end gap-2">
 						<Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
