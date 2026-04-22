@@ -1,8 +1,8 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
-import { X, Calendar as CalendarIcon } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Clock3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CREATE_SESSION, GET_USERS } from '@/graphql/operations/index';
 import type { GetUsersQuery } from '@/graphql/generated/graphql';
@@ -77,13 +77,15 @@ export function AdminCreateSessionModal({
 	const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 	const [sessionName, setSessionName] = useState('');
 	const [date, setDate] = useState<Date | undefined>();
-	const [startTimeStr, setStartTimeStr] = useState('09:00');
+	const [startTimeStr, setStartTimeStr] = useState('');
 	const [endTimeStr, setEndTimeStr] = useState('');
 	const [gymArea, setGymArea] = useState('');
 	const [note, setNote] = useState('');
 	const [isGroupClass, setIsGroupClass] = useState(false);
 	const [maxParticipants, setMaxParticipants] = useState('20');
 	const [formError, setFormError] = useState('');
+	const startTimeInputRef = useRef<HTMLInputElement | null>(null);
+	const endTimeInputRef = useRef<HTMLInputElement | null>(null);
 
 	const { data: membersData } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Member, includeDisabled: false },
@@ -96,7 +98,7 @@ export function AdminCreateSessionModal({
 		setSelectedMemberIds([]);
 		setSessionName('');
 		setDate(undefined);
-		setStartTimeStr('09:00');
+		setStartTimeStr('');
 		setEndTimeStr('');
 		setGymArea('');
 		setNote('');
@@ -148,6 +150,17 @@ export function AdminCreateSessionModal({
 		);
 	};
 
+	const openTimePicker = (inputRef: React.RefObject<HTMLInputElement | null>) => {
+		const el = inputRef.current;
+		if (!el) return;
+		try {
+			(el as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+		} catch {
+			// Some browsers block showPicker outside trusted gesture.
+		}
+		el.focus();
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setFormError('');
@@ -174,6 +187,10 @@ export function AdminCreateSessionModal({
 			const endD = parseTimeInputToDate(endTimeStr);
 			if (!endD) {
 				setFormError('Invalid end time.');
+				return;
+			}
+			if (endD <= startD) {
+				setFormError('End time must be later than start time.');
 				return;
 			}
 			endTimeString = formatTimeToString(endD);
@@ -436,23 +453,50 @@ export function AdminCreateSessionModal({
 							<label htmlFor="admin-session-start">
 								Start time <span className="required">*</span>
 							</label>
-							<input
-								id="admin-session-start"
-								type="time"
-								value={startTimeStr}
-								onChange={(e) => setStartTimeStr(e.target.value)}
-								className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm"
-							/>
+							<div className="relative">
+								<input
+									ref={startTimeInputRef}
+									id="admin-session-start"
+									type="time"
+									value={startTimeStr}
+									step={300}
+									onClick={() => openTimePicker(startTimeInputRef)}
+									onChange={(e) => setStartTimeStr(e.target.value)}
+									className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 pr-10 text-sm admin-time-input"
+								/>
+								<button
+									type="button"
+									onClick={() => openTimePicker(startTimeInputRef)}
+									className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--primary-yellow)]"
+									aria-label="Open start time picker"
+								>
+									<Clock3 className="h-4 w-4" />
+								</button>
+							</div>
 						</div>
 						<div className="form-group">
 							<label htmlFor="admin-session-end">End time</label>
-							<input
-								id="admin-session-end"
-								type="time"
-								value={endTimeStr}
-								onChange={(e) => setEndTimeStr(e.target.value)}
-								className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm"
-							/>
+							<div className="relative">
+								<input
+									ref={endTimeInputRef}
+									id="admin-session-end"
+									type="time"
+									value={endTimeStr}
+									step={300}
+									min={startTimeStr || undefined}
+									onClick={() => openTimePicker(endTimeInputRef)}
+									onChange={(e) => setEndTimeStr(e.target.value)}
+									className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 pr-10 text-sm admin-time-input"
+								/>
+								<button
+									type="button"
+									onClick={() => openTimePicker(endTimeInputRef)}
+									className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--primary-yellow)]"
+									aria-label="Open end time picker"
+								>
+									<Clock3 className="h-4 w-4" />
+								</button>
+							</div>
 						</div>
 					</div>
 
