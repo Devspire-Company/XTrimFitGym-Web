@@ -28,6 +28,12 @@ const WEEKDAY_OPTIONS: { label: string; value: WeekdayValue }[] = [
 	{ label: 'Saturday', value: 'saturday' },
 	{ label: 'Sunday', value: 'sunday' },
 ];
+const SCHEDULE_PRESETS: { label: string; days: WeekdayValue[] }[] = [
+	{ label: 'M-W-F', days: ['monday', 'wednesday', 'friday'] },
+	{ label: 'T-TH-S', days: ['tuesday', 'thursday', 'saturday'] },
+	{ label: 'Weekdays', days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] },
+	{ label: 'Daily', days: [...WEEKDAY_VALUES] },
+];
 type ScheduleType = 'one_day' | 'specific_days';
 const GYM_AREAS = [
 	{ label: 'Main Training Area', value: 'Main Training Area' },
@@ -285,6 +291,11 @@ export function AdminCreateSessionModal({
 			if (scheduleType === 'one_day') return [day];
 			return prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day];
 		});
+	};
+
+	const applySchedulePreset = (days: WeekdayValue[]) => {
+		setScheduleType('specific_days');
+		setScheduleDays(days);
 	};
 
 	useEffect(() => {
@@ -634,59 +645,97 @@ export function AdminCreateSessionModal({
 						<label>
 							Session schedule frequency <span className="required">*</span>
 						</label>
-						<div className="flex items-center gap-4 mb-3">
-							<label className="!inline-flex !items-center gap-2 cursor-pointer mb-0 select-none text-sm">
-								<input
-									type="radio"
-									name="admin-session-schedule-type"
-									checked={scheduleType === 'one_day'}
-									onChange={() => {
+						<div className="rounded-2xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.02)] p-3">
+							<div className="grid grid-cols-2 gap-2 mb-3">
+								<button
+									type="button"
+									onClick={() => {
 										setScheduleType('one_day');
-										if (scheduleDays.length > 1) {
+										if (scheduleDays.length === 0) {
+											setScheduleDays([date ? WEEKDAY_VALUES[date.getDay()] : 'monday']);
+										} else if (scheduleDays.length > 1) {
 											setScheduleDays([scheduleDays[0]]);
 										}
 									}}
-								/>
-								<span>One day only</span>
-							</label>
-							<label className="!inline-flex !items-center gap-2 cursor-pointer mb-0 select-none text-sm">
-								<input
-									type="radio"
-									name="admin-session-schedule-type"
-									checked={scheduleType === 'specific_days'}
-									onChange={() => setScheduleType('specific_days')}
-								/>
-								<span>Specific days</span>
-							</label>
+									className={cn(
+										'rounded-xl px-3 py-2 text-sm font-semibold transition-colors',
+										scheduleType === 'one_day'
+											? 'bg-[rgba(249,197,19,0.18)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.45)]'
+											: 'bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+									)}
+								>
+									One day only
+								</button>
+								<button
+									type="button"
+									onClick={() => setScheduleType('specific_days')}
+									className={cn(
+										'rounded-xl px-3 py-2 text-sm font-semibold transition-colors',
+										scheduleType === 'specific_days'
+											? 'bg-[rgba(249,197,19,0.18)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.45)]'
+											: 'bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+									)}
+								>
+									Specific days
+								</button>
+							</div>
+							{scheduleType === 'specific_days' ? (
+								<div className="flex flex-wrap gap-2 mb-3">
+									{SCHEDULE_PRESETS.map((preset) => (
+										<button
+											key={preset.label}
+											type="button"
+											onClick={() => applySchedulePreset(preset.days)}
+											className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[rgba(249,197,19,0.4)]"
+										>
+											{preset.label}
+										</button>
+									))}
+								</div>
+							) : null}
+							<div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2.5">
+								{WEEKDAY_OPTIONS.map((day) => {
+									const checked = scheduleDays.includes(day.value);
+									return (
+										<button
+											key={day.value}
+											type="button"
+											onClick={() => toggleScheduleDay(day.value)}
+											className={cn(
+												'flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
+												'border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--text-primary)]',
+												checked && 'border-[var(--primary-yellow)] bg-[rgba(249,197,19,0.14)]',
+												scheduleType === 'one_day' && checked && 'shadow-[0_0_0_1px_rgba(249,197,19,0.35)]'
+											)}
+										>
+											<span
+												className={cn(
+													'flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[11px] font-bold',
+													checked
+														? 'border-[var(--primary-yellow)] bg-[var(--primary-yellow)] text-[#161616]'
+														: 'border-[rgba(255,255,255,0.35)] bg-transparent text-transparent'
+												)}
+											>
+												✓
+											</span>
+											<span>{day.label}</span>
+										</button>
+									);
+								})}
+							</div>
+							<small className="block text-xs text-[var(--text-secondary)] mt-3">
+								{scheduleType === 'one_day'
+									? 'Select exactly one day for this session.'
+									: 'Select one or more recurring days. You can use presets for faster setup.'}
+							</small>
+							<div className="mt-1 text-xs text-[var(--text-secondary)]">
+								{scheduleDays.length > 0
+									? `Selected: ${scheduleDays
+											.map((d) => WEEKDAY_OPTIONS.find((x) => x.value === d)?.label ?? d)
+											.join(', ')}`
+									: 'No days selected yet.'}
+							</div>
 						</div>
-						<div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-							{WEEKDAY_OPTIONS.map((day) => {
-								const checked = scheduleDays.includes(day.value);
-								return (
-									<label
-										key={day.value}
-										className={cn(
-											'!flex !items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium cursor-pointer mb-0 transition-colors',
-											'border-[var(--card-border)] bg-[var(--card-bg)]',
-											checked && 'border-[var(--primary-yellow)] bg-[rgba(249,197,19,0.12)]'
-										)}
-									>
-										<input
-											type="checkbox"
-											checked={checked}
-											onChange={() => toggleScheduleDay(day.value)}
-											className="h-4 w-4"
-										/>
-										<span>{day.label}</span>
-									</label>
-								);
-							})}
-						</div>
-						<small className="block text-xs text-[var(--text-secondary)] mt-2">
-							{scheduleType === 'one_day'
-								? 'Pick one day only.'
-								: 'Pick one or more days for recurring sessions (e.g., M-W-F).'}
-						</small>
 					</div>
 
 					<div className="form-group">
