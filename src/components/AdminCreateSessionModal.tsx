@@ -502,26 +502,46 @@ export function AdminCreateSessionModal({
 							Schedule days <span className="required">*</span>
 						</label>
 						<div className="flex flex-wrap gap-4 mt-1">
-							<label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+							<label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
 								<input
 									type="radio"
 									name="schedule-mode"
 									value="one_day"
 									checked={scheduleMode === 'one_day'}
 									onChange={() => setScheduleMode('one_day')}
-									className="h-4 w-4 accent-[var(--primary-yellow)]"
+									className="peer sr-only"
 								/>
+								<span
+									className={cn(
+										'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
+										'border-[rgba(255,255,255,0.45)]',
+										'peer-checked:border-[var(--primary-yellow)]'
+									)}
+									aria-hidden
+								>
+									<span className="h-2 w-2 rounded-full bg-[var(--primary-yellow)] opacity-0 transition-opacity peer-checked:opacity-100" />
+								</span>
 								<span>One day</span>
 							</label>
-							<label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+							<label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
 								<input
 									type="radio"
 									name="schedule-mode"
 									value="repeat"
 									checked={scheduleMode === 'repeat'}
 									onChange={() => setScheduleMode('repeat')}
-									className="h-4 w-4 accent-[var(--primary-yellow)]"
+									className="peer sr-only"
 								/>
+								<span
+									className={cn(
+										'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
+										'border-[rgba(255,255,255,0.45)]',
+										'peer-checked:border-[var(--primary-yellow)]'
+									)}
+									aria-hidden
+								>
+									<span className="h-2 w-2 rounded-full bg-[var(--primary-yellow)] opacity-0 transition-opacity peer-checked:opacity-100" />
+								</span>
 								<span>Repeat</span>
 							</label>
 						</div>
