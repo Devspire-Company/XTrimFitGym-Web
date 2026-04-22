@@ -174,6 +174,10 @@ function statusBadgeClass(s: EquipmentStatus): string {
 	}
 }
 
+function archivedBadgeClass(): string {
+	return 'bg-[rgba(148,163,184,0.2)] text-[#E2E8F0] border-[rgba(148,163,184,0.4)]';
+}
+
 function toStatusText(status: EquipmentStatus | string | null | undefined): string {
 	if (!status) return 'N/A';
 	switch (status) {
@@ -1204,11 +1208,18 @@ export function EquipmentPage() {
 									{item.name}
 								</h3>
 								<span
-									className={`shrink-0 px-2 py-1 rounded-lg text-xs font-semibold border ${statusBadgeClass(item.status)}`}
+									className={`shrink-0 px-2 py-1 rounded-lg text-xs font-semibold border ${
+										item.isArchived ? archivedBadgeClass() : statusBadgeClass(item.status)
+									}`}
 								>
-									{statusLabel(item.status)}
+									{item.isArchived ? 'Archived' : statusLabel(item.status)}
 								</span>
 								</div>
+								{item.isArchived ? (
+									<div className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">
+										Condition before archive: {statusLabel(item.status)}
+									</div>
+								) : null}
 								<div className="mt-3 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-2.5">
 									<div className="flex items-center justify-between text-xs">
 										<span className="text-[var(--text-secondary)]">Quantity</span>
