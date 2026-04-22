@@ -285,7 +285,10 @@ export function AdminCreateSessionModal({
 				onSubmit={handleSubmit}
 				style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
 			>
-				<div className="modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+				<div
+					className="modal-body"
+					style={{ flex: 1, overflowY: 'auto', minHeight: 0, maxHeight: 'calc(90vh - 128px)' }}
+				>
 					{formError ? (
 						<p className="text-sm text-red-500 mb-3" role="alert">
 							{formError}
@@ -497,12 +500,12 @@ export function AdminCreateSessionModal({
 						</select>
 					</div>
 
-					<div className="form-group">
+					<div className="form-group mb-4">
 						<label>
 							Schedule days <span className="required">*</span>
 						</label>
-						<div className="flex flex-wrap gap-4 mt-1">
-							<label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+						<div className="flex gap-6 mt-2 mb-3">
+							<label className="flex items-center gap-2 text-sm cursor-pointer select-none">
 								<input
 									type="radio"
 									name="schedule-mode"
@@ -514,16 +517,16 @@ export function AdminCreateSessionModal({
 								<span
 									className={cn(
 										'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
-										'border-[rgba(255,255,255,0.45)]',
-										'peer-checked:border-[var(--primary-yellow)]'
+										'bg-[rgba(12,16,28,0.9)] border-[rgba(255,255,255,0.35)]',
+										'peer-checked:border-[#F59E0B]'
 									)}
 									aria-hidden
 								>
-									<span className="h-2 w-2 rounded-full bg-[var(--primary-yellow)] opacity-0 transition-opacity peer-checked:opacity-100" />
+									<span className="h-2 w-2 rounded-full bg-[#F59E0B] opacity-0 transition-opacity peer-checked:opacity-100" />
 								</span>
 								<span>One day</span>
 							</label>
-							<label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+							<label className="flex items-center gap-2 text-sm cursor-pointer select-none">
 								<input
 									type="radio"
 									name="schedule-mode"
@@ -535,12 +538,12 @@ export function AdminCreateSessionModal({
 								<span
 									className={cn(
 										'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
-										'border-[rgba(255,255,255,0.45)]',
-										'peer-checked:border-[var(--primary-yellow)]'
+										'bg-[rgba(12,16,28,0.9)] border-[rgba(255,255,255,0.35)]',
+										'peer-checked:border-[#F59E0B]'
 									)}
 									aria-hidden
 								>
-									<span className="h-2 w-2 rounded-full bg-[var(--primary-yellow)] opacity-0 transition-opacity peer-checked:opacity-100" />
+									<span className="h-2 w-2 rounded-full bg-[#F59E0B] opacity-0 transition-opacity peer-checked:opacity-100" />
 								</span>
 								<span>Repeat</span>
 							</label>
@@ -603,7 +606,7 @@ export function AdminCreateSessionModal({
 								</div>
 							)}
 						</div>
-						<small className="block text-xs text-[var(--text-secondary)] mt-1">
+						<small className="block text-xs text-[var(--text-secondary)] mt-2">
 							One day = choose a single day; Repeat = choose multiple days.
 						</small>
 					</div>
