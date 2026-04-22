@@ -190,6 +190,12 @@ function memberHasActiveSubscription(
 	return Number.isFinite(exp.getTime()) && exp > new Date();
 }
 
+function areSameWeekdaySet(a: WeekdayValue[], b: WeekdayValue[]): boolean {
+	if (a.length !== b.length) return false;
+	const setA = new Set(a);
+	return b.every((d) => setA.has(d));
+}
+
 export type AdminCoachOption = { id: string; name: string };
 
 type Props = {
@@ -628,14 +634,24 @@ export function AdminCreateSessionModal({
 						<div className="rounded-2xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.02)] p-3">
 							<div className="flex flex-wrap gap-2 mb-3">
 								{SCHEDULE_PRESETS.map((preset) => (
+									(() => {
+										const isActive = areSameWeekdaySet(scheduleDays, preset.days);
+										return (
 									<button
 										key={preset.label}
 										type="button"
 										onClick={() => applySchedulePreset(preset.days)}
-										className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[rgba(249,197,19,0.4)]"
+										className={cn(
+											'rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
+											isActive
+												? 'border-[rgba(96,165,250,0.75)] bg-[rgba(96,165,250,0.18)] text-[#bfdbfe]'
+												: 'border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[rgba(96,165,250,0.4)]'
+										)}
 									>
 										{preset.label}
 									</button>
+										);
+									})()
 								))}
 							</div>
 							<div className="flex flex-wrap gap-2.5">
