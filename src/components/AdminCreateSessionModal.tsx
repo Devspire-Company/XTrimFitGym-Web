@@ -19,6 +19,16 @@ const WEEKDAY_VALUES = [
 	'saturday',
 ] as const;
 type WeekdayValue = (typeof WEEKDAY_VALUES)[number];
+const WEEKDAY_OPTIONS: { label: string; value: WeekdayValue }[] = [
+	{ label: 'Monday', value: 'monday' },
+	{ label: 'Tuesday', value: 'tuesday' },
+	{ label: 'Wednesday', value: 'wednesday' },
+	{ label: 'Thursday', value: 'thursday' },
+	{ label: 'Friday', value: 'friday' },
+	{ label: 'Saturday', value: 'saturday' },
+	{ label: 'Sunday', value: 'sunday' },
+];
+type ScheduleType = 'one_day' | 'specific_days';
 const GYM_AREAS = [
 	{ label: 'Main Training Area', value: 'Main Training Area' },
 	{ label: 'Cardio Zone', value: 'Cardio Zone' },
@@ -198,6 +208,8 @@ export function AdminCreateSessionModal({
 	const [startTimeStr, setStartTimeStr] = useState('');
 	const [endTimeStr, setEndTimeStr] = useState('');
 	const [gymArea, setGymArea] = useState('');
+	const [scheduleType, setScheduleType] = useState<ScheduleType>('one_day');
+	const [scheduleDays, setScheduleDays] = useState<WeekdayValue[]>([]);
 	const [note, setNote] = useState('');
 	const [isGroupClass, setIsGroupClass] = useState(false);
 	const [maxParticipants, setMaxParticipants] = useState('20');
@@ -217,6 +229,8 @@ export function AdminCreateSessionModal({
 		setStartTimeStr('');
 		setEndTimeStr('');
 		setGymArea('');
+		setScheduleType('one_day');
+		setScheduleDays([]);
 		setNote('');
 		setIsGroupClass(false);
 		setMaxParticipants('20');
@@ -266,6 +280,24 @@ export function AdminCreateSessionModal({
 		);
 	};
 
+	const toggleScheduleDay = (day: WeekdayValue) => {
+		setScheduleDays((prev) => {
+			if (scheduleType === 'one_day') return [day];
+			return prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day];
+		});
+	};
+
+	useEffect(() => {
+		if (!date) return;
+		const dayFromDate = WEEKDAY_VALUES[date.getDay()];
+		setScheduleDays((prev) => {
+			if (scheduleType === 'one_day') {
+				return prev.length === 1 ? prev : [dayFromDate];
+			}
+			return prev;
+		});
+	}, [date, scheduleType]);
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setFormError('');
@@ -304,7 +336,15 @@ export function AdminCreateSessionModal({
 			setFormError('Gym area is required.');
 			return;
 		}
-		const scheduleDays: WeekdayValue[] = [WEEKDAY_VALUES[date.getDay()]];
+		let normalizedScheduleDays = scheduleDays;
+		if (scheduleType === 'one_day') {
+			const fallbackDay = WEEKDAY_VALUES[date.getDay()];
+			normalizedScheduleDays = [scheduleDays[0] ?? fallbackDay];
+		}
+		if (normalizedScheduleDays.length === 0) {
+			setFormError('Select schedule day(s).');
+			return;
+		}
 
 		if (isGroupClass) {
 			const mp = parseInt(maxParticipants, 10);
@@ -321,7 +361,7 @@ export function AdminCreateSessionModal({
 						startTime: startTimeString,
 						endTime: endTimeString,
 						gymArea,
-						scheduleDays,
+						scheduleDays: normalizedScheduleDays,
 						note: note.trim() || undefined,
 						sessionKind: SessionKind.GroupClass,
 						maxParticipants: mp,
@@ -348,7 +388,7 @@ export function AdminCreateSessionModal({
 					startTime: startTimeString,
 					endTime: endTimeString,
 					gymArea,
-					scheduleDays,
+					scheduleDays: normalizedScheduleDays,
 					note: note.trim() || undefined,
 					sessionKind: SessionKind.Personal,
 				} as any,
@@ -588,6 +628,65 @@ export function AdminCreateSessionModal({
 								</option>
 							))}
 						</select>
+					</div>
+
+					<div className="form-group">
+						<label>
+							Session schedule frequency <span className="required">*</span>
+						</label>
+						<div className="flex items-center gap-4 mb-3">
+							<label className="!inline-flex !items-center gap-2 cursor-pointer mb-0 select-none text-sm">
+								<input
+									type="radio"
+									name="admin-session-schedule-type"
+									checked={scheduleType === 'one_day'}
+									onChange={() => {
+										setScheduleType('one_day');
+										if (scheduleDays.length > 1) {
+											setScheduleDays([scheduleDays[0]]);
+										}
+									}}
+								/>
+								<span>One day only</span>
+							</label>
+							<label className="!inline-flex !items-center gap-2 cursor-pointer mb-0 select-none text-sm">
+								<input
+									type="radio"
+									name="admin-session-schedule-type"
+									checked={scheduleType === 'specific_days'}
+									onChange={() => setScheduleType('specific_days')}
+								/>
+								<span>Specific days</span>
+							</label>
+						</div>
+						<div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+							{WEEKDAY_OPTIONS.map((day) => {
+								const checked = scheduleDays.includes(day.value);
+								return (
+									<label
+										key={day.value}
+										className={cn(
+											'!flex !items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium cursor-pointer mb-0 transition-colors',
+											'border-[var(--card-border)] bg-[var(--card-bg)]',
+											checked && 'border-[var(--primary-yellow)] bg-[rgba(249,197,19,0.12)]'
+										)}
+									>
+										<input
+											type="checkbox"
+											checked={checked}
+											onChange={() => toggleScheduleDay(day.value)}
+											className="h-4 w-4"
+										/>
+										<span>{day.label}</span>
+									</label>
+								);
+							})}
+						</div>
+						<small className="block text-xs text-[var(--text-secondary)] mt-2">
+							{scheduleType === 'one_day'
+								? 'Pick one day only.'
+								: 'Pick one or more days for recurring sessions (e.g., M-W-F).'}
+						</small>
 					</div>
 
 					<div className="form-group">
