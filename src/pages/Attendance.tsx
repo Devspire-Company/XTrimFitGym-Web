@@ -129,48 +129,8 @@ function normalizePersonName(value: string | null | undefined): string {
 		.trim();
 }
 
-type AttendancePeriod = 'day' | 'week' | 'month';
-
-function getRangeForPeriod(
-	selectedYmd: string,
-	period: AttendancePeriod
-): { startDate: string; endDate: string; label: string } | null {
-	const baseDate = parseYmdToDate(selectedYmd);
-	if (!baseDate) return null;
-	const start = new Date(baseDate);
-	const end = new Date(baseDate);
-
-	if (period === 'week') {
-		const day = start.getDay();
-		const diffToMonday = (day + 6) % 7;
-		start.setDate(start.getDate() - diffToMonday);
-		end.setDate(start.getDate() + 6);
-	} else if (period === 'month') {
-		start.setDate(1);
-		end.setMonth(start.getMonth() + 1, 0);
-	}
-
-	const startDate = formatDateToYmd(start);
-	const endDate = formatDateToYmd(end);
-	const humanStart = start.toLocaleDateString('en-PH', {
-		timeZone: 'Asia/Manila',
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-	});
-	const humanEnd = end.toLocaleDateString('en-PH', {
-		timeZone: 'Asia/Manila',
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-	});
-	const label =
-		period === 'day'
-			? `Day: ${humanStart}`
-			: period === 'week'
-				? `Week: ${humanStart} - ${humanEnd}`
-				: `Month: ${humanStart} - ${humanEnd}`;
-	return { startDate, endDate, label };
+function getTodayYmdManila(): string {
+	return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 }
 
 function buildUserNameCandidates(
@@ -218,8 +178,8 @@ export function AttendancePage() {
 
 	const [searchTerm, setSearchTerm] = useState('');
 	const [roleFilter, setRoleFilter] = useState<'all' | 'coach' | 'client'>('all');
-	const [selectedDate, setSelectedDate] = useState<string>('');
-	const [periodFilter, setPeriodFilter] = useState<AttendancePeriod>('day');
+	const [rangeStartDate, setRangeStartDate] = useState<string>(() => getTodayYmdManila());
+	const [rangeEndDate, setRangeEndDate] = useState<string>(() => getTodayYmdManila());
 	const [currentPage, setCurrentPage] = useState(1);
 	const [subscriptionConnected, setSubscriptionConnected] = useState(false);
 	const [, setLastUpdateTime] = useState<Date | null>(null);
@@ -250,10 +210,30 @@ export function AttendancePage() {
 		}
 	};
 
-	const selectedRange = useMemo(
-		() => getRangeForPeriod(selectedDate, periodFilter),
-		[selectedDate, periodFilter]
-	);
+	const selectedRange = useMemo(() => {
+		if (!rangeStartDate && !rangeEndDate) return null;
+		const start = rangeStartDate || rangeEndDate;
+		const end = rangeEndDate || rangeStartDate;
+		if (!start || !end) return null;
+		const [effectiveStart, effectiveEnd] = start <= end ? [start, end] : [end, start];
+		const humanStart = parseYmdToDate(effectiveStart)?.toLocaleDateString('en-PH', {
+			timeZone: 'Asia/Manila',
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+		});
+		const humanEnd = parseYmdToDate(effectiveEnd)?.toLocaleDateString('en-PH', {
+			timeZone: 'Asia/Manila',
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+		});
+		return {
+			startDate: effectiveStart,
+			endDate: effectiveEnd,
+			label: `${humanStart || effectiveStart} - ${humanEnd || effectiveEnd}`,
+		};
+	}, [rangeStartDate, rangeEndDate]);
 
 	// Build filter object (date filter sent to API; API filters by authDateTime for correct results)
 	const filter = useMemo(() => {
@@ -268,7 +248,7 @@ export function AttendancePage() {
 	// Reset to page 1 when date filter changes so we don't request offset 50 for a single day
 	useEffect(() => {
 		setCurrentPage(1);
-	}, [selectedDate, periodFilter]);
+	}, [rangeStartDate, rangeEndDate]);
 
 	// Today's date (Asia/Manila) for the "Today's Records" stat - never affected by date filter; updates past midnight
 	const [todayStr, setTodayStr] = useState(() =>
@@ -597,7 +577,7 @@ export function AttendancePage() {
 		return rows;
 	}, [filteredRecords]);
 
-	const { coachRecords, clientRecords } = useMemo(() => {
+	const { coachRecords, clientRecords, otherRecords } = useMemo(() => {
 		const categorize = (row: { cardNo: string; personName: string }): 'coach' | 'client' | 'other' => {
 			const normalizedName = normalizePersonName(row.personName);
 			// Priority: coach match first so coach scans never fall into clients.
@@ -609,11 +589,14 @@ export function AttendancePage() {
 		};
 		const coach = [];
 		const client = [];
+		const other = [];
 		for (const row of summarizedRecords) {
-			if (categorize(row) === 'coach') coach.push(row);
-			else client.push(row);
+			const bucket = categorize(row);
+			if (bucket === 'coach') coach.push(row);
+			else if (bucket === 'client') client.push(row);
+			else other.push(row);
 		}
-		return { coachRecords: coach, clientRecords: client };
+		return { coachRecords: coach, clientRecords: client, otherRecords: other };
 	}, [summarizedRecords, coachAttendanceIds, memberAttendanceIds, coachNameCandidates, memberNameCandidates]);
 	const showCoachSection = roleFilter !== 'client';
 	const showClientSection = roleFilter !== 'coach';
@@ -673,7 +656,7 @@ export function AttendancePage() {
 				? coachRecords
 				: roleFilter === 'client'
 					? clientRecords
-					: summarizedRecords;
+					: [...coachRecords, ...clientRecords, ...otherRecords];
 		const exportRows: ExportRow[] = exportSourceRows.map((row) => ({
 			member: row.personName,
 			date: row.date,
@@ -761,7 +744,7 @@ export function AttendancePage() {
 				? coachRecords
 				: roleFilter === 'client'
 					? clientRecords
-					: summarizedRecords;
+					: [...coachRecords, ...clientRecords, ...otherRecords];
 		const exportRows: ExportRow[] = exportSourceRows.map((row) => ({
 			member: row.personName,
 			date: row.date,
@@ -899,48 +882,40 @@ export function AttendancePage() {
 						</select>
 					</div>
 
-					{/* Period + Date Filter */}
+					{/* Date Range Filter */}
 					<div className="flex items-center gap-2">
-						<div className="inline-flex items-center rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-1">
-							{(['day', 'week', 'month'] as AttendancePeriod[]).map((period) => (
-								<button
-									key={period}
-									type="button"
-									onClick={() => setPeriodFilter(period)}
-									className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
-										periodFilter === period
-											? 'bg-[rgba(249,197,19,0.2)] text-[var(--primary-yellow)]'
-											: 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-									}`}
-								>
-									{period}
-								</button>
-							))}
-						</div>
 						<DatePicker
-							date={parseYmdToDate(selectedDate)}
-							onDateChange={(date) => setSelectedDate(date ? formatDateToYmd(date) : '')}
-							placeholder={periodFilter === 'day' ? 'Select day' : periodFilter === 'week' ? 'Select week anchor date' : 'Select month anchor date'}
+							date={parseYmdToDate(rangeStartDate)}
+							onDateChange={(date) => setRangeStartDate(date ? formatDateToYmd(date) : '')}
+							placeholder="From date"
 							className="w-full"
 						/>
-						{selectedDate && (
-							<button
-								type="button"
-								onClick={() => setSelectedDate('')}
-								className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border border-[var(--border-color)] rounded-lg hover:text-[var(--text-primary)] hover:border-[var(--primary-yellow)] transition-colors"
-							>
-								Clear
-							</button>
-						)}
+						<DatePicker
+							date={parseYmdToDate(rangeEndDate)}
+							onDateChange={(date) => setRangeEndDate(date ? formatDateToYmd(date) : '')}
+							placeholder="To date"
+							className="w-full"
+						/>
+						<button
+							type="button"
+							onClick={() => {
+								const today = getTodayYmdManila();
+								setRangeStartDate(today);
+								setRangeEndDate(today);
+							}}
+							className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border border-[var(--border-color)] rounded-lg hover:text-[var(--text-primary)] hover:border-[var(--primary-yellow)] transition-colors"
+						>
+							Today
+						</button>
 					</div>
 				</div>
 				{selectedRange ? (
 					<div className="rounded-xl border border-[rgba(249,197,19,0.32)] bg-[rgba(249,197,19,0.08)] px-3 py-2 text-xs font-medium text-[var(--text-primary)]">
-						Applied period: <span className="text-[var(--primary-yellow)]">{selectedRange.label}</span>
+						Applied date range: <span className="text-[var(--primary-yellow)]">{selectedRange.label}</span>
 					</div>
 				) : (
 					<div className="rounded-xl border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs text-[var(--text-secondary)]">
-						Applied period: All records
+						Applied date range: All records
 					</div>
 				)}
 			</div>
