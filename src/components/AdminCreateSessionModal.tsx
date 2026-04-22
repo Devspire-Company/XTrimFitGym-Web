@@ -18,6 +18,7 @@ const WEEKDAY_OPTIONS = [
 	{ label: 'Sun', value: 'sunday' },
 ] as const;
 type WeekdayValue = (typeof WEEKDAY_OPTIONS)[number]['value'];
+type ScheduleMode = 'one_day' | 'repeat';
 const GYM_AREAS = [
 	{ label: 'Main Training Area', value: 'Main Training Area' },
 	{ label: 'Cardio Zone', value: 'Cardio Zone' },
@@ -80,15 +81,9 @@ export function AdminCreateSessionModal({
 	const [startTimeStr, setStartTimeStr] = useState('09:00');
 	const [endTimeStr, setEndTimeStr] = useState('');
 	const [gymArea, setGymArea] = useState('');
-	const [scheduleDays, setScheduleDays] = useState<WeekdayValue[]>([
-		'monday',
-		'tuesday',
-		'wednesday',
-		'thursday',
-		'friday',
-		'saturday',
-		'sunday',
-	]);
+	const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('one_day');
+	const [singleDay, setSingleDay] = useState<WeekdayValue>('monday');
+	const [repeatDays, setRepeatDays] = useState<WeekdayValue[]>(['monday', 'wednesday', 'friday']);
 	const [note, setNote] = useState('');
 	const [isGroupClass, setIsGroupClass] = useState(false);
 	const [maxParticipants, setMaxParticipants] = useState('20');
@@ -108,15 +103,9 @@ export function AdminCreateSessionModal({
 		setStartTimeStr('09:00');
 		setEndTimeStr('');
 		setGymArea('');
-		setScheduleDays([
-			'monday',
-			'tuesday',
-			'wednesday',
-			'thursday',
-			'friday',
-			'saturday',
-			'sunday',
-		]);
+		setScheduleMode('one_day');
+		setSingleDay('monday');
+		setRepeatDays(['monday', 'wednesday', 'friday']);
 		setNote('');
 		setIsGroupClass(false);
 		setMaxParticipants('20');
@@ -166,19 +155,9 @@ export function AdminCreateSessionModal({
 		);
 	};
 
-	const allDaysSelected = scheduleDays.length === WEEKDAY_OPTIONS.length;
-
-	const toggleScheduleDay = (day: WeekdayValue) => {
-		setScheduleDays((prev) =>
+	const toggleRepeatDay = (day: WeekdayValue) => {
+		setRepeatDays((prev) =>
 			prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-		);
-	};
-
-	const toggleDaily = () => {
-		setScheduleDays((prev) =>
-			prev.length === WEEKDAY_OPTIONS.length
-				? []
-				: WEEKDAY_OPTIONS.map((d) => d.value)
 		);
 	};
 
@@ -216,8 +195,9 @@ export function AdminCreateSessionModal({
 			setFormError('Gym area is required.');
 			return;
 		}
+		const scheduleDays = scheduleMode === 'one_day' ? [singleDay] : repeatDays;
 		if (scheduleDays.length === 0) {
-			setFormError('Select at least one schedule day, or enable Daily.');
+			setFormError('Select at least one day for the schedule.');
 			return;
 		}
 
@@ -524,17 +504,18 @@ export function AdminCreateSessionModal({
 						<label
 							className={cn(
 								'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
-								allDaysSelected
+								scheduleMode === 'one_day'
 									? 'bg-[rgba(249,197,19,0.12)]'
 									: 'hover:bg-[rgba(255,255,255,0.04)]'
 							)}
 							style={{ display: 'inline-flex', marginBottom: 6 }}
 						>
 							<input
-								type="checkbox"
-								checked={allDaysSelected}
+								type="radio"
+								name="schedule-mode"
+								checked={scheduleMode === 'one_day'}
 								className="peer sr-only"
-								onChange={toggleDaily}
+								onChange={() => setScheduleMode('one_day')}
 							/>
 							<span
 								className={cn(
@@ -546,45 +527,113 @@ export function AdminCreateSessionModal({
 							>
 								✓
 							</span>
-							<span className="font-medium">Daily</span>
+							<span className="font-medium">One day</span>
 						</label>
-						<div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-							{WEEKDAY_OPTIONS.map((day) => {
-								const checked = scheduleDays.includes(day.value);
-								return (
-									<label
-										key={day.value}
-										className={cn(
-											'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
-											checked
-												? 'bg-[rgba(249,197,19,0.12)]'
-												: 'hover:bg-[rgba(255,255,255,0.04)]'
-										)}
-										style={{ display: 'flex', marginBottom: 0 }}
-									>
-										<input
-											type="checkbox"
-											checked={checked}
-											className="peer sr-only"
-											onChange={() => toggleScheduleDay(day.value)}
-										/>
-										<span
+						<label
+							className={cn(
+								'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
+								scheduleMode === 'repeat'
+									? 'bg-[rgba(249,197,19,0.12)]'
+									: 'hover:bg-[rgba(255,255,255,0.04)]'
+							)}
+							style={{ display: 'inline-flex', marginBottom: 6, marginLeft: 8 }}
+						>
+							<input
+								type="radio"
+								name="schedule-mode"
+								checked={scheduleMode === 'repeat'}
+								className="peer sr-only"
+								onChange={() => setScheduleMode('repeat')}
+							/>
+							<span
+								className={cn(
+									'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+									'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
+									'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
+								)}
+								aria-hidden
+							>
+								✓
+							</span>
+							<span className="font-medium">Repeat</span>
+						</label>
+
+						{scheduleMode === 'one_day' ? (
+							<div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+								{WEEKDAY_OPTIONS.map((day) => {
+									const checked = singleDay === day.value;
+									return (
+										<label
+											key={day.value}
 											className={cn(
-												'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-												'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
-												'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
+												'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
+												checked
+													? 'bg-[rgba(249,197,19,0.12)]'
+													: 'hover:bg-[rgba(255,255,255,0.04)]'
 											)}
-											aria-hidden
+											style={{ display: 'flex', marginBottom: 0 }}
 										>
-											✓
-										</span>
-										<span>{day.label}</span>
-									</label>
-								);
-							})}
-						</div>
+											<input
+												type="radio"
+												name="single-day"
+												checked={checked}
+												className="peer sr-only"
+												onChange={() => setSingleDay(day.value)}
+											/>
+											<span
+												className={cn(
+													'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+													'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
+													'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
+												)}
+												aria-hidden
+											>
+												✓
+											</span>
+											<span>{day.label}</span>
+										</label>
+									);
+								})}
+							</div>
+						) : (
+							<div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+								{WEEKDAY_OPTIONS.map((day) => {
+									const checked = repeatDays.includes(day.value);
+									return (
+										<label
+											key={day.value}
+											className={cn(
+												'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
+												checked
+													? 'bg-[rgba(249,197,19,0.12)]'
+													: 'hover:bg-[rgba(255,255,255,0.04)]'
+											)}
+											style={{ display: 'flex', marginBottom: 0 }}
+										>
+											<input
+												type="checkbox"
+												checked={checked}
+												className="peer sr-only"
+												onChange={() => toggleRepeatDay(day.value)}
+											/>
+											<span
+												className={cn(
+													'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+													'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
+													'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
+												)}
+												aria-hidden
+											>
+												✓
+											</span>
+											<span>{day.label}</span>
+										</label>
+									);
+								})}
+							</div>
+						)}
 						<small className="block text-xs text-[var(--text-secondary)] mt-1">
-							Choose specific days, or use Daily to select all days.
+							One day = choose a single day; Repeat = choose multiple days.
 						</small>
 					</div>
 
