@@ -6,6 +6,7 @@ import {
 	User,
 	UserCog,
 	Fingerprint,
+	CalendarRange,
 } from 'lucide-react';
 import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -131,6 +132,20 @@ function normalizePersonName(value: string | null | undefined): string {
 
 function getTodayYmdManila(): string {
 	return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+}
+
+function getLastNDaysRangeYmd(days: number): { start: string; end: string } {
+	const end = new Date();
+	const start = new Date();
+	start.setDate(end.getDate() - (days - 1));
+	return { start: formatDateToYmd(start), end: formatDateToYmd(end) };
+}
+
+function getThisMonthRangeYmd(): { start: string; end: string } {
+	const today = new Date();
+	const start = new Date(today.getFullYear(), today.getMonth(), 1);
+	const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+	return { start: formatDateToYmd(start), end: formatDateToYmd(end) };
 }
 
 function buildUserNameCandidates(
@@ -606,6 +621,24 @@ export function AttendancePage() {
 
 	const totalPages = Math.ceil(totalCount / recordsPerPage);
 
+	const applyTodayRange = () => {
+		const today = getTodayYmdManila();
+		setRangeStartDate(today);
+		setRangeEndDate(today);
+	};
+
+	const applyLast7DaysRange = () => {
+		const { start, end } = getLastNDaysRangeYmd(7);
+		setRangeStartDate(start);
+		setRangeEndDate(end);
+	};
+
+	const applyThisMonthRange = () => {
+		const { start, end } = getThisMonthRangeYmd();
+		setRangeStartDate(start);
+		setRangeEndDate(end);
+	};
+
 	const handleExportPdf = async () => {
 		const now = new Date();
 		const doc = new jsPDF({ orientation: 'landscape' });
@@ -883,30 +916,70 @@ export function AttendancePage() {
 					</div>
 
 					{/* Date Range Filter */}
-					<div className="flex items-center gap-2">
-						<DatePicker
-							date={parseYmdToDate(rangeStartDate)}
-							onDateChange={(date) => setRangeStartDate(date ? formatDateToYmd(date) : '')}
-							placeholder="From date"
-							className="w-full"
-						/>
-						<DatePicker
-							date={parseYmdToDate(rangeEndDate)}
-							onDateChange={(date) => setRangeEndDate(date ? formatDateToYmd(date) : '')}
-							placeholder="To date"
-							className="w-full"
-						/>
-						<button
-							type="button"
-							onClick={() => {
-								const today = getTodayYmdManila();
-								setRangeStartDate(today);
-								setRangeEndDate(today);
-							}}
-							className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border border-[var(--border-color)] rounded-lg hover:text-[var(--text-primary)] hover:border-[var(--primary-yellow)] transition-colors"
-						>
-							Today
-						</button>
+					<div className="rounded-xl border border-[rgba(249,197,19,0.24)] bg-[linear-gradient(180deg,rgba(249,197,19,0.08),rgba(255,255,255,0.02))] p-3 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+						<div className="mb-2 flex items-center justify-between gap-2">
+							<div className="flex items-center gap-2">
+								<div className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[rgba(249,197,19,0.35)] bg-[rgba(249,197,19,0.12)]">
+									<CalendarRange className="h-3.5 w-3.5 text-[var(--primary-yellow)]" />
+								</div>
+								<div>
+									<p className="text-xs font-semibold text-[var(--text-primary)]">Date range</p>
+									<p className="text-[10px] text-[var(--text-secondary)]">
+										Choose inclusive range for screen + export
+									</p>
+								</div>
+							</div>
+						</div>
+						<div className="mb-2 flex flex-wrap items-center gap-2">
+							<button
+								type="button"
+								onClick={applyTodayRange}
+								className="rounded-lg border border-[rgba(249,197,19,0.3)] bg-[rgba(249,197,19,0.08)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-primary)] transition hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.16)] hover:text-[var(--primary-yellow)]"
+							>
+								Today
+							</button>
+							<button
+								type="button"
+								onClick={applyLast7DaysRange}
+								className="rounded-lg border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] transition hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)] hover:text-[var(--primary-yellow)]"
+							>
+								Last 7 days
+							</button>
+							<button
+								type="button"
+								onClick={applyThisMonthRange}
+								className="rounded-lg border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] transition hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)] hover:text-[var(--primary-yellow)]"
+							>
+								This month
+							</button>
+						</div>
+						<div className="grid grid-cols-1 gap-2 xl:grid-cols-[1fr_auto_1fr] xl:items-center">
+							<div>
+								<p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+									From
+								</p>
+								<DatePicker
+									date={parseYmdToDate(rangeStartDate)}
+									onDateChange={(date) => setRangeStartDate(date ? formatDateToYmd(date) : '')}
+									placeholder="From date"
+									className="w-full"
+								/>
+							</div>
+							<div className="hidden text-center text-xs font-semibold text-[var(--text-secondary)] xl:block">
+								To
+							</div>
+							<div>
+								<p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+									To
+								</p>
+								<DatePicker
+									date={parseYmdToDate(rangeEndDate)}
+									onDateChange={(date) => setRangeEndDate(date ? formatDateToYmd(date) : '')}
+									placeholder="To date"
+									className="w-full"
+								/>
+							</div>
+						</div>
 					</div>
 				</div>
 				{selectedRange ? (
