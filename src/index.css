@@ -1447,7 +1447,8 @@
 }
 
 .admin-session-modal {
-	height: min(90vh, 760px);
+	max-height: 90vh;
+	height: auto;
 }
 
 .admin-session-modal-header {
@@ -1457,20 +1458,20 @@
 .admin-session-modal-form {
 	display: flex;
 	flex-direction: column;
-	flex: 1;
 	min-height: 0;
 }
 
 .admin-session-modal-body {
-	flex: 1;
+	flex: 1 1 auto;
 	overflow-y: auto;
 	min-height: 0;
-	max-height: none;
+	max-height: calc(90vh - 220px);
 	padding-bottom: 1.25rem;
 }
 
 .admin-session-modal-footer {
 	flex-shrink: 0;
+	margin-top: auto;
 	border-top: 1px solid var(--card-border);
 	padding: 1rem;
 }
