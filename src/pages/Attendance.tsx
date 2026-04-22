@@ -129,6 +129,50 @@ function normalizePersonName(value: string | null | undefined): string {
 		.trim();
 }
 
+type AttendancePeriod = 'day' | 'week' | 'month';
+
+function getRangeForPeriod(
+	selectedYmd: string,
+	period: AttendancePeriod
+): { startDate: string; endDate: string; label: string } | null {
+	const baseDate = parseYmdToDate(selectedYmd);
+	if (!baseDate) return null;
+	const start = new Date(baseDate);
+	const end = new Date(baseDate);
+
+	if (period === 'week') {
+		const day = start.getDay();
+		const diffToMonday = (day + 6) % 7;
+		start.setDate(start.getDate() - diffToMonday);
+		end.setDate(start.getDate() + 6);
+	} else if (period === 'month') {
+		start.setDate(1);
+		end.setMonth(start.getMonth() + 1, 0);
+	}
+
+	const startDate = formatDateToYmd(start);
+	const endDate = formatDateToYmd(end);
+	const humanStart = start.toLocaleDateString('en-PH', {
+		timeZone: 'Asia/Manila',
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+	});
+	const humanEnd = end.toLocaleDateString('en-PH', {
+		timeZone: 'Asia/Manila',
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+	});
+	const label =
+		period === 'day'
+			? `Day: ${humanStart}`
+			: period === 'week'
+				? `Week: ${humanStart} - ${humanEnd}`
+				: `Month: ${humanStart} - ${humanEnd}`;
+	return { startDate, endDate, label };
+}
+
 function buildUserNameCandidates(
 	user: { firstName?: string | null; middleName?: string | null; lastName?: string | null } | null | undefined
 ): string[] {
@@ -174,7 +218,8 @@ export function AttendancePage() {
 
 	const [searchTerm, setSearchTerm] = useState('');
 	const [roleFilter, setRoleFilter] = useState<'all' | 'coach' | 'client'>('all');
-	const [dateFilter, setDateFilter] = useState<string>('');
+	const [selectedDate, setSelectedDate] = useState<string>('');
+	const [periodFilter, setPeriodFilter] = useState<AttendancePeriod>('day');
 	const [currentPage, setCurrentPage] = useState(1);
 	const [subscriptionConnected, setSubscriptionConnected] = useState(false);
 	const [, setLastUpdateTime] = useState<Date | null>(null);
@@ -205,20 +250,25 @@ export function AttendancePage() {
 		}
 	};
 
+	const selectedRange = useMemo(
+		() => getRangeForPeriod(selectedDate, periodFilter),
+		[selectedDate, periodFilter]
+	);
+
 	// Build filter object (date filter sent to API; API filters by authDateTime for correct results)
 	const filter = useMemo(() => {
 		const f: Record<string, string> = {};
-		if (dateFilter) {
-			f.startDate = dateFilter;
-			f.endDate = dateFilter;
+		if (selectedRange) {
+			f.startDate = selectedRange.startDate;
+			f.endDate = selectedRange.endDate;
 		}
 		return Object.keys(f).length > 0 ? f : undefined;
-	}, [dateFilter]);
+	}, [selectedRange]);
 
 	// Reset to page 1 when date filter changes so we don't request offset 50 for a single day
 	useEffect(() => {
 		setCurrentPage(1);
-	}, [dateFilter]);
+	}, [selectedDate, periodFilter]);
 
 	// Today's date (Asia/Manila) for the "Today's Records" stat - never affected by date filter; updates past midnight
 	const [todayStr, setTodayStr] = useState(() =>
@@ -297,7 +347,7 @@ export function AttendancePage() {
 		if (!data?.getAttendanceRecords) return;
 		const fromQuery = data.getAttendanceRecords.records;
 		const queryTotal = data.getAttendanceRecords.totalCount;
-		if (dateFilter) {
+		if (selectedRange) {
 			// Date filter is active: show only what the API returned for that date (no merge)
 			setRecords(fromQuery);
 		} else {
@@ -311,7 +361,7 @@ export function AttendancePage() {
 			});
 		}
 		setTotalCount(queryTotal);
-	}, [data, dateFilter]);
+	}, [data, selectedRange]);
 
 	// Real-time subscription for new records
 	const { error: subscriptionError, loading: subscriptionLoading } = useSubscription(
@@ -653,10 +703,15 @@ export function AttendancePage() {
 			14,
 			40
 		);
-		doc.text(`Exported by: ${exportedByLabel}`, 14, 46);
+		doc.text(
+			`Period: ${selectedRange?.label ?? 'All records'} | Search: ${searchTerm || 'none'}`,
+			14,
+			46
+		);
+		doc.text(`Exported by: ${exportedByLabel}`, 14, 52);
 
 		autoTable(doc, {
-			startY: 52,
+			startY: 58,
 			head: [['Member', 'Date', 'Time In', 'Time Out', 'Log Type']],
 			body: exportRows.map((r) => [
 				r.member,
@@ -678,9 +733,12 @@ export function AttendancePage() {
 					input: {
 						reportType: ReportType.Attendance,
 						fileName: filename,
-						filterSummary: `date=${dateFilter || 'all'}; role=${roleFilter}; search=${searchTerm || 'none'}`,
-						dateRange: dateFilter
-							? { startDate: `${dateFilter}T00:00:00.000Z`, endDate: `${dateFilter}T23:59:59.999Z` }
+						filterSummary: `period=${selectedRange?.label || 'all'}; role=${roleFilter}; search=${searchTerm || 'none'}`,
+						dateRange: selectedRange
+							? {
+									startDate: `${selectedRange.startDate}T00:00:00.000Z`,
+									endDate: `${selectedRange.endDate}T23:59:59.999Z`,
+								}
 							: undefined,
 					},
 				},
@@ -722,9 +780,12 @@ export function AttendancePage() {
 				input: {
 					reportType: ReportType.Attendance,
 					fileName,
-					filterSummary: `date=${dateFilter || 'all'}; role=${roleFilter}; search=${searchTerm || 'none'};format=csv`,
-					dateRange: dateFilter
-						? { startDate: `${dateFilter}T00:00:00.000Z`, endDate: `${dateFilter}T23:59:59.999Z` }
+					filterSummary: `period=${selectedRange?.label || 'all'}; role=${roleFilter}; search=${searchTerm || 'none'};format=csv`,
+					dateRange: selectedRange
+						? {
+								startDate: `${selectedRange.startDate}T00:00:00.000Z`,
+								endDate: `${selectedRange.endDate}T23:59:59.999Z`,
+							}
 						: undefined,
 				},
 			},
@@ -838,18 +899,34 @@ export function AttendancePage() {
 						</select>
 					</div>
 
-					{/* Date Filter */}
+					{/* Period + Date Filter */}
 					<div className="flex items-center gap-2">
+						<div className="inline-flex items-center rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-1">
+							{(['day', 'week', 'month'] as AttendancePeriod[]).map((period) => (
+								<button
+									key={period}
+									type="button"
+									onClick={() => setPeriodFilter(period)}
+									className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+										periodFilter === period
+											? 'bg-[rgba(249,197,19,0.2)] text-[var(--primary-yellow)]'
+											: 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+									}`}
+								>
+									{period}
+								</button>
+							))}
+						</div>
 						<DatePicker
-							date={parseYmdToDate(dateFilter)}
-							onDateChange={(date) => setDateFilter(date ? formatDateToYmd(date) : '')}
-							placeholder="Select date"
+							date={parseYmdToDate(selectedDate)}
+							onDateChange={(date) => setSelectedDate(date ? formatDateToYmd(date) : '')}
+							placeholder={periodFilter === 'day' ? 'Select day' : periodFilter === 'week' ? 'Select week anchor date' : 'Select month anchor date'}
 							className="w-full"
 						/>
-						{dateFilter && (
+						{selectedDate && (
 							<button
 								type="button"
-								onClick={() => setDateFilter('')}
+								onClick={() => setSelectedDate('')}
 								className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border border-[var(--border-color)] rounded-lg hover:text-[var(--text-primary)] hover:border-[var(--primary-yellow)] transition-colors"
 							>
 								Clear
@@ -857,6 +934,15 @@ export function AttendancePage() {
 						)}
 					</div>
 				</div>
+				{selectedRange ? (
+					<div className="rounded-xl border border-[rgba(249,197,19,0.32)] bg-[rgba(249,197,19,0.08)] px-3 py-2 text-xs font-medium text-[var(--text-primary)]">
+						Applied period: <span className="text-[var(--primary-yellow)]">{selectedRange.label}</span>
+					</div>
+				) : (
+					<div className="rounded-xl border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+						Applied period: All records
+					</div>
+				)}
 			</div>
 
 			{/* Records: coaches vs clients (same filters; split by linked attendance ID) */}
