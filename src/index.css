@@ -1457,9 +1457,9 @@
 
 .admin-session-modal .admin-session-modal-form {
 	display: flex;
-	flex: 1 1 auto;
 	flex-direction: column;
 	min-height: 0;
+	max-height: calc(90vh - 92px);
 	overflow: hidden;
 }
 
@@ -1468,7 +1468,7 @@
 	overflow-y: auto;
 	min-height: 0;
 	max-height: none;
-	padding-bottom: 1.25rem;
+	padding-bottom: 1.5rem;
 }
 
 .admin-session-modal .admin-session-modal-footer {
