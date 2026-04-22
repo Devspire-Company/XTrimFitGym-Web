@@ -14,6 +14,12 @@ export type Scalars = {
   Float: { input: number; output: number; }
 };
 
+export type AdjustEquipmentStockInput = {
+  change: Scalars['Int']['input'];
+  id: Scalars['ID']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type Analytics = {
   __typename?: 'Analytics';
   activeSubscriptions: Scalars['Int']['output'];
@@ -170,8 +176,10 @@ export type CreateEquipmentInput = {
   acquiredAt?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl: Scalars['String']['input'];
+  maintenanceStartedAt?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
+  quantity?: InputMaybe<Scalars['Int']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<EquipmentStatus>;
 };
@@ -328,8 +336,10 @@ export type Equipment = {
   imageUrl: Scalars['String']['output'];
   isArchived: Scalars['Boolean']['output'];
   lifecycleLogs: Array<EquipmentLifecycleLog>;
+  maintenanceStartedAt?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
+  quantity: Scalars['Int']['output'];
   sortOrder: Scalars['Int']['output'];
   status: EquipmentStatus;
   updatedAt?: Maybe<Scalars['String']['output']>;
@@ -474,6 +484,7 @@ export type MembershipTransaction = {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  adjustEquipmentStock: Equipment;
   approveSubscriptionRequest: MembershipTransaction;
   archiveEquipment: Equipment;
   assignCoachToGoal: Goal;
@@ -533,6 +544,11 @@ export type Mutation = {
   updateWalkInClient: WalkInClient;
   updateWalkInPaymentSettings: WalkInPaymentSettings;
   walkInTimeIn: WalkInAttendanceLog;
+};
+
+
+export type MutationAdjustEquipmentStockArgs = {
+  input: AdjustEquipmentStockInput;
 };
 
 
@@ -1372,8 +1388,10 @@ export type UpdateEquipmentInput = {
   acquiredAt?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
+  maintenanceStartedAt?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
+  quantity?: InputMaybe<Scalars['Int']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<EquipmentStatus>;
 };
@@ -1589,7 +1607,7 @@ export type GetEquipmentsQueryVariables = Exact<{
 }>;
 
 
-export type GetEquipmentsQuery = { __typename?: 'Query', getEquipments: Array<{ __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> }> };
+export type GetEquipmentsQuery = { __typename?: 'Query', getEquipments: Array<{ __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, quantity: number, maintenanceStartedAt?: string | null, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> }> };
 
 export type GetEquipmentsLegacyQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1601,21 +1619,21 @@ export type GetEquipmentQueryVariables = Exact<{
 }>;
 
 
-export type GetEquipmentQuery = { __typename?: 'Query', getEquipment?: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> } | null };
+export type GetEquipmentQuery = { __typename?: 'Query', getEquipment?: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, quantity: number, maintenanceStartedAt?: string | null, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> } | null };
 
 export type CreateEquipmentMutationVariables = Exact<{
   input: CreateEquipmentInput;
 }>;
 
 
-export type CreateEquipmentMutation = { __typename?: 'Mutation', createEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> } };
+export type CreateEquipmentMutation = { __typename?: 'Mutation', createEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, acquiredAt?: string | null, sortOrder: number, status: EquipmentStatus, quantity: number, maintenanceStartedAt?: string | null, isArchived: boolean, archivedAt?: string | null, archiveReason?: string | null, createdAt?: string | null, updatedAt?: string | null, lifecycleLogs: Array<{ __typename?: 'EquipmentLifecycleLog', action: string, notes?: string | null, status?: EquipmentStatus | null, changedAt: string, changedById?: string | null }> } };
 
 export type CreateEquipmentLegacyMutationVariables = Exact<{
   input: CreateEquipmentInput;
 }>;
 
 
-export type CreateEquipmentLegacyMutation = { __typename?: 'Mutation', createEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } };
+export type CreateEquipmentLegacyMutation = { __typename?: 'Mutation', createEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, quantity: number, maintenanceStartedAt?: string | null, createdAt?: string | null, updatedAt?: string | null } };
 
 export type UpdateEquipmentMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1631,7 +1649,14 @@ export type UpdateEquipmentLegacyMutationVariables = Exact<{
 }>;
 
 
-export type UpdateEquipmentLegacyMutation = { __typename?: 'Mutation', updateEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, createdAt?: string | null, updatedAt?: string | null } };
+export type UpdateEquipmentLegacyMutation = { __typename?: 'Mutation', updateEquipment: { __typename?: 'Equipment', id: string, name: string, imageUrl: string, description?: string | null, notes?: string | null, sortOrder: number, status: EquipmentStatus, quantity: number, maintenanceStartedAt?: string | null, createdAt?: string | null, updatedAt?: string | null } };
+
+export type AdjustEquipmentStockMutationVariables = Exact<{
+  input: AdjustEquipmentStockInput;
+}>;
+
+
+export type AdjustEquipmentStockMutation = { __typename?: 'Mutation', adjustEquipmentStock: { __typename?: 'Equipment', id: string, quantity: number, status: EquipmentStatus, maintenanceStartedAt?: string | null, updatedAt?: string | null } };
 
 export type ArchiveEquipmentMutationVariables = Exact<{
   id: Scalars['ID']['input'];

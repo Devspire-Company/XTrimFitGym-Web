@@ -13,6 +13,7 @@ import {
 	UPDATE_EQUIPMENT_LEGACY,
 	ARCHIVE_EQUIPMENT,
 	UNARCHIVE_EQUIPMENT,
+	ADJUST_EQUIPMENT_STOCK,
 	LOG_REPORT_DOWNLOAD,
 } from '@/graphql/operations/index';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -29,6 +30,7 @@ import {
 } from '@/lib/equipmentActionLogs';
 
 const LEGACY_ARCHIVE_PREFIX = '__ARCHIVED__|';
+const normalizeEquipmentName = (raw: string) => raw.trim().toLowerCase();
 
 function parseLegacyArchiveMeta(rawNotes: string | null | undefined) {
 	if (!rawNotes) {
@@ -155,6 +157,10 @@ function statusLabel(s: EquipmentStatus): string {
 		default:
 			return 'Available';
 	}
+}
+
+function availabilityLabel(quantity: number): string {
+	return quantity > 0 ? 'In stock' : 'Out of stock';
 }
 
 function statusBadgeClass(s: EquipmentStatus): string {
@@ -608,6 +614,12 @@ export function EquipmentPage() {
 			dispatch(addToast({ type: 'error', message: e.message }));
 		},
 	});
+	const [adjustEquipmentStock, { loading: adjustingStock }] = useMutation(ADJUST_EQUIPMENT_STOCK, {
+		onCompleted: () => {
+			refreshEquipmentList().catch(() => {});
+		},
+		onError: (e) => dispatch(addToast({ type: 'error', message: e.message })),
+	});
 	const [logReportDownload] = useMutation(LOG_REPORT_DOWNLOAD);
 
 	const handleCreate = () => {
@@ -658,6 +670,21 @@ export function EquipmentPage() {
 	};
 
 	const handleFormSubmit = async (formData: EquipmentFormData) => {
+		const normalizedIncomingName = normalizeEquipmentName(formData.name);
+		const conflictingEquipment = normalizedList.find((item) => {
+			if (isEdit && selected?.id === item.id) return false;
+			return normalizeEquipmentName(String(item.name || '')) === normalizedIncomingName;
+		});
+		if (conflictingEquipment?.isArchived) {
+			dispatch(
+				addToast({
+					type: 'error',
+					message:
+						'This equipment name already exists in archived items. Restore it instead of creating a duplicate.',
+				})
+			);
+			return;
+		}
 		let imageUrl = formData.imageUrl;
 		if (formData.imageFile) {
 			setUploading(true);
@@ -691,6 +718,8 @@ export function EquipmentPage() {
 						notes: formData.notes || undefined,
 						acquiredAt: formData.acquiredAt || undefined,
 						status: formData.status,
+						quantity: formData.quantity,
+						maintenanceStartedAt: formData.maintenanceStartedAt || undefined,
 					},
 				},
 			});
@@ -708,9 +737,38 @@ export function EquipmentPage() {
 						notes: formData.notes || undefined,
 						acquiredAt: formData.acquiredAt || undefined,
 						status: formData.status,
+						quantity: formData.quantity,
+						maintenanceStartedAt: formData.maintenanceStartedAt || undefined,
 					},
 				},
 			});
+		}
+	};
+
+	const handleAdjustStock = async (item: any, change: number) => {
+		if (!Number.isInteger(change) || change === 0) return;
+		if (change < 0 && Number(item.quantity ?? 0) <= 0) {
+			dispatch(addToast({ type: 'error', message: 'Quantity is already 0.' }));
+			return;
+		}
+		try {
+			await adjustEquipmentStock({
+				variables: {
+					input: {
+						id: item.id,
+						change,
+						reason: change > 0 ? 'Stock in (quick action)' : 'Stock out (quick action)',
+					},
+				},
+			});
+			dispatch(
+				addToast({
+					type: 'success',
+					message: `Stock ${change > 0 ? 'added' : 'deducted'} for ${item.name}.`,
+				})
+			);
+		} catch {
+			// handled by mutation onError
 		}
 	};
 
@@ -1096,6 +1154,18 @@ export function EquipmentPage() {
 									{statusLabel(item.status)}
 								</span>
 								</div>
+								<div className="mt-2 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+									<span>Qty: {Math.max(0, Number(item.quantity ?? 0))}</span>
+									<span
+										className={
+											Math.max(0, Number(item.quantity ?? 0)) > 0
+												? 'text-[#10B981]'
+												: 'text-[#EF4444]'
+										}
+									>
+										{availabilityLabel(Math.max(0, Number(item.quantity ?? 0)))}
+									</span>
+								</div>
 							</div>
 							{(item.description || item.notes) && (
 								<div className="mb-4 cursor-pointer space-y-2" onClick={() => handleView(item)}>
@@ -1123,7 +1193,9 @@ export function EquipmentPage() {
 								{item.status === EquipmentStatus.Undermaintenance ? (
 									<div>
 										Under maintenance since:{' '}
-										{formatDateManila(maintenanceSetAtByEquipmentId[item.id])}
+										{formatDateManila(
+											item.maintenanceStartedAt || maintenanceSetAtByEquipmentId[item.id]
+										)}
 									</div>
 								) : null}
 								{item.isArchived ? (
@@ -1154,7 +1226,32 @@ export function EquipmentPage() {
 										{restoring ? 'Restoring...' : 'Restore'}
 									</button>
 								) : (
-									<>
+									<div className="flex w-full flex-col gap-2">
+										<div className="flex gap-2">
+											<button
+												type="button"
+												onClick={(e) => {
+													e.stopPropagation();
+													void handleAdjustStock(item, -1);
+												}}
+												disabled={adjustingStock || Number(item.quantity ?? 0) <= 0}
+												className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.12)] text-xs font-semibold text-[#F87171] disabled:opacity-50"
+											>
+												Stock out (-1)
+											</button>
+											<button
+												type="button"
+												onClick={(e) => {
+													e.stopPropagation();
+													void handleAdjustStock(item, 1);
+												}}
+												disabled={adjustingStock}
+												className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.12)] text-xs font-semibold text-[#34D399] disabled:opacity-50"
+											>
+												Stock in (+1)
+											</button>
+										</div>
+										<div className="flex gap-3">
 										<button
 											type="button"
 											onClick={(e) => {
@@ -1175,7 +1272,8 @@ export function EquipmentPage() {
 										>
 											Archive
 										</button>
-									</>
+										</div>
+									</div>
 								)}
 							</div>
 						</div>

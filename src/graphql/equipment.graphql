@@ -8,6 +8,8 @@ query GetEquipments($includeArchived: Boolean) {
     acquiredAt
     sortOrder
     status
+    quantity
+    maintenanceStartedAt
     isArchived
     archivedAt
     archiveReason
@@ -47,6 +49,8 @@ query GetEquipment($id: ID!) {
     acquiredAt
     sortOrder
     status
+    quantity
+    maintenanceStartedAt
     isArchived
     archivedAt
     archiveReason
@@ -72,6 +76,8 @@ mutation CreateEquipment($input: CreateEquipmentInput!) {
     acquiredAt
     sortOrder
     status
+    quantity
+    maintenanceStartedAt
     isArchived
     archivedAt
     archiveReason
@@ -96,6 +102,8 @@ mutation CreateEquipmentLegacy($input: CreateEquipmentInput!) {
     notes
     sortOrder
     status
+    quantity
+    maintenanceStartedAt
     createdAt
     updatedAt
   }
@@ -135,7 +143,19 @@ mutation UpdateEquipmentLegacy($id: ID!, $input: UpdateEquipmentInput!) {
     notes
     sortOrder
     status
+    quantity
+    maintenanceStartedAt
     createdAt
+    updatedAt
+  }
+}
+
+mutation AdjustEquipmentStock($input: AdjustEquipmentStockInput!) {
+  adjustEquipmentStock(input: $input) {
+    id
+    quantity
+    status
+    maintenanceStartedAt
     updatedAt
   }
 }

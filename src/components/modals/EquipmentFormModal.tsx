@@ -8,6 +8,8 @@ export interface EquipmentFormData {
 	description: string;
 	notes: string;
 	acquiredAt: string;
+	quantity: number;
+	maintenanceStartedAt?: string;
 	imageUrl: string;
 	imageFile?: File | null;
 	status: EquipmentStatus;
@@ -31,6 +33,7 @@ export function EquipmentFormModal({
 	uploading = false,
 }: EquipmentFormModalProps) {
 	const [acquiredDate, setAcquiredDate] = useState<Date | undefined>(undefined);
+	const [maintenanceStartDate, setMaintenanceStartDate] = useState<Date | undefined>(undefined);
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -42,6 +45,16 @@ export function EquipmentFormModal({
 		setAcquiredDate(Number.isFinite(parsed.getTime()) ? parsed : undefined);
 	}, [isOpen, equipment?.acquiredAt]);
 
+	useEffect(() => {
+		if (!isOpen) return;
+		if (!equipment?.maintenanceStartedAt) {
+			setMaintenanceStartDate(undefined);
+			return;
+		}
+		const parsed = new Date(equipment.maintenanceStartedAt);
+		setMaintenanceStartDate(Number.isFinite(parsed.getTime()) ? parsed : undefined);
+	}, [isOpen, equipment?.maintenanceStartedAt]);
+
 	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const formData = new FormData(e.currentTarget);
@@ -51,15 +64,23 @@ export function EquipmentFormModal({
 		const acquiredAt = acquiredDate
 			? `${acquiredDate.getFullYear()}-${String(acquiredDate.getMonth() + 1).padStart(2, '0')}-${String(acquiredDate.getDate()).padStart(2, '0')}`
 			: '';
+		const maintenanceStartedAt = maintenanceStartDate
+			? `${maintenanceStartDate.getFullYear()}-${String(maintenanceStartDate.getMonth() + 1).padStart(2, '0')}-${String(maintenanceStartDate.getDate()).padStart(2, '0')}`
+			: '';
 		const imageUrl = (formData.get('imageUrl') as string)?.trim() || '';
 		const imageFile = formData.get('imageFile') as File | null;
 		const statusRaw = (formData.get('status') as string) || EquipmentStatus.Available;
+		const quantityRaw = String(formData.get('quantity') ?? '0').trim();
+		const quantity = Number.parseInt(quantityRaw, 10);
 		if (!name) return;
+		if (!Number.isFinite(quantity) || quantity < 0) return;
 		onSubmit({
 			name,
 			description,
 			notes,
 			acquiredAt,
+			quantity,
+			maintenanceStartedAt,
 			imageUrl,
 			imageFile: imageFile && imageFile.size > 0 ? imageFile : null,
 			status: statusRaw as EquipmentStatus,
@@ -117,11 +138,32 @@ export function EquipmentFormModal({
 								</select>
 							</div>
 							<div className="form-group">
+								<label htmlFor="quantity">Quantity *</label>
+								<input
+									id="quantity"
+									name="quantity"
+									type="number"
+									min={0}
+									step={1}
+									required
+									defaultValue={equipment?.quantity ?? 0}
+								/>
+							</div>
+							<div className="form-group">
 								<label htmlFor="acquiredAt">Acquired date</label>
 								<DatePicker
 									date={acquiredDate}
 									onDateChange={setAcquiredDate}
 									placeholder="Select acquired date"
+									className="w-full"
+								/>
+							</div>
+							<div className="form-group">
+								<label htmlFor="maintenanceStartedAt">Maintenance started at</label>
+								<DatePicker
+									date={maintenanceStartDate}
+									onDateChange={setMaintenanceStartDate}
+									placeholder="Select maintenance start date"
 									className="w-full"
 								/>
 							</div>

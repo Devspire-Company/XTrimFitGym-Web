@@ -41,6 +41,7 @@ export {
 	DeleteEquipmentDocument as DELETE_EQUIPMENT,
 	ArchiveEquipmentDocument as ARCHIVE_EQUIPMENT,
 	UnarchiveEquipmentDocument as UNARCHIVE_EQUIPMENT,
+	AdjustEquipmentStockDocument as ADJUST_EQUIPMENT_STOCK,
 	PurchaseMembershipDocument as PURCHASE_MEMBERSHIP,
 	CancelMembershipDocument as CANCEL_MEMBERSHIP,
 	DirectSubscribeMemberDocument as DIRECT_SUBSCRIBE_MEMBER,

@@ -8,8 +8,10 @@ type EquipmentLike = {
 	description?: string | null;
 	notes?: string | null;
 	status: EquipmentStatus;
+	quantity?: number | null;
 	createdAt?: string | null;
 	acquiredAt?: string | null;
+	maintenanceStartedAt?: string | null;
 	isArchived?: boolean | null;
 	archivedAt?: string | null;
 	archiveReason?: string | null;
@@ -104,10 +106,14 @@ export function EquipmentViewModal({
 									Timeline
 								</p>
 								<div className="space-y-1.5 text-sm text-[var(--text-primary)]">
+									<p>Quantity remaining: {Math.max(0, Number(equipment.quantity ?? 0))}</p>
 									<p>Added: {formatDate(equipment.createdAt)}</p>
 									<p>Acquired: {formatDate(equipment.acquiredAt)}</p>
 									{equipment.status === EquipmentStatus.Undermaintenance ? (
-										<p>Under maintenance since: {formatDate(maintenanceSince)}</p>
+										<p>
+											Under maintenance since:{' '}
+											{formatDate(maintenanceSince ?? equipment.maintenanceStartedAt)}
+										</p>
 									) : null}
 									{equipment.isArchived ? (
 										<>
