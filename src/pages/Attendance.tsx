@@ -887,27 +887,27 @@ export function AttendancePage() {
 
 			{/* Filters */}
 			<div className="bg-[var(--bg-secondary)] rounded-lg p-4 space-y-4">
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 					{/* Search */}
-					<div className="w-full flex items-center gap-2 px-4 py-[0.9rem] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-[12px] text-[var(--text-primary)] text-sm transition-all duration-300 focus-within:border-[var(--primary-yellow)] focus-within:ring-2 focus-within:ring-[rgba(249,197,19,0.1)]">
+					<div className="w-full flex items-center gap-2 px-3 py-2.5 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-[12px] text-[var(--text-primary)] text-sm transition-all duration-300 focus-within:border-[var(--primary-yellow)] focus-within:ring-2 focus-within:ring-[rgba(249,197,19,0.1)]">
 						<Search className="w-4 h-4 text-[var(--text-secondary)] shrink-0" />
 						<input
 							type="text"
 							placeholder="Search by name..."
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
-							className="w-full bg-transparent border-0 p-0 text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
+							className="w-full bg-transparent border-0 p-0 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
 						/>
 					</div>
 
 					{/* Role Filter */}
-					<div className="w-full flex items-center gap-2 px-4 py-[0.9rem] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-[12px] text-[var(--text-primary)] text-sm transition-all duration-300 focus-within:border-[var(--primary-yellow)] focus-within:ring-2 focus-within:ring-[rgba(249,197,19,0.1)]">
+					<div className="w-full flex items-center gap-2 px-3 py-2.5 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-[12px] text-[var(--text-primary)] text-sm transition-all duration-300 focus-within:border-[var(--primary-yellow)] focus-within:ring-2 focus-within:ring-[rgba(249,197,19,0.1)]">
 						<Filter className="w-4 h-4 text-[var(--text-secondary)] shrink-0" />
 						<select
 							value={roleFilter}
 							onChange={(e) => setRoleFilter(e.target.value as 'all' | 'coach' | 'client')}
 							aria-label="Filter attendance by role"
-							className="w-full bg-transparent border-0 p-0 text-[var(--text-primary)] focus:outline-none"
+							className="w-full bg-transparent border-0 p-0 text-sm text-[var(--text-primary)] focus:outline-none"
 						>
 							<option value="all">All Roles</option>
 							<option value="coach">Coaches</option>
@@ -953,7 +953,7 @@ export function AttendancePage() {
 								This month
 							</button>
 						</div>
-						<div className="grid grid-cols-1 gap-2 xl:grid-cols-[1fr_auto_1fr] xl:items-center">
+						<div className="grid grid-cols-1 gap-2 xl:grid-cols-[1fr_1fr] xl:items-end">
 							<div>
 								<p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
 									From
@@ -964,9 +964,6 @@ export function AttendancePage() {
 									placeholder="From date"
 									className="w-full"
 								/>
-							</div>
-							<div className="hidden text-center text-xs font-semibold text-[var(--text-secondary)] xl:block">
-								To
 							</div>
 							<div>
 								<p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
