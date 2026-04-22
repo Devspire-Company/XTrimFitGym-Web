@@ -257,6 +257,11 @@ export function MembershipsPage() {
 			year: 'numeric',
 		})}`;
 	};
+	const getCardStatusEffectiveLabel = (plan: Membership) => {
+		const effectiveIso = (plan as Membership & { statusEffectiveAt?: string | null }).statusEffectiveAt;
+		if (plan.status === 'ACTIVE') return null;
+		return formatStatusEffectiveDate(effectiveIso);
+	};
 	const durationMap: Record<string, string> = {
 		MONTHLY: 'month',
 		QUARTERLY: 'quarter',
@@ -434,9 +439,11 @@ export function MembershipsPage() {
 								>
 									{statusMap[plan.status] || plan.status}
 								</span>
-								<p className="mt-2 text-[11px] font-medium text-[var(--text-secondary)]">
-									{formatStatusEffectiveDate((plan as Membership & { statusEffectiveAt?: string | null }).statusEffectiveAt)}
-								</p>
+								{getCardStatusEffectiveLabel(plan) ? (
+									<p className="mt-2 text-[11px] font-medium text-[var(--text-secondary)]">
+										{getCardStatusEffectiveLabel(plan)}
+									</p>
+								) : null}
 							</div>
 							<div className="plan-price flex items-baseline gap-2 mb-4">
 								<span className="plan-price-value text-[2.5rem] font-bold text-[var(--primary-yellow)] font-['Inter',ui-sans-serif,system-ui,sans-serif]">
