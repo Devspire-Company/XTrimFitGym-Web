@@ -293,7 +293,7 @@ export function EquipmentPage() {
 	const [statusFilter, setStatusFilter] = useState<'ALL' | EquipmentStatus>('ALL');
 	const [searchTerm, setSearchTerm] = useState('');
 	const [useLegacyApi, setUseLegacyApi] = useState(
-		import.meta.env.VITE_ENABLE_MODERN_ARCHIVE_API !== 'true'
+		import.meta.env.VITE_ENABLE_MODERN_ARCHIVE_API === 'false'
 	);
 	const [archiveReasonOption, setArchiveReasonOption] = useState<(typeof ARCHIVE_REASON_OPTIONS)[number]>(
 		'Damaged beyond repair'
