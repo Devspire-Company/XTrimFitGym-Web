@@ -1,12 +1,13 @@
-import { useMemo, useEffect, useRef, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
-import { X, Calendar as CalendarIcon, Clock3 } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Clock3, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CREATE_SESSION, GET_USERS } from '@/graphql/operations/index';
 import type { GetUsersQuery } from '@/graphql/generated/graphql';
 import { RoleType, SessionKind, TransactionStatus } from '@/graphql/generated/graphql';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const WEEKDAY_VALUES = [
 	'sunday',
@@ -47,6 +48,123 @@ function parseTimeInputToDate(timeVal: string): Date | undefined {
 	return new Date(2000, 0, 1, h, m, 0, 0);
 }
 
+type Meridiem = 'am' | 'pm';
+
+function parse24HourTime(timeVal: string): { hour12: number; minute: number; meridiem: Meridiem } {
+	const [rawH, rawM] = timeVal.split(':').map((x) => parseInt(x, 10));
+	const hour = Number.isNaN(rawH) ? 9 : rawH;
+	const minute = Number.isNaN(rawM) ? 0 : rawM;
+	const meridiem: Meridiem = hour >= 12 ? 'pm' : 'am';
+	const hour12 = hour % 12 || 12;
+	return { hour12, minute, meridiem };
+}
+
+function to24HourString(hour12: number, minute: number, meridiem: Meridiem): string {
+	const base = hour12 % 12;
+	const hour24 = meridiem === 'pm' ? base + 12 : base;
+	return `${hour24.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+}
+
+function formatDisplayTime(timeVal: string): string {
+	const parsed = parseTimeInputToDate(timeVal);
+	if (!parsed) return '--:-- --';
+	return formatTimeToString(parsed).toLowerCase();
+}
+
+type CustomTimePickerProps = {
+	id: string;
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	required?: boolean;
+	min?: string;
+};
+
+function CustomTimePicker({ id, label, value, onChange, required, min }: CustomTimePickerProps) {
+	const [open, setOpen] = useState(false);
+	const parsed = parse24HourTime(value || '09:00');
+	const hours = Array.from({ length: 12 }, (_, i) => i + 1);
+	const minutes = Array.from({ length: 60 }, (_, i) => i);
+	const minTime = min && min.trim() ? min : null;
+
+	const apply = (hour12: number, minute: number, meridiem: Meridiem) => {
+		const next = to24HourString(hour12, minute, meridiem);
+		if (minTime && next <= minTime) {
+			onChange(minTime);
+			return;
+		}
+		onChange(next);
+	};
+
+	return (
+		<div className="form-group">
+			<label htmlFor={id}>
+				{label} {required ? <span className="required">*</span> : null}
+			</label>
+			<Popover open={open} onOpenChange={setOpen} modal={true}>
+				<PopoverTrigger asChild>
+					<button
+						id={id}
+						type="button"
+						className="w-full flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)]"
+					>
+						<Clock3 className="h-4 w-4 text-[var(--text-secondary)]" />
+						<span className={cn('flex-1 text-left', value ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]')}>
+							{value ? formatDisplayTime(value) : '--:-- --'}
+						</span>
+						<ChevronDown className="h-4 w-4 text-[var(--text-secondary)]" />
+					</button>
+				</PopoverTrigger>
+				<PopoverContent className="w-[260px] p-3" align="start" style={{ zIndex: 9999 }}>
+					<div className="grid grid-cols-3 gap-2">
+						<select
+							aria-label={`${label} hour`}
+							title={`${label} hour`}
+							value={parsed.hour12}
+							onChange={(e) => apply(parseInt(e.target.value, 10), parsed.minute, parsed.meridiem)}
+							className="rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2 py-2 text-sm"
+						>
+							{hours.map((h) => (
+								<option key={h} value={h}>
+									{h.toString().padStart(2, '0')}
+								</option>
+							))}
+						</select>
+						<select
+							aria-label={`${label} minute`}
+							title={`${label} minute`}
+							value={parsed.minute}
+							onChange={(e) => apply(parsed.hour12, parseInt(e.target.value, 10), parsed.meridiem)}
+							className="rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2 py-2 text-sm"
+						>
+							{minutes.map((m) => (
+								<option key={m} value={m}>
+									{m.toString().padStart(2, '0')}
+								</option>
+							))}
+						</select>
+						<select
+							aria-label={`${label} meridiem`}
+							title={`${label} meridiem`}
+							value={parsed.meridiem}
+							onChange={(e) => apply(parsed.hour12, parsed.minute, e.target.value as Meridiem)}
+							className="rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2 py-2 text-sm"
+						>
+							<option value="am">AM</option>
+							<option value="pm">PM</option>
+						</select>
+					</div>
+					<div className="mt-2 flex justify-end">
+						<Button type="button" size="sm" onClick={() => setOpen(false)}>
+							Done
+						</Button>
+					</div>
+				</PopoverContent>
+			</Popover>
+		</div>
+	);
+}
+
 function memberHasActiveSubscription(
 	u: NonNullable<NonNullable<GetUsersQuery['getUsers']>[number]>
 ): boolean {
@@ -84,8 +202,6 @@ export function AdminCreateSessionModal({
 	const [isGroupClass, setIsGroupClass] = useState(false);
 	const [maxParticipants, setMaxParticipants] = useState('20');
 	const [formError, setFormError] = useState('');
-	const startTimeInputRef = useRef<HTMLInputElement | null>(null);
-	const endTimeInputRef = useRef<HTMLInputElement | null>(null);
 
 	const { data: membersData } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Member, includeDisabled: false },
@@ -148,17 +264,6 @@ export function AdminCreateSessionModal({
 		setSelectedMemberIds((prev) =>
 			prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
 		);
-	};
-
-	const openTimePicker = (inputRef: React.RefObject<HTMLInputElement | null>) => {
-		const el = inputRef.current;
-		if (!el) return;
-		try {
-			(el as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
-		} catch {
-			// Some browsers block showPicker outside trusted gesture.
-		}
-		el.focus();
 	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
@@ -449,55 +554,20 @@ export function AdminCreateSessionModal({
 					</div>
 
 					<div className="form-grid">
-						<div className="form-group">
-							<label htmlFor="admin-session-start">
-								Start time <span className="required">*</span>
-							</label>
-							<div className="relative">
-								<input
-									ref={startTimeInputRef}
-									id="admin-session-start"
-									type="time"
-									value={startTimeStr}
-									step={300}
-									onClick={() => openTimePicker(startTimeInputRef)}
-									onChange={(e) => setStartTimeStr(e.target.value)}
-									className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 pr-10 text-sm admin-time-input"
-								/>
-								<button
-									type="button"
-									onClick={() => openTimePicker(startTimeInputRef)}
-									className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--primary-yellow)]"
-									aria-label="Open start time picker"
-								>
-									<Clock3 className="h-4 w-4" />
-								</button>
-							</div>
-						</div>
-						<div className="form-group">
-							<label htmlFor="admin-session-end">End time</label>
-							<div className="relative">
-								<input
-									ref={endTimeInputRef}
-									id="admin-session-end"
-									type="time"
-									value={endTimeStr}
-									step={300}
-									min={startTimeStr || undefined}
-									onClick={() => openTimePicker(endTimeInputRef)}
-									onChange={(e) => setEndTimeStr(e.target.value)}
-									className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 pr-10 text-sm admin-time-input"
-								/>
-								<button
-									type="button"
-									onClick={() => openTimePicker(endTimeInputRef)}
-									className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--primary-yellow)]"
-									aria-label="Open end time picker"
-								>
-									<Clock3 className="h-4 w-4" />
-								</button>
-							</div>
-						</div>
+						<CustomTimePicker
+							id="admin-session-start"
+							label="Start time"
+							required
+							value={startTimeStr}
+							onChange={setStartTimeStr}
+						/>
+						<CustomTimePicker
+							id="admin-session-end"
+							label="End time"
+							value={endTimeStr}
+							onChange={setEndTimeStr}
+							min={startTimeStr || undefined}
+						/>
 					</div>
 
 					<div className="form-group">
