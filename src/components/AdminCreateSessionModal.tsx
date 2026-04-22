@@ -501,102 +501,52 @@ export function AdminCreateSessionModal({
 						<label>
 							Schedule days <span className="required">*</span>
 						</label>
-						<label
-							className={cn(
-								'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
-								scheduleMode === 'one_day'
-									? 'bg-[rgba(249,197,19,0.12)]'
-									: 'hover:bg-[rgba(255,255,255,0.04)]'
-							)}
-							style={{ display: 'inline-flex', marginBottom: 6 }}
-						>
-							<input
-								type="radio"
-								name="schedule-mode"
-								checked={scheduleMode === 'one_day'}
-								className="peer sr-only"
-								onChange={() => setScheduleMode('one_day')}
-							/>
-							<span
-								className={cn(
-									'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-									'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
-									'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
-								)}
-								aria-hidden
-							>
-								✓
-							</span>
-							<span className="font-medium">One day</span>
-						</label>
-						<label
-							className={cn(
-								'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
-								scheduleMode === 'repeat'
-									? 'bg-[rgba(249,197,19,0.12)]'
-									: 'hover:bg-[rgba(255,255,255,0.04)]'
-							)}
-							style={{ display: 'inline-flex', marginBottom: 6, marginLeft: 8 }}
-						>
-							<input
-								type="radio"
-								name="schedule-mode"
-								checked={scheduleMode === 'repeat'}
-								className="peer sr-only"
-								onChange={() => setScheduleMode('repeat')}
-							/>
-							<span
-								className={cn(
-									'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-									'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
-									'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
-								)}
-								aria-hidden
-							>
-								✓
-							</span>
-							<span className="font-medium">Repeat</span>
-						</label>
+						<div className="flex flex-wrap gap-4 mt-1">
+							<label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+								<input
+									type="radio"
+									name="schedule-mode"
+									value="one_day"
+									checked={scheduleMode === 'one_day'}
+									onChange={() => setScheduleMode('one_day')}
+									className="h-4 w-4 accent-[var(--primary-yellow)]"
+								/>
+								<span>One day</span>
+							</label>
+							<label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+								<input
+									type="radio"
+									name="schedule-mode"
+									value="repeat"
+									checked={scheduleMode === 'repeat'}
+									onChange={() => setScheduleMode('repeat')}
+									className="h-4 w-4 accent-[var(--primary-yellow)]"
+								/>
+								<span>Repeat</span>
+							</label>
+						</div>
 
-						{scheduleMode === 'one_day' ? (
-							<div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-								{WEEKDAY_OPTIONS.map((day) => {
-									const checked = singleDay === day.value;
-									return (
-										<label
-											key={day.value}
-											className={cn(
-												'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
-												checked
-													? 'bg-[rgba(249,197,19,0.12)]'
-													: 'hover:bg-[rgba(255,255,255,0.04)]'
-											)}
-											style={{ display: 'flex', marginBottom: 0 }}
-										>
-											<input
-												type="radio"
-												name="single-day"
-												checked={checked}
-												className="peer sr-only"
-												onChange={() => setSingleDay(day.value)}
-											/>
-											<span
-												className={cn(
-													'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-													'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
-													'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
-												)}
-												aria-hidden
-											>
-												✓
-											</span>
-											<span>{day.label}</span>
-										</label>
-									);
-								})}
-							</div>
-						) : (
-							<div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+						<div className="mt-2 min-h-[112px]">
+							{scheduleMode === 'one_day' ? (
+								<div className="max-w-xs">
+									<label htmlFor="admin-single-day" className="block text-xs text-[var(--text-secondary)] mb-1">
+										Choose day
+									</label>
+									<select
+										id="admin-single-day"
+										value={singleDay}
+										onChange={(e) => setSingleDay(e.target.value as WeekdayValue)}
+										className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm"
+									>
+										{WEEKDAY_OPTIONS.map((day) => (
+											<option key={day.value} value={day.value}>
+												{day.label}
+											</option>
+										))}
+									</select>
+								</div>
+							) : (
+								<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
 								{WEEKDAY_OPTIONS.map((day) => {
 									const checked = repeatDays.includes(day.value);
 									return (
@@ -630,8 +580,9 @@ export function AdminCreateSessionModal({
 										</label>
 									);
 								})}
-							</div>
-						)}
+								</div>
+							)}
+						</div>
 						<small className="block text-xs text-[var(--text-secondary)] mt-1">
 							One day = choose a single day; Repeat = choose multiple days.
 						</small>
