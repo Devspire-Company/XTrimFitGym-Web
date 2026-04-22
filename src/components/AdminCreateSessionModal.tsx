@@ -8,12 +8,16 @@ import { CREATE_SESSION, GET_USERS } from '@/graphql/operations/index';
 import type { GetUsersQuery } from '@/graphql/generated/graphql';
 import { RoleType, SessionKind, TransactionStatus } from '@/graphql/generated/graphql';
 
-const SCHEDULE_FREQUENCY_OPTIONS = [
-	{ label: 'One-time', value: 'once' },
-	{ label: 'M-W-F', value: 'm_w_f' },
-	{ label: 'T-TH-S', value: 't_th_s' },
-	{ label: 'Daily', value: 'daily' },
+const WEEKDAY_OPTIONS = [
+	{ label: 'Mon', value: 'monday' },
+	{ label: 'Tue', value: 'tuesday' },
+	{ label: 'Wed', value: 'wednesday' },
+	{ label: 'Thu', value: 'thursday' },
+	{ label: 'Fri', value: 'friday' },
+	{ label: 'Sat', value: 'saturday' },
+	{ label: 'Sun', value: 'sunday' },
 ] as const;
+type WeekdayValue = (typeof WEEKDAY_OPTIONS)[number]['value'];
 const GYM_AREAS = [
 	{ label: 'Main Training Area', value: 'Main Training Area' },
 	{ label: 'Cardio Zone', value: 'Cardio Zone' },
@@ -76,9 +80,15 @@ export function AdminCreateSessionModal({
 	const [startTimeStr, setStartTimeStr] = useState('09:00');
 	const [endTimeStr, setEndTimeStr] = useState('');
 	const [gymArea, setGymArea] = useState('');
-	const [scheduleFrequency, setScheduleFrequency] = useState<
-		'once' | 'm_w_f' | 't_th_s' | 'daily'
-	>('once');
+	const [scheduleDays, setScheduleDays] = useState<WeekdayValue[]>([
+		'monday',
+		'tuesday',
+		'wednesday',
+		'thursday',
+		'friday',
+		'saturday',
+		'sunday',
+	]);
 	const [note, setNote] = useState('');
 	const [isGroupClass, setIsGroupClass] = useState(false);
 	const [maxParticipants, setMaxParticipants] = useState('20');
@@ -98,7 +108,15 @@ export function AdminCreateSessionModal({
 		setStartTimeStr('09:00');
 		setEndTimeStr('');
 		setGymArea('');
-		setScheduleFrequency('once');
+		setScheduleDays([
+			'monday',
+			'tuesday',
+			'wednesday',
+			'thursday',
+			'friday',
+			'saturday',
+			'sunday',
+		]);
 		setNote('');
 		setIsGroupClass(false);
 		setMaxParticipants('20');
@@ -148,6 +166,22 @@ export function AdminCreateSessionModal({
 		);
 	};
 
+	const allDaysSelected = scheduleDays.length === WEEKDAY_OPTIONS.length;
+
+	const toggleScheduleDay = (day: WeekdayValue) => {
+		setScheduleDays((prev) =>
+			prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+		);
+	};
+
+	const toggleDaily = () => {
+		setScheduleDays((prev) =>
+			prev.length === WEEKDAY_OPTIONS.length
+				? []
+				: WEEKDAY_OPTIONS.map((d) => d.value)
+		);
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setFormError('');
@@ -182,6 +216,10 @@ export function AdminCreateSessionModal({
 			setFormError('Gym area is required.');
 			return;
 		}
+		if (scheduleDays.length === 0) {
+			setFormError('Select at least one schedule day, or enable Daily.');
+			return;
+		}
 
 		if (isGroupClass) {
 			const mp = parseInt(maxParticipants, 10);
@@ -198,7 +236,7 @@ export function AdminCreateSessionModal({
 						startTime: startTimeString,
 						endTime: endTimeString,
 						gymArea,
-						scheduleFrequency,
+						scheduleDays,
 						note: note.trim() || undefined,
 						sessionKind: SessionKind.GroupClass,
 						maxParticipants: mp,
@@ -225,7 +263,7 @@ export function AdminCreateSessionModal({
 					startTime: startTimeString,
 					endTime: endTimeString,
 					gymArea,
-					scheduleFrequency,
+					scheduleDays,
 					note: note.trim() || undefined,
 					sessionKind: SessionKind.Personal,
 				} as any,
@@ -480,28 +518,73 @@ export function AdminCreateSessionModal({
 					</div>
 
 					<div className="form-group">
-						<label htmlFor="admin-session-frequency">
-							Schedule frequency <span className="required">*</span>
+						<label>
+							Schedule days <span className="required">*</span>
 						</label>
-						<select
-							id="admin-session-frequency"
-							value={scheduleFrequency}
-							onChange={(e) =>
-								setScheduleFrequency(
-									e.target.value as 'once' | 'm_w_f' | 't_th_s' | 'daily'
-								)
-							}
-							className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm"
-							required
+						<label
+							className={cn(
+								'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
+								allDaysSelected
+									? 'bg-[rgba(249,197,19,0.12)]'
+									: 'hover:bg-[rgba(255,255,255,0.04)]'
+							)}
+							style={{ display: 'inline-flex', marginBottom: 6 }}
 						>
-							{SCHEDULE_FREQUENCY_OPTIONS.map((option) => (
-								<option key={option.value} value={option.value}>
-									{option.label}
-								</option>
-							))}
-						</select>
+							<input
+								type="checkbox"
+								checked={allDaysSelected}
+								className="peer sr-only"
+								onChange={toggleDaily}
+							/>
+							<span
+								className={cn(
+									'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+									'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
+									'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
+								)}
+								aria-hidden
+							>
+								✓
+							</span>
+							<span className="font-medium">Daily</span>
+						</label>
+						<div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+							{WEEKDAY_OPTIONS.map((day) => {
+								const checked = scheduleDays.includes(day.value);
+								return (
+									<label
+										key={day.value}
+										className={cn(
+											'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm cursor-pointer',
+											checked
+												? 'bg-[rgba(249,197,19,0.12)]'
+												: 'hover:bg-[rgba(255,255,255,0.04)]'
+										)}
+										style={{ display: 'flex', marginBottom: 0 }}
+									>
+										<input
+											type="checkbox"
+											checked={checked}
+											className="peer sr-only"
+											onChange={() => toggleScheduleDay(day.value)}
+										/>
+										<span
+											className={cn(
+												'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+												'border-[rgba(255,255,255,0.32)] bg-transparent text-transparent',
+												'peer-checked:border-[var(--primary-yellow)] peer-checked:bg-[var(--primary-yellow)] peer-checked:text-[#161616]'
+											)}
+											aria-hidden
+										>
+											✓
+										</span>
+										<span>{day.label}</span>
+									</label>
+								);
+							})}
+						</div>
 						<small className="block text-xs text-[var(--text-secondary)] mt-1">
-							Use this for recurring patterns like M-W-F, T-TH-S, or daily.
+							Choose specific days, or use Daily to select all days.
 						</small>
 					</div>
 
