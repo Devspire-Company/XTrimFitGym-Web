@@ -34,7 +34,6 @@ const SCHEDULE_PRESETS: { label: string; days: WeekdayValue[] }[] = [
 	{ label: 'Weekdays', days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] },
 	{ label: 'Daily', days: [...WEEKDAY_VALUES] },
 ];
-type ScheduleType = 'one_day' | 'specific_days';
 const GYM_AREAS = [
 	{ label: 'Main Training Area', value: 'Main Training Area' },
 	{ label: 'Cardio Zone', value: 'Cardio Zone' },
@@ -214,8 +213,7 @@ export function AdminCreateSessionModal({
 	const [startTimeStr, setStartTimeStr] = useState('');
 	const [endTimeStr, setEndTimeStr] = useState('');
 	const [gymArea, setGymArea] = useState('');
-	const [scheduleType, setScheduleType] = useState<ScheduleType>('one_day');
-	const [scheduleDays, setScheduleDays] = useState<WeekdayValue[]>([]);
+	const [scheduleDays, setScheduleDays] = useState<WeekdayValue[]>(['monday', 'wednesday', 'friday']);
 	const [note, setNote] = useState('');
 	const [isGroupClass, setIsGroupClass] = useState(false);
 	const [maxParticipants, setMaxParticipants] = useState('20');
@@ -235,8 +233,7 @@ export function AdminCreateSessionModal({
 		setStartTimeStr('');
 		setEndTimeStr('');
 		setGymArea('');
-		setScheduleType('one_day');
-		setScheduleDays([]);
+		setScheduleDays(['monday', 'wednesday', 'friday']);
 		setNote('');
 		setIsGroupClass(false);
 		setMaxParticipants('20');
@@ -288,26 +285,13 @@ export function AdminCreateSessionModal({
 
 	const toggleScheduleDay = (day: WeekdayValue) => {
 		setScheduleDays((prev) => {
-			if (scheduleType === 'one_day') return [day];
 			return prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day];
 		});
 	};
 
 	const applySchedulePreset = (days: WeekdayValue[]) => {
-		setScheduleType('specific_days');
 		setScheduleDays(days);
 	};
-
-	useEffect(() => {
-		if (!date) return;
-		const dayFromDate = WEEKDAY_VALUES[date.getDay()];
-		setScheduleDays((prev) => {
-			if (scheduleType === 'one_day') {
-				return prev.length === 1 ? prev : [dayFromDate];
-			}
-			return prev;
-		});
-	}, [date, scheduleType]);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -347,11 +331,7 @@ export function AdminCreateSessionModal({
 			setFormError('Gym area is required.');
 			return;
 		}
-		let normalizedScheduleDays = scheduleDays;
-		if (scheduleType === 'one_day') {
-			const fallbackDay = WEEKDAY_VALUES[date.getDay()];
-			normalizedScheduleDays = [scheduleDays[0] ?? fallbackDay];
-		}
+		const normalizedScheduleDays = scheduleDays;
 		if (normalizedScheduleDays.length === 0) {
 			setFormError('Select schedule day(s).');
 			return;
@@ -646,54 +626,19 @@ export function AdminCreateSessionModal({
 							Session schedule frequency <span className="required">*</span>
 						</label>
 						<div className="rounded-2xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.02)] p-3">
-							<div className="grid grid-cols-2 gap-2 mb-3">
-								<button
-									type="button"
-									onClick={() => {
-										setScheduleType('one_day');
-										if (scheduleDays.length === 0) {
-											setScheduleDays([date ? WEEKDAY_VALUES[date.getDay()] : 'monday']);
-										} else if (scheduleDays.length > 1) {
-											setScheduleDays([scheduleDays[0]]);
-										}
-									}}
-									className={cn(
-										'rounded-xl px-3 py-2 text-sm font-semibold transition-colors',
-										scheduleType === 'one_day'
-											? 'bg-[rgba(249,197,19,0.18)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.45)]'
-											: 'bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-									)}
-								>
-									One day only
-								</button>
-								<button
-									type="button"
-									onClick={() => setScheduleType('specific_days')}
-									className={cn(
-										'rounded-xl px-3 py-2 text-sm font-semibold transition-colors',
-										scheduleType === 'specific_days'
-											? 'bg-[rgba(249,197,19,0.18)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.45)]'
-											: 'bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-									)}
-								>
-									Specific days
-								</button>
+							<div className="flex flex-wrap gap-2 mb-3">
+								{SCHEDULE_PRESETS.map((preset) => (
+									<button
+										key={preset.label}
+										type="button"
+										onClick={() => applySchedulePreset(preset.days)}
+										className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[rgba(249,197,19,0.4)]"
+									>
+										{preset.label}
+									</button>
+								))}
 							</div>
-							{scheduleType === 'specific_days' ? (
-								<div className="flex flex-wrap gap-2 mb-3">
-									{SCHEDULE_PRESETS.map((preset) => (
-										<button
-											key={preset.label}
-											type="button"
-											onClick={() => applySchedulePreset(preset.days)}
-											className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[rgba(249,197,19,0.4)]"
-										>
-											{preset.label}
-										</button>
-									))}
-								</div>
-							) : null}
-							<div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2.5">
+							<div className="flex flex-wrap gap-2.5">
 								{WEEKDAY_OPTIONS.map((day) => {
 									const checked = scheduleDays.includes(day.value);
 									return (
@@ -702,10 +647,9 @@ export function AdminCreateSessionModal({
 											type="button"
 											onClick={() => toggleScheduleDay(day.value)}
 											className={cn(
-												'flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
+												'inline-flex min-w-[132px] items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
 												'border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--text-primary)]',
-												checked && 'border-[var(--primary-yellow)] bg-[rgba(249,197,19,0.14)]',
-												scheduleType === 'one_day' && checked && 'shadow-[0_0_0_1px_rgba(249,197,19,0.35)]'
+												checked && 'border-[var(--primary-yellow)] bg-[rgba(249,197,19,0.14)]'
 											)}
 										>
 											<span
@@ -724,9 +668,7 @@ export function AdminCreateSessionModal({
 								})}
 							</div>
 							<small className="block text-xs text-[var(--text-secondary)] mt-3">
-								{scheduleType === 'one_day'
-									? 'Select exactly one day for this session.'
-									: 'Select one or more recurring days. You can use presets for faster setup.'}
+								Select one or more recurring days. You can use presets for faster setup.
 							</small>
 							<div className="mt-1 text-xs text-[var(--text-secondary)]">
 								{scheduleDays.length > 0
