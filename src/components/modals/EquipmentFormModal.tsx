@@ -62,7 +62,7 @@ export function EquipmentFormModal({
 		if (!isOpen) return;
 		setQuantityInput(String(Math.max(0, Number(equipment?.quantity ?? 0))));
 		setStockAdjustMode('IN');
-		setStockAdjustAmount('1');
+		setStockAdjustAmount('0');
 	}, [isOpen, equipment?.quantity]);
 
 	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -82,14 +82,19 @@ export function EquipmentFormModal({
 		const statusRaw = (formData.get('status') as string) || EquipmentStatus.Available;
 		const quantityRaw = quantityInput.trim();
 		const quantity = Number.parseInt(quantityRaw, 10);
+		const quickAdjust = Number.parseInt(stockAdjustAmount.trim(), 10);
+		const finalQuantity =
+			equipment && Number.isFinite(quickAdjust) && quickAdjust > 0
+				? Math.max(0, quantity + (stockAdjustMode === 'IN' ? quickAdjust : -quickAdjust))
+				: quantity;
 		if (!name) return;
-		if (!Number.isFinite(quantity) || quantity < 0) return;
+		if (!Number.isFinite(finalQuantity) || finalQuantity < 0) return;
 		onSubmit({
 			name,
 			description,
 			notes,
 			acquiredAt,
-			quantity,
+			quantity: finalQuantity,
 			maintenanceStartedAt,
 			imageUrl,
 			imageFile: imageFile && imageFile.size > 0 ? imageFile : null,
@@ -206,34 +211,17 @@ export function EquipmentFormModal({
 											<input
 												id="quick-stock-amount"
 												type="number"
-												min={1}
+												min={0}
 												step={1}
 												value={stockAdjustAmount}
 												onChange={(e) => setStockAdjustAmount(e.target.value)}
 												aria-label="Stock adjustment amount"
 											/>
 										</div>
-										<button
-											type="button"
-											className="btn-secondary h-10 px-4"
-											onClick={() => {
-												const amount = Number.parseInt(stockAdjustAmount.trim(), 10);
-												if (!Number.isFinite(amount) || amount <= 0) return;
-												setQuantityInput(
-													String(
-														Math.max(
-															0,
-															currentQuantity + (stockAdjustMode === 'IN' ? amount : -amount)
-														)
-													)
-												);
-											}}
-										>
-											Apply
-										</button>
 									</div>
 									<div className="mt-2 text-xs text-[var(--text-secondary)]">
-										Preview quantity: <span className="font-semibold text-[var(--text-primary)]">{previewQuantity}</span>
+										Preview quantity after save:{' '}
+										<span className="font-semibold text-[var(--text-primary)]">{previewQuantity}</span>
 									</div>
 								</div>
 							) : null}
