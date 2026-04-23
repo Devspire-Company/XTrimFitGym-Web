@@ -8,9 +8,13 @@ import {
 	Fingerprint,
 	CalendarRange,
 	ChevronDown,
+	CheckCircle2,
+	XCircle,
+	CalendarDays,
 } from 'lucide-react';
 import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Calendar } from '@/components/ui/calendar';
 import {
 	GET_ATTENDANCE_RECORDS,
 	ATTENDANCE_RECORD_ADDED,
@@ -48,6 +52,7 @@ import { useAppSelector } from '@/store/hooks';
 import { exportTableCsv } from '@/lib/csvExport';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { format, startOfDay } from 'date-fns';
 
 async function loadImageAsDataUrl(path: string): Promise<string | null> {
 	try {
@@ -131,6 +136,10 @@ function normalizePersonName(value: string | null | undefined): string {
 		.trim();
 }
 
+function getDateKeyManila(iso: string): string {
+	return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+}
+
 function getTodayYmdManila(): string {
 	return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 }
@@ -162,6 +171,14 @@ function buildUserNameCandidates(
 		[last, first].filter(Boolean).join(', '),
 	];
 	return candidates.map(normalizePersonName).filter(Boolean);
+}
+
+function displayCoachName(user: AttendanceRosterUser): string {
+	return [user.firstName, user.middleName, user.lastName]
+		.filter(Boolean)
+		.join(' ')
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 async function tryRegisterInterFont(doc: jsPDF): Promise<boolean> {
@@ -617,6 +634,148 @@ export function AttendancePage() {
 	}, [summarizedRecords, coachAttendanceIds, memberAttendanceIds, coachNameCandidates, memberNameCandidates]);
 	const showCoachSection = roleFilter !== 'client';
 	const showClientSection = roleFilter !== 'coach';
+	const [mobileCoachCalendarMonth, setMobileCoachCalendarMonth] = useState<Date>(() => new Date());
+	const [selectedCoachCalendarDate, setSelectedCoachCalendarDate] = useState<Date | undefined>(() =>
+		startOfDay(new Date())
+	);
+	const [selectedCoachCalendarKey, setSelectedCoachCalendarKey] = useState<string>('');
+
+	const mobileCoachMonthRange = useMemo(() => {
+		const monthStart = new Date(
+			mobileCoachCalendarMonth.getFullYear(),
+			mobileCoachCalendarMonth.getMonth(),
+			1
+		);
+		const monthEnd = new Date(
+			mobileCoachCalendarMonth.getFullYear(),
+			mobileCoachCalendarMonth.getMonth() + 1,
+			0
+		);
+		return {
+			startDate: formatDateToYmd(monthStart),
+			endDate: formatDateToYmd(monthEnd),
+		};
+	}, [mobileCoachCalendarMonth]);
+
+	const { data: mobileCoachMonthData } = useQuery(GET_ATTENDANCE_RECORDS, {
+		variables: {
+			filter: mobileCoachMonthRange,
+			pagination: { limit: 5000, offset: 0 },
+		},
+		fetchPolicy: 'cache-and-network',
+	});
+
+	const coachRecordsByDay = useMemo(() => {
+		const byCoach = new Map<string, Map<string, { hasIn: boolean; hasOut: boolean }>>();
+		const coachLabelByKey = new Map<string, string>();
+		const coaches = coachesUsersData?.getUsers || [];
+		for (const coach of coaches) {
+			const name = displayCoachName(coach);
+			if (!name) continue;
+			const key = normalizePersonName(name);
+			if (!key) continue;
+			coachLabelByKey.set(key, name);
+			if (!byCoach.has(key)) byCoach.set(key, new Map());
+		}
+
+		const isCoachRecord = (personName: string, cardNo?: string | null) => {
+			const normalizedName = normalizePersonName(personName);
+			if (cardNo && coachAttendanceIds.has(cardNo)) return true;
+			if (normalizedName && coachNameCandidates.has(normalizedName)) return true;
+			return false;
+		};
+
+		const sourceRecords = mobileCoachMonthData?.getAttendanceRecords?.records || filteredRecords;
+		for (const record of sourceRecords) {
+			const personName = record.personName || '';
+			const cardNo =
+				record.cardNo != null && String(record.cardNo).trim() !== ''
+					? String(record.cardNo).trim()
+					: '';
+			if (!isCoachRecord(personName, cardNo)) continue;
+			const coachKey = normalizePersonName(personName);
+			if (!coachKey) continue;
+			if (!coachLabelByKey.has(coachKey)) coachLabelByKey.set(coachKey, personName);
+			const dateKey = getDateKeyManila(record.authDateTime);
+			let dayMap = byCoach.get(coachKey);
+			if (!dayMap) {
+				dayMap = new Map();
+				byCoach.set(coachKey, dayMap);
+			}
+			const current = dayMap.get(dateKey) || { hasIn: false, hasOut: false };
+			if ((record.direction || '').toUpperCase() === 'IN') current.hasIn = true;
+			if ((record.direction || '').toUpperCase() === 'OUT') current.hasOut = true;
+			dayMap.set(dateKey, current);
+		}
+
+		const coachOptions = Array.from(coachLabelByKey.entries())
+			.map(([key, label]) => ({ key, label }))
+			.sort((a, b) => a.label.localeCompare(b.label));
+
+		return { byCoach, coachOptions };
+	}, [coachesUsersData, filteredRecords, coachAttendanceIds, coachNameCandidates, mobileCoachMonthData]);
+
+	useEffect(() => {
+		if (coachRecordsByDay.coachOptions.length === 0) {
+			setSelectedCoachCalendarKey('');
+			return;
+		}
+		if (
+			!selectedCoachCalendarKey ||
+			!coachRecordsByDay.coachOptions.some((coach) => coach.key === selectedCoachCalendarKey)
+		) {
+			setSelectedCoachCalendarKey(coachRecordsByDay.coachOptions[0].key);
+		}
+	}, [coachRecordsByDay.coachOptions, selectedCoachCalendarKey]);
+
+	const mobileCoachCalendarSummary = useMemo(() => {
+		if (!selectedCoachCalendarKey) {
+			return {
+				checkedInDates: [] as Date[],
+				notCheckedInDates: [] as Date[],
+				checkedInCount: 0,
+				notCheckedInCount: 0,
+				checkRate: 0,
+				selectedDayStatus: null as null | 'checked-in' | 'not-checked-in',
+			};
+		}
+		const coachDayMap = coachRecordsByDay.byCoach.get(selectedCoachCalendarKey) || new Map();
+		const year = mobileCoachCalendarMonth.getFullYear();
+		const month = mobileCoachCalendarMonth.getMonth();
+		const daysInMonth = new Date(year, month + 1, 0).getDate();
+		const today = startOfDay(new Date());
+		const checkedInDates: Date[] = [];
+		const notCheckedInDates: Date[] = [];
+
+		for (let day = 1; day <= daysInMonth; day += 1) {
+			const currentDate = new Date(year, month, day);
+			const normalizedCurrent = startOfDay(currentDate);
+			if (normalizedCurrent.getTime() > today.getTime()) continue;
+			const dateKey = format(currentDate, 'yyyy-MM-dd');
+			const dayEntry = coachDayMap.get(dateKey);
+			if (dayEntry?.hasIn) checkedInDates.push(currentDate);
+			else notCheckedInDates.push(currentDate);
+		}
+
+		const totalTrackable = checkedInDates.length + notCheckedInDates.length;
+		const checkRate = totalTrackable > 0 ? Math.round((checkedInDates.length / totalTrackable) * 100) : 0;
+
+		let selectedDayStatus: null | 'checked-in' | 'not-checked-in' = null;
+		if (selectedCoachCalendarDate) {
+			const dayKey = format(selectedCoachCalendarDate, 'yyyy-MM-dd');
+			const selectedEntry = coachDayMap.get(dayKey);
+			selectedDayStatus = selectedEntry?.hasIn ? 'checked-in' : 'not-checked-in';
+		}
+
+		return {
+			checkedInDates,
+			notCheckedInDates,
+			checkedInCount: checkedInDates.length,
+			notCheckedInCount: notCheckedInDates.length,
+			checkRate,
+			selectedDayStatus,
+		};
+	}, [selectedCoachCalendarKey, coachRecordsByDay.byCoach, mobileCoachCalendarMonth, selectedCoachCalendarDate]);
 
 	// Today's records count: always current day from API, not affected by list date filter
 	const todaysRecordsCount = dataToday?.getAttendanceRecords?.totalCount ?? 0;
@@ -1016,6 +1175,93 @@ export function AttendancePage() {
 						<span className="text-sm text-[var(--text-secondary)]">
 							({coachRecords.length} rows on this page)
 						</span>
+					</div>
+					<div className="border-b border-[var(--border-color)] p-4 lg:hidden">
+						<div className="rounded-xl border border-[rgba(249,197,19,0.25)] bg-[rgba(249,197,19,0.06)] p-3">
+							<div className="mb-3 flex items-center gap-2">
+								<CalendarDays className="h-4 w-4 text-[var(--primary-yellow)]" />
+								<p className="text-sm font-semibold text-[var(--text-primary)]">Coach attendance calendar</p>
+							</div>
+							{coachRecordsByDay.coachOptions.length > 0 ? (
+								<>
+									<select
+										value={selectedCoachCalendarKey}
+										onChange={(e) => setSelectedCoachCalendarKey(e.target.value)}
+										aria-label="Select coach for monthly calendar"
+										className="mb-3 w-full rounded-lg border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary-yellow)] focus:outline-none"
+									>
+										{coachRecordsByDay.coachOptions.map((coach) => (
+											<option key={coach.key} value={coach.key}>
+												{coach.label}
+											</option>
+										))}
+									</select>
+									<div className="mb-3 flex justify-center">
+										<Calendar
+											mode="single"
+											selected={selectedCoachCalendarDate}
+											onSelect={setSelectedCoachCalendarDate}
+											month={mobileCoachCalendarMonth}
+											onMonthChange={setMobileCoachCalendarMonth}
+											modifiers={{
+												checkedIn: mobileCoachCalendarSummary.checkedInDates,
+												notCheckedIn: mobileCoachCalendarSummary.notCheckedInDates,
+											}}
+											modifiersClassNames={{
+												checkedIn:
+													'bg-[rgba(16,185,129,0.18)] text-[#34D399] [&_button]:font-semibold',
+												notCheckedIn:
+													'bg-[rgba(239,68,68,0.12)] text-[#F87171] [&_button]:font-semibold',
+											}}
+											captionLayout="dropdown"
+											className="rounded-lg border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] p-2"
+										/>
+									</div>
+									<div className="mb-3 grid grid-cols-3 gap-2">
+										<div className="rounded-lg border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.1)] px-2 py-2 text-center">
+											<p className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">Checked in</p>
+											<p className="text-base font-semibold text-[#34D399]">{mobileCoachCalendarSummary.checkedInCount}</p>
+										</div>
+										<div className="rounded-lg border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.1)] px-2 py-2 text-center">
+											<p className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">Not checked-in</p>
+											<p className="text-base font-semibold text-[#F87171]">{mobileCoachCalendarSummary.notCheckedInCount}</p>
+										</div>
+										<div className="rounded-lg border border-[rgba(249,197,19,0.32)] bg-[rgba(249,197,19,0.12)] px-2 py-2 text-center">
+											<p className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">Rate</p>
+											<p className="text-base font-semibold text-[var(--primary-yellow)]">{mobileCoachCalendarSummary.checkRate}%</p>
+										</div>
+									</div>
+									<div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+										<span className="inline-flex items-center gap-1 rounded-full border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.12)] px-2 py-1 text-[#34D399]">
+											<CheckCircle2 className="h-3.5 w-3.5" />
+											Checked-in day
+										</span>
+										<span className="inline-flex items-center gap-1 rounded-full border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.12)] px-2 py-1 text-[#F87171]">
+											<XCircle className="h-3.5 w-3.5" />
+											Not checked-in day
+										</span>
+									</div>
+									{selectedCoachCalendarDate ? (
+										<div className="mt-3 rounded-lg border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+											{format(selectedCoachCalendarDate, 'MMMM d, yyyy')}:{' '}
+											<span
+												className={
+													mobileCoachCalendarSummary.selectedDayStatus === 'checked-in'
+														? 'font-semibold text-[#34D399]'
+														: 'font-semibold text-[#F87171]'
+												}
+											>
+												{mobileCoachCalendarSummary.selectedDayStatus === 'checked-in'
+													? 'Checked-in'
+													: 'Not checked-in'}
+											</span>
+										</div>
+									) : null}
+								</>
+							) : (
+								<p className="text-xs text-[var(--text-secondary)]">No coach attendance data available for calendar review.</p>
+							)}
+						</div>
 					</div>
 					<div className="overflow-x-auto">
 						<table className="w-full">
