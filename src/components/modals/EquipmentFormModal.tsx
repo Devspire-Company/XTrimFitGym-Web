@@ -34,6 +34,9 @@ export function EquipmentFormModal({
 }: EquipmentFormModalProps) {
 	const [acquiredDate, setAcquiredDate] = useState<Date | undefined>(undefined);
 	const [maintenanceStartDate, setMaintenanceStartDate] = useState<Date | undefined>(undefined);
+	const [quantityInput, setQuantityInput] = useState('0');
+	const [stockAdjustMode, setStockAdjustMode] = useState<'IN' | 'OUT'>('IN');
+	const [stockAdjustAmount, setStockAdjustAmount] = useState('1');
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -55,6 +58,13 @@ export function EquipmentFormModal({
 		setMaintenanceStartDate(Number.isFinite(parsed.getTime()) ? parsed : undefined);
 	}, [isOpen, equipment?.maintenanceStartedAt]);
 
+	useEffect(() => {
+		if (!isOpen) return;
+		setQuantityInput(String(Math.max(0, Number(equipment?.quantity ?? 0))));
+		setStockAdjustMode('IN');
+		setStockAdjustAmount('1');
+	}, [isOpen, equipment?.quantity]);
+
 	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const formData = new FormData(e.currentTarget);
@@ -70,7 +80,7 @@ export function EquipmentFormModal({
 		const imageUrl = (formData.get('imageUrl') as string)?.trim() || '';
 		const imageFile = formData.get('imageFile') as File | null;
 		const statusRaw = (formData.get('status') as string) || EquipmentStatus.Available;
-		const quantityRaw = String(formData.get('quantity') ?? '0').trim();
+		const quantityRaw = quantityInput.trim();
 		const quantity = Number.parseInt(quantityRaw, 10);
 		if (!name) return;
 		if (!Number.isFinite(quantity) || quantity < 0) return;
@@ -90,6 +100,11 @@ export function EquipmentFormModal({
 	if (!isOpen) return null;
 
 	const defaultStatus = equipment?.status ?? EquipmentStatus.Available;
+	const parsedQuickAdjust = Number.parseInt(stockAdjustAmount.trim(), 10);
+	const currentQuantity = Math.max(0, Number.parseInt(quantityInput || '0', 10) || 0);
+	const previewQuantity = Number.isFinite(parsedQuickAdjust) && parsedQuickAdjust > 0
+		? Math.max(0, currentQuantity + (stockAdjustMode === 'IN' ? parsedQuickAdjust : -parsedQuickAdjust))
+		: currentQuantity;
 
 	return (
 		<div className={`modal-overlay ${isOpen ? 'active' : ''}`} onClick={onClose}>
@@ -102,7 +117,7 @@ export function EquipmentFormModal({
 					<h2 className="modal-title">
 						{equipment ? 'Edit Equipment' : 'Add Equipment'}
 					</h2>
-					<button className="modal-close" onClick={onClose} aria-label="Close">
+					<button type="button" className="modal-close" onClick={onClose} aria-label="Close">
 						<X size={24} />
 					</button>
 				</div>
@@ -146,9 +161,82 @@ export function EquipmentFormModal({
 									min={0}
 									step={1}
 									required
-									defaultValue={equipment?.quantity ?? 0}
+									value={quantityInput}
+									onChange={(e) => setQuantityInput(e.target.value)}
+									aria-label="Equipment quantity"
 								/>
 							</div>
+							{equipment ? (
+								<div
+									className="form-group rounded-xl border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.03)] p-3"
+									style={{ gridColumn: '1 / -1' }}
+								>
+									<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+										Stock adjustment
+									</div>
+									<div className="mb-3 inline-flex w-full items-center rounded-lg border border-[var(--card-border)] bg-[var(--bg-darker)] p-1">
+										<button
+											type="button"
+											onClick={() => setStockAdjustMode('OUT')}
+											className={`h-9 flex-1 rounded-md text-sm font-semibold transition ${
+												stockAdjustMode === 'OUT'
+													? 'bg-[rgba(239,68,68,0.16)] text-[#F87171]'
+													: 'text-[var(--text-secondary)]'
+											}`}
+										>
+											Stock out
+										</button>
+										<button
+											type="button"
+											onClick={() => setStockAdjustMode('IN')}
+											className={`h-9 flex-1 rounded-md text-sm font-semibold transition ${
+												stockAdjustMode === 'IN'
+													? 'bg-[rgba(16,185,129,0.16)] text-[#34D399]'
+													: 'text-[var(--text-secondary)]'
+											}`}
+										>
+											Stock in
+										</button>
+									</div>
+									<div className="flex flex-wrap items-end gap-2">
+										<div className="min-w-[120px] flex-1">
+											<label htmlFor="quick-stock-amount" className="mb-1 block text-xs text-[var(--text-secondary)]">
+												Amount
+											</label>
+											<input
+												id="quick-stock-amount"
+												type="number"
+												min={1}
+												step={1}
+												value={stockAdjustAmount}
+												onChange={(e) => setStockAdjustAmount(e.target.value)}
+												aria-label="Stock adjustment amount"
+											/>
+										</div>
+										<button
+											type="button"
+											className="btn-secondary h-10 px-4"
+											onClick={() => {
+												const amount = Number.parseInt(stockAdjustAmount.trim(), 10);
+												if (!Number.isFinite(amount) || amount <= 0) return;
+												setQuantityInput(
+													String(
+														Math.max(
+															0,
+															currentQuantity + (stockAdjustMode === 'IN' ? amount : -amount)
+														)
+													)
+												);
+											}}
+										>
+											Apply
+										</button>
+									</div>
+									<div className="mt-2 text-xs text-[var(--text-secondary)]">
+										Preview quantity: <span className="font-semibold text-[var(--text-primary)]">{previewQuantity}</span>
+									</div>
+								</div>
+							) : null}
 							<div className="form-group">
 								<label htmlFor="acquiredAt">Acquired date</label>
 								<DatePicker

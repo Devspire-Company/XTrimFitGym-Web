@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { Button } from '@/components/ui/button';
-import { Plus, Dumbbell, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Plus, Dumbbell, AlertTriangle } from 'lucide-react';
 import { EquipmentFormModal, type EquipmentFormData } from '@/components/modals/EquipmentFormModal';
 import { EquipmentViewModal } from '@/components/modals/EquipmentViewModal';
 import { SuccessModal } from '@/components/modals/SuccessModal';
@@ -308,7 +308,6 @@ export function EquipmentPage() {
 	const [stockDirection, setStockDirection] = useState<StockDirection>('IN');
 	const [stockAmount, setStockAmount] = useState('1');
 	const [stockReason, setStockReason] = useState('');
-	const [editActionTarget, setEditActionTarget] = useState<any | null>(null);
 	const [equipmentActionLogs, setEquipmentActionLogs] = useState<EquipmentActionLog[]>(() =>
 		typeof window === 'undefined' ? [] : readEquipmentActionLogs()
 	);
@@ -641,7 +640,6 @@ export function EquipmentPage() {
 	};
 
 	const handleEdit = (item: any) => {
-		setEditActionTarget(null);
 		setIsEdit(true);
 		setSelected(item);
 		setIsFormOpen(true);
@@ -653,7 +651,6 @@ export function EquipmentPage() {
 	};
 
 	const handleDelete = (item: any) => {
-		setEditActionTarget(null);
 		setSelected(item);
 		setArchiveReasonOption('Damaged beyond repair');
 		setArchiveReasonOther('');
@@ -814,7 +811,6 @@ export function EquipmentPage() {
 	};
 
 	const openStockAdjustmentModal = (item: any, direction: StockDirection) => {
-		setEditActionTarget(null);
 		setStockTarget(item);
 		setStockDirection(direction);
 		setStockAmount('1');
@@ -833,10 +829,6 @@ export function EquipmentPage() {
 		await handleAdjustStock(stockTarget, signedChange, stockReason);
 		setIsStockModalOpen(false);
 		setStockTarget(null);
-	};
-
-	const openEditActions = (item: any) => {
-		setEditActionTarget(item);
 	};
 
 	const handleConfirmDelete = async () => {
@@ -1314,12 +1306,11 @@ export function EquipmentPage() {
 											type="button"
 											onClick={(e) => {
 												e.stopPropagation();
-												openEditActions(item);
+												handleEdit(item);
 											}}
 											className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[rgba(249,197,19,0.35)] bg-[rgba(249,197,19,0.14)] px-4 text-sm font-semibold text-[var(--primary-yellow)] transition hover:bg-[rgba(249,197,19,0.22)]"
 										>
 											Edit
-											<ChevronDown className="h-4 w-4" />
 										</button>
 										</div>
 										<button
@@ -1595,58 +1586,6 @@ export function EquipmentPage() {
 									{adjustingStock ? 'Saving...' : 'Apply adjustment'}
 								</button>
 							</div>
-						</div>
-					</div>
-				</div>
-			) : null}
-
-			{editActionTarget ? (
-				<div
-					className="modal-overlay active"
-					onClick={() => {
-						setEditActionTarget(null);
-					}}
-				>
-					<div className="modal modal-center max-w-[420px]" onClick={(e) => e.stopPropagation()}>
-						<div className="modal-body">
-							<h2 className="text-xl font-semibold text-[var(--text-primary)]">Edit actions</h2>
-							<p className="mt-1 text-sm text-[var(--text-secondary)]">
-								{editActionTarget.name}
-							</p>
-
-							<div className="mt-4 space-y-2">
-								<button
-									type="button"
-									onClick={() => handleEdit(editActionTarget)}
-									className="flex h-11 w-full items-center justify-center rounded-xl border border-[rgba(249,197,19,0.35)] bg-[rgba(249,197,19,0.14)] px-4 text-sm font-semibold text-[var(--primary-yellow)] transition hover:bg-[rgba(249,197,19,0.22)]"
-								>
-									Edit details
-								</button>
-								<button
-									type="button"
-									onClick={() => openStockAdjustmentModal(editActionTarget, 'IN')}
-									disabled={adjustingStock}
-									className="flex h-11 w-full items-center justify-center rounded-xl border border-[rgba(16,185,129,0.35)] bg-[linear-gradient(180deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))] px-4 text-sm font-semibold text-[#34D399] transition hover:bg-[rgba(16,185,129,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
-								>
-									Stock in
-								</button>
-								<button
-									type="button"
-									onClick={() => openStockAdjustmentModal(editActionTarget, 'OUT')}
-									disabled={adjustingStock}
-									className="flex h-11 w-full items-center justify-center rounded-xl border border-[rgba(239,68,68,0.35)] bg-[linear-gradient(180deg,rgba(239,68,68,0.2),rgba(239,68,68,0.08))] px-4 text-sm font-semibold text-[#F87171] transition hover:bg-[rgba(239,68,68,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
-								>
-									Stock out
-								</button>
-							</div>
-
-							<button
-								type="button"
-								className="btn-secondary mt-4 h-11 w-full rounded-xl"
-								onClick={() => setEditActionTarget(null)}
-							>
-								Close
-							</button>
 						</div>
 					</div>
 				</div>
