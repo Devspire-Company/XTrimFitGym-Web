@@ -810,14 +810,6 @@ export function EquipmentPage() {
 		}
 	};
 
-	const openStockAdjustmentModal = (item: any, direction: StockDirection) => {
-		setStockTarget(item);
-		setStockDirection(direction);
-		setStockAmount('1');
-		setStockReason('');
-		setIsStockModalOpen(true);
-	};
-
 	const handleStockAdjustmentSubmit = async () => {
 		if (!stockTarget) return;
 		const parsedAmount = Number.parseInt(stockAmount.trim(), 10);
