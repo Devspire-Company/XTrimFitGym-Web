@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { Button } from '@/components/ui/button';
-import { Plus, Dumbbell, AlertTriangle } from 'lucide-react';
+import { Plus, Dumbbell, AlertTriangle, ChevronDown } from 'lucide-react';
 import { EquipmentFormModal, type EquipmentFormData } from '@/components/modals/EquipmentFormModal';
 import { EquipmentViewModal } from '@/components/modals/EquipmentViewModal';
 import { SuccessModal } from '@/components/modals/SuccessModal';
@@ -308,6 +308,7 @@ export function EquipmentPage() {
 	const [stockDirection, setStockDirection] = useState<StockDirection>('IN');
 	const [stockAmount, setStockAmount] = useState('1');
 	const [stockReason, setStockReason] = useState('');
+	const [openActionMenuForId, setOpenActionMenuForId] = useState<string | null>(null);
 	const [equipmentActionLogs, setEquipmentActionLogs] = useState<EquipmentActionLog[]>(() =>
 		typeof window === 'undefined' ? [] : readEquipmentActionLogs()
 	);
@@ -640,6 +641,7 @@ export function EquipmentPage() {
 	};
 
 	const handleEdit = (item: any) => {
+		setOpenActionMenuForId(null);
 		setIsEdit(true);
 		setSelected(item);
 		setIsFormOpen(true);
@@ -651,6 +653,7 @@ export function EquipmentPage() {
 	};
 
 	const handleDelete = (item: any) => {
+		setOpenActionMenuForId(null);
 		setSelected(item);
 		setArchiveReasonOption('Damaged beyond repair');
 		setArchiveReasonOther('');
@@ -811,6 +814,7 @@ export function EquipmentPage() {
 	};
 
 	const openStockAdjustmentModal = (item: any, direction: StockDirection) => {
+		setOpenActionMenuForId(null);
 		setStockTarget(item);
 		setStockDirection(direction);
 		setStockAmount('1');
@@ -1300,42 +1304,56 @@ export function EquipmentPage() {
 										{restoring ? 'Restoring...' : 'Restore'}
 									</button>
 								) : (
-									<div className="flex w-full flex-col gap-2">
-										<div className="flex gap-2">
-											<button
-												type="button"
-												onClick={(e) => {
-													e.stopPropagation();
-													openStockAdjustmentModal(item, 'OUT');
-												}}
-												disabled={adjustingStock}
-												className="flex h-10 flex-1 items-center justify-center rounded-xl border border-[rgba(239,68,68,0.35)] bg-[linear-gradient(180deg,rgba(239,68,68,0.2),rgba(239,68,68,0.08))] text-xs font-semibold text-[#F87171] transition hover:bg-[rgba(239,68,68,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
-											>
-												Stock out
-											</button>
-											<button
-												type="button"
-												onClick={(e) => {
-													e.stopPropagation();
-													openStockAdjustmentModal(item, 'IN');
-												}}
-												disabled={adjustingStock}
-												className="flex h-10 flex-1 items-center justify-center rounded-xl border border-[rgba(16,185,129,0.35)] bg-[linear-gradient(180deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))] text-xs font-semibold text-[#34D399] transition hover:bg-[rgba(16,185,129,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
-											>
-												Stock in
-											</button>
-										</div>
-										<div className="flex gap-3">
+									<div className="flex w-full gap-3">
+										<div className="relative flex-1">
 										<button
 											type="button"
 											onClick={(e) => {
 												e.stopPropagation();
-												handleEdit(item);
+												setOpenActionMenuForId((prev) => (prev === item.id ? null : item.id));
 											}}
-											className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(249,197,19,0.35)] bg-[rgba(249,197,19,0.14)] px-4 text-sm font-semibold text-[var(--primary-yellow)] transition hover:bg-[rgba(249,197,19,0.22)]"
+											className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[rgba(249,197,19,0.35)] bg-[rgba(249,197,19,0.14)] px-4 text-sm font-semibold text-[var(--primary-yellow)] transition hover:bg-[rgba(249,197,19,0.22)]"
 										>
 											Edit
+											<ChevronDown className="h-4 w-4" />
 										</button>
+										{openActionMenuForId === item.id ? (
+											<div className="absolute bottom-full left-0 z-20 mb-2 w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-1 shadow-lg">
+												<button
+													type="button"
+													onClick={(e) => {
+														e.stopPropagation();
+														handleEdit(item);
+													}}
+													className="flex h-9 w-full items-center justify-start rounded-lg px-3 text-sm text-[var(--text-primary)] transition hover:bg-[rgba(249,197,19,0.12)]"
+												>
+													Edit details
+												</button>
+												<button
+													type="button"
+													onClick={(e) => {
+														e.stopPropagation();
+														openStockAdjustmentModal(item, 'IN');
+													}}
+													disabled={adjustingStock}
+													className="flex h-9 w-full items-center justify-start rounded-lg px-3 text-sm text-[#34D399] transition hover:bg-[rgba(16,185,129,0.12)] disabled:cursor-not-allowed disabled:opacity-50"
+												>
+													Stock in
+												</button>
+												<button
+													type="button"
+													onClick={(e) => {
+														e.stopPropagation();
+														openStockAdjustmentModal(item, 'OUT');
+													}}
+													disabled={adjustingStock}
+													className="flex h-9 w-full items-center justify-start rounded-lg px-3 text-sm text-[#F87171] transition hover:bg-[rgba(239,68,68,0.12)] disabled:cursor-not-allowed disabled:opacity-50"
+												>
+													Stock out
+												</button>
+											</div>
+										) : null}
+										</div>
 										<button
 											type="button"
 											onClick={(e) => {
@@ -1346,7 +1364,6 @@ export function EquipmentPage() {
 										>
 											Archive
 										</button>
-										</div>
 									</div>
 								)}
 							</div>
