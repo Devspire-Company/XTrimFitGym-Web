@@ -345,6 +345,53 @@ function formatUsageScheduleLabel(
 	return dateLabel;
 }
 
+function getManilaNowContext(): { ymd: string; minutes: number } {
+	const parts = new Intl.DateTimeFormat('en-US', {
+		timeZone: 'Asia/Manila',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+		hour12: false,
+	}).formatToParts(new Date());
+	const get = (type: string) => parts.find((p) => p.type === type)?.value || '';
+	const year = get('year');
+	const month = get('month');
+	const day = get('day');
+	const hour = Number(get('hour') || '0');
+	const minute = Number(get('minute') || '0');
+	return { ymd: `${year}-${month}-${day}`, minutes: hour * 60 + minute };
+}
+
+function parseAmPmToMinutes(value: string | null | undefined): number {
+	const raw = String(value || '').trim().toUpperCase();
+	const m = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+	if (!m) return 0;
+	let hours = Number(m[1]);
+	const minutes = Number(m[2]);
+	if (m[3] === 'AM' && hours === 12) hours = 0;
+	if (m[3] === 'PM' && hours !== 12) hours += 12;
+	return hours * 60 + minutes;
+}
+
+function getYmdInManilaFromIso(iso: string | null | undefined): string {
+	if (!iso) return '';
+	const parsed = new Date(iso);
+	if (!Number.isFinite(parsed.getTime())) return '';
+	const parts = new Intl.DateTimeFormat('en-US', {
+		timeZone: 'Asia/Manila',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+	}).formatToParts(parsed);
+	const get = (type: string) => parts.find((p) => p.type === type)?.value || '';
+	const year = get('year');
+	const month = get('month');
+	const day = get('day');
+	return year && month && day ? `${year}-${month}-${day}` : '';
+}
+
 const ARCHIVE_REASON_OPTIONS = [
 	'Damaged beyond repair',
 	'Replaced by a new unit',
@@ -1328,7 +1375,19 @@ export function EquipmentPage() {
 						const availabilityMeta = getAvailabilityMeta(item);
 						const statusKey = String(item.status || '').toUpperCase();
 						const isUnavailable = statusKey === 'UNDERMAINTENANCE' || statusKey === 'DAMAGED';
-						const usageRows = Array.isArray(item.upcomingUsages) ? item.upcomingUsages.slice(0, 2) : [];
+						const manilaNow = getManilaNowContext();
+						const usageRows = Array.isArray(item.upcomingUsages)
+							? (item.upcomingUsages as any[])
+									.filter((slot) => {
+										const usageYmd = getYmdInManilaFromIso(slot?.date);
+										if (!usageYmd) return false;
+										if (usageYmd > manilaNow.ymd) return true;
+										if (usageYmd < manilaNow.ymd) return false;
+										const endMinutes = parseAmPmToMinutes(slot?.endTime || slot?.startTime);
+										return endMinutes > manilaNow.minutes;
+									})
+									.slice(0, 2)
+							: [];
 						return (
 					<div
 						key={item.id}
