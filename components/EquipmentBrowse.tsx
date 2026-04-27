@@ -208,6 +208,9 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 			) : error ? (
 				<View style={styles.centered}>
 					<Text style={styles.errorText}>Could not load equipment.</Text>
+					<Text style={[styles.errorText, { marginTop: 8, fontSize: 12, opacity: 0.8 }]}>
+						{String(error.message || '').slice(0, 180)}
+					</Text>
 				</View>
 			) : (
 				<FlatList

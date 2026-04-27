@@ -110,6 +110,7 @@ export function WheelColumn({ data, selectedIndex, onSelectIndex }: WheelColumnP
 				onScroll={onScroll}
 				scrollEventThrottle={8}
 				onMomentumScrollEnd={onMomentumScrollEnd}
+				onScrollEndDrag={onMomentumScrollEnd}
 				getItemLayout={(_, index) => ({
 					length: WHEEL_ITEM_HEIGHT,
 					offset: WHEEL_ITEM_HEIGHT * index,

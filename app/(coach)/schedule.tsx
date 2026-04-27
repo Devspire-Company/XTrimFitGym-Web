@@ -181,6 +181,7 @@ const CoachSchedule = () => {
 	const [scheduleListUpcoming, setScheduleListUpcoming] = useState(false);
 
 	const SESSION_DEFAULT_DURATION_MINUTES = 60;
+const OPEN_TIME_SCREENSHOT_MODE = true;
 
 	const [showCreateSessionSuccess, setShowCreateSessionSuccess] = useState(false);
 	const [showTemplateSessionSuccess, setShowTemplateSessionSuccess] =
@@ -386,6 +387,44 @@ const CoachSchedule = () => {
 		const displayMinutes = minutes.toString().padStart(2, '0');
 		return `${displayHours}:${displayMinutes} ${ampm}`;
 	};
+
+	const parseAmPmToMinutes = useCallback((raw: string | null | undefined): number => {
+		const value = String(raw || '').trim().toUpperCase();
+		const m = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+		if (!m) return 0;
+		let hours = parseInt(m[1], 10);
+		const minutes = parseInt(m[2], 10);
+		if (m[3] === 'AM' && hours === 12) hours = 0;
+		if (m[3] === 'PM' && hours !== 12) hours += 12;
+		return hours * 60 + minutes;
+	}, []);
+
+	const getYmdInManila = useCallback((input: string | Date | null | undefined): string => {
+		if (!input) return '';
+		const parsed = input instanceof Date ? input : new Date(input);
+		if (!Number.isFinite(parsed.getTime())) return '';
+		const parts = new Intl.DateTimeFormat('en-US', {
+			timeZone: 'Asia/Manila',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+		}).formatToParts(parsed);
+		const get = (type: string) => parts.find((p) => p.type === type)?.value || '';
+		const year = get('year');
+		const month = get('month');
+		const day = get('day');
+		return year && month && day ? `${year}-${month}-${day}` : '';
+	}, []);
+
+	const hasWindowOverlap = useCallback(
+		(
+			aStart: number,
+			aEnd: number,
+			bStart: number,
+			bEnd: number
+		): boolean => aStart < bEnd && bStart < aEnd,
+		[]
+	);
 
 	const equipmentCheckDate = useMemo(
 		() => (date ? sessionCalendarDateToIso(date) : undefined),
@@ -748,6 +787,9 @@ const CoachSchedule = () => {
 	}, [date]);
 
 	const sessionTimeBounds = useMemo(() => {
+		if (OPEN_TIME_SCREENSHOT_MODE) {
+			return { min: 0, max: 23 * 60 + 45 };
+		}
 		if (isTemplate || isGroupClass) return gymBoundsForSession;
 
 		const clientIds =
@@ -799,6 +841,10 @@ const CoachSchedule = () => {
 	);
 
 	useEffect(() => {
+		if (OPEN_TIME_SCREENSHOT_MODE) {
+			setPreferredTimeLabel('Listed times: Open time mode (12:00 AM – 11:45 PM).');
+			return;
+		}
 		if (isTemplate || isGroupClass) {
 			setPreferredTimeLabel(null);
 			return;
@@ -962,11 +1008,20 @@ const CoachSchedule = () => {
 
 	const equipmentOptions = useMemo(() => {
 		const rows = (equipmentsData?.getEquipments || []) as any[];
+		const selectedDateYmd = date ? getYmdInManila(sessionCalendarDateToIso(date)) : '';
+		const selectedStartMinutes = startTime ? parseAmPmToMinutes(formatTimeToString(startTime)) : 0;
+		const selectedEndMinutes = endTime
+			? parseAmPmToMinutes(formatTimeToString(endTime))
+			: selectedStartMinutes > 0
+				? selectedStartMinutes + 60
+				: 0;
+		const hasSelectedWindow = !!selectedDateYmd && selectedStartMinutes > 0;
 		const byName = new Map<
 			string,
 			{
 				id: string;
 				name: string;
+				status: string;
 				quantity: number;
 				isReservedInWindow: boolean;
 				reservedQuantityInWindow: number;
@@ -984,41 +1039,143 @@ const CoachSchedule = () => {
 			const name = String(x.name || 'Equipment').trim();
 			const key = name.toLowerCase();
 			const quantity = Math.max(0, Number(x.quantity ?? 0));
-			const reservedQuantityInWindow = Math.max(
-				0,
-				Number(x.reservedQuantityInWindow ?? 0)
-			);
+			const rawUpcomingUsages: Array<{
+				sessionId: string;
+				sessionName: string;
+				startTime: string;
+				endTime?: string | null;
+				date?: string | null;
+				quantity: number;
+			}> = Array.isArray(x.upcomingUsages) ? x.upcomingUsages : [];
+			const computedReservedInWindow = hasSelectedWindow
+				? rawUpcomingUsages.reduce((sum, slot) => {
+						const slotDateYmd = getYmdInManila(slot?.date || null);
+						if (!slotDateYmd || slotDateYmd !== selectedDateYmd) return sum;
+						const slotStart = parseAmPmToMinutes(slot?.startTime);
+						const slotEnd = parseAmPmToMinutes(slot?.endTime || slot?.startTime);
+						const normalizedSlotEnd = slotEnd > slotStart ? slotEnd : slotStart + 60;
+						const normalizedSelectedEnd =
+							selectedEndMinutes > selectedStartMinutes
+								? selectedEndMinutes
+								: selectedStartMinutes + 60;
+						return hasWindowOverlap(
+							selectedStartMinutes,
+							normalizedSelectedEnd,
+							slotStart,
+							normalizedSlotEnd
+						)
+							? sum + Math.max(1, Number(slot?.quantity || 1))
+							: sum;
+				  }, 0)
+				: Math.max(0, Number(x.reservedQuantityInWindow ?? 0));
+			const reservedQuantityInWindow = Math.max(0, computedReservedInWindow);
 			const existing = byName.get(key);
 			if (!existing || quantity > existing.quantity) {
 				byName.set(key, {
 					id: String(x.id),
 					name,
+					status: String(x.status || 'AVAILABLE').toUpperCase(),
 					quantity,
-					isReservedInWindow: !!x.isReservedInWindow,
+					isReservedInWindow: reservedQuantityInWindow > 0,
 					reservedQuantityInWindow,
-					upcomingUsages: Array.isArray(x.upcomingUsages) ? x.upcomingUsages : [],
+					upcomingUsages: rawUpcomingUsages,
 				});
 			}
 		}
 		return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
-	}, [equipmentsData]);
+	}, [
+		equipmentsData,
+		date,
+		startTime,
+		endTime,
+		formatTimeToString,
+		getYmdInManila,
+		parseAmPmToMinutes,
+		hasWindowOverlap,
+	]);
 
 	const equipmentById = useMemo(() => {
 		return new Map(equipmentOptions.map((x) => [String(x.id), x]));
 	}, [equipmentOptions]);
 
+	const getEquipmentAvailabilityMeta = useCallback(
+		(eq: {
+			status?: string;
+			quantity?: number;
+			reservedQuantityInWindow?: number;
+			isReservedInWindow?: boolean;
+		}) => {
+			const status = String(eq.status || 'AVAILABLE').toUpperCase();
+			const total = Math.max(0, Number(eq.quantity || 0));
+			const reserved = Math.max(0, Number(eq.reservedQuantityInWindow || 0));
+			const availableUnits = Math.max(0, total - reserved);
+
+			if (status === 'UNDERMAINTENANCE') {
+				return {
+					availableUnits,
+					selectable: false,
+					badge: 'Unavailable - Maintenance',
+				};
+			}
+			if (status === 'DAMAGED') {
+				return {
+					availableUnits,
+					selectable: false,
+					badge: 'Unavailable - Damaged',
+				};
+			}
+			if (total <= 0) {
+				return {
+					availableUnits,
+					selectable: false,
+					badge: 'Unavailable - Out of stock',
+				};
+			}
+			if (eq.isReservedInWindow && availableUnits <= 0) {
+				return {
+					availableUnits,
+					selectable: false,
+					badge: 'In Use Now',
+				};
+			}
+			if (eq.isReservedInWindow && availableUnits > 0) {
+				return {
+					availableUnits,
+					selectable: true,
+					badge: `Partially Available ${availableUnits}/${total}`,
+				};
+			}
+			return {
+				availableUnits,
+				selectable: true,
+				badge: `Available ${availableUnits}/${total}`,
+			};
+		},
+		[]
+	);
+
 	const availableEquipmentSelectOptions = useMemo(() => {
 		return equipmentOptions
 			.filter((eq) => !manualEquipmentSelections.some((m) => m.equipmentId === eq.id))
 			.map((eq) => {
-				const availableUnits = Math.max(
-					0,
-					Number(eq.quantity || 0) - Number(eq.reservedQuantityInWindow || 0)
-				);
-				const label = `${eq.name} • ${availableUnits}/${eq.quantity} available`;
-				return { label, value: eq.id };
-			});
-	}, [equipmentOptions, manualEquipmentSelections]);
+				const meta = getEquipmentAvailabilityMeta(eq);
+				const total = Math.max(0, Number(eq.quantity || 0));
+				const availableUnits = Math.max(0, Number(meta.availableUnits || 0));
+				const trailingText = meta.selectable
+					? `${availableUnits}/${total}`
+					: meta.badge.replace(/^Unavailable -\s*/i, '');
+				return {
+					label: eq.name,
+					value: eq.id,
+					trailingText,
+					disabled: !meta.selectable,
+					muted: !meta.selectable,
+					sortKey: meta.selectable ? 0 : 1,
+				};
+			})
+			.sort((a, b) => (a.sortKey - b.sortKey) || a.label.localeCompare(b.label))
+			.map(({ sortKey, ...row }) => row);
+	}, [equipmentOptions, manualEquipmentSelections, getEquipmentAvailabilityMeta]);
 
 	const toggleManualEquipment = (equipmentId: string) => {
 		setManualEquipmentSelections((prev) => {
@@ -1030,6 +1187,19 @@ const CoachSchedule = () => {
 
 	const addManualEquipment = (equipmentId: string) => {
 		if (!equipmentId) return;
+		const eq = equipmentById.get(String(equipmentId));
+		if (!eq) return;
+		const availability = getEquipmentAvailabilityMeta(eq);
+		if (!availability.selectable) {
+			setAlertModal({
+				visible: true,
+				title: 'Equipment not selectable',
+				message: `${eq.name} is currently ${availability.badge.toLowerCase()}. Please choose another equipment or time.`,
+				variant: 'warning',
+			});
+			setEquipmentPickerValue('');
+			return;
+		}
 		setManualEquipmentSelections((prev) => {
 			if (prev.some((x) => x.equipmentId === equipmentId)) return prev;
 			return [...prev, { equipmentId, quantity: 1 }];
@@ -1098,10 +1268,7 @@ const CoachSchedule = () => {
 				{manualEquipmentSelections.map((row) => {
 					const eq = equipmentById.get(String(row.equipmentId));
 					if (!eq) return null;
-					const availableUnits = Math.max(
-						0,
-						Number(eq.quantity || 0) - Number(eq.reservedQuantityInWindow || 0)
-					);
+					const meta = getEquipmentAvailabilityMeta(eq);
 					return (
 						<View
 							key={`manual-${eq.id}`}
@@ -1122,9 +1289,7 @@ const CoachSchedule = () => {
 								</TouchableOpacity>
 							</View>
 							<Text className='text-text-secondary text-xs mt-1'>
-								{availableUnits > 0
-									? `Available now: ${availableUnits}/${eq.quantity}`
-									: `Unavailable now: reserved ${eq.reservedQuantityInWindow}/${eq.quantity}`}
+								{meta.badge}
 							</Text>
 							{eq.upcomingUsages?.slice(0, 2).map((slot) => (
 								<Text key={`${eq.id}-${slot.sessionId}-${slot.startTime}`} className='text-text-secondary text-xs mt-1'>
@@ -1132,7 +1297,7 @@ const CoachSchedule = () => {
 									{slot.endTime ? ` - ${slot.endTime}` : ''} (qty {slot.quantity})
 								</Text>
 							))}
-							<View className='mt-2 flex-row items-center'>
+							<View className='mt-2 flex-row items-center justify-between'>
 								<Text className='text-text-secondary mr-2'>Qty</Text>
 								<TextInput
 									value={String(row.quantity)}
@@ -1145,6 +1310,7 @@ const CoachSchedule = () => {
 									keyboardType='number-pad'
 									className='bg-bg-primary rounded-lg p-2 text-text-primary border border-[#F9C513] w-20'
 									style={{ borderWidth: 0.5 }}
+									editable={meta.selectable}
 								/>
 							</View>
 						</View>

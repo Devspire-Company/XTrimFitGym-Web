@@ -11,6 +11,9 @@ import {
 interface SelectOption {
 	label: string;
 	value: string;
+	trailingText?: string;
+	disabled?: boolean;
+	muted?: boolean;
 }
 
 interface SelectProps {
@@ -87,8 +90,10 @@ const Select: React.FC<SelectProps> = ({
 								<TouchableOpacity
 									style={[
 										styles.option,
+										item.disabled && styles.disabledOption,
 										value === item.value && styles.selectedOption,
 									]}
+									disabled={!!item.disabled}
 									onPress={() => {
 										onChange(item.value);
 										setIsOpen(false);
@@ -98,6 +103,7 @@ const Select: React.FC<SelectProps> = ({
 										<Text
 											style={[
 												styles.optionText,
+												item.muted && styles.mutedOptionText,
 												value === item.value && styles.selectedOptionText,
 											]}
 										>
@@ -106,6 +112,10 @@ const Select: React.FC<SelectProps> = ({
 									</View>
 									{value === item.value ? (
 										<Text style={styles.checkmark}>✓</Text>
+									) : item.trailingText ? (
+										<Text style={[styles.trailingText, item.muted && styles.mutedTrailingText]}>
+											{item.trailingText}
+										</Text>
 									) : (
 										<View style={styles.checkmarkSpacer} />
 									)}
@@ -156,6 +166,9 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: '#333',
 	},
+	disabledOption: {
+		backgroundColor: '#161616',
+	},
 	optionTextWrap: {
 		flex: 1,
 		paddingRight: 12,
@@ -175,6 +188,19 @@ const styles = StyleSheet.create({
 	selectedOptionText: {
 		color: '#F9C513',
 		fontWeight: '600',
+	},
+	mutedOptionText: {
+		opacity: 0.55,
+	},
+	trailingText: {
+		fontSize: 13,
+		lineHeight: 22,
+		color: '#BDBFC7',
+		textAlign: 'right',
+		width: 110,
+	},
+	mutedTrailingText: {
+		opacity: 0.55,
 	},
 	checkmark: {
 		fontSize: 18,
