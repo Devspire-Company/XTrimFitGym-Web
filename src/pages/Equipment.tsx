@@ -364,6 +364,46 @@ function getManilaNowContext(): { ymd: string; minutes: number } {
 	return { ymd: `${year}-${month}-${day}`, minutes: hour * 60 + minute };
 }
 
+function getCurrentManilaEquipmentWindowVariables(): {
+	checkDate: string;
+	checkStartTime: string;
+	checkEndTime: string;
+} {
+	const now = new Date();
+	const startParts = new Intl.DateTimeFormat('en-US', {
+		timeZone: 'Asia/Manila',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	}).formatToParts(now);
+	const endParts = new Intl.DateTimeFormat('en-US', {
+		timeZone: 'Asia/Manila',
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	}).formatToParts(new Date(now.getTime() + 60 * 1000));
+	const get = (parts: Intl.DateTimeFormatPart[], type: string) =>
+		parts.find((p) => p.type === type)?.value || '';
+	const year = get(startParts, 'year');
+	const month = get(startParts, 'month');
+	const day = get(startParts, 'day');
+	const checkDate = `${year}-${month}-${day}T12:00:00.000Z`;
+	const toTime = (parts: Intl.DateTimeFormatPart[]) => {
+		const h = get(parts, 'hour');
+		const m = get(parts, 'minute');
+		const ap = get(parts, 'dayPeriod').toUpperCase();
+		return `${h}:${m} ${ap}`;
+	};
+	return {
+		checkDate,
+		checkStartTime: toTime(startParts),
+		checkEndTime: toTime(endParts),
+	};
+}
+
 function parseAmPmToMinutes(value: string | null | undefined): number {
 	const raw = String(value || '').trim().toUpperCase();
 	const m = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
@@ -436,6 +476,7 @@ export function EquipmentPage() {
 	const [stockDirection, setStockDirection] = useState<StockDirection>('IN');
 	const [stockAmount, setStockAmount] = useState('1');
 	const [stockReason, setStockReason] = useState('');
+	const currentWindowVars = useMemo(() => getCurrentManilaEquipmentWindowVariables(), []);
 	const [equipmentActionLogs, setEquipmentActionLogs] = useState<EquipmentActionLog[]>(() =>
 		typeof window === 'undefined' ? [] : readEquipmentActionLogs()
 	);
@@ -486,14 +527,14 @@ export function EquipmentPage() {
 	};
 
 	const enhancedQuery = useQuery(GET_EQUIPMENTS_WITH_AVAILABILITY, {
-		variables: { includeArchived: true },
+		variables: { includeArchived: true, ...currentWindowVars },
 		errorPolicy: 'none',
 		skip: useLegacyApi || !useEnhancedAvailabilityQuery,
 		pollInterval: 15000,
 		notifyOnNetworkStatusChange: true,
 	});
 	const modernQuery = useQuery(GET_EQUIPMENTS, {
-		variables: { includeArchived: true },
+		variables: { includeArchived: true, ...currentWindowVars },
 		errorPolicy: 'none',
 		skip: useLegacyApi || useEnhancedAvailabilityQuery,
 		pollInterval: 15000,
@@ -569,10 +610,10 @@ export function EquipmentPage() {
 			return;
 		}
 		if (useEnhancedAvailabilityQuery) {
-			await enhancedQuery.refetch({ includeArchived: true });
+			await enhancedQuery.refetch({ includeArchived: true, ...getCurrentManilaEquipmentWindowVariables() });
 			return;
 		}
-		await modernQuery.refetch({ includeArchived: true });
+		await modernQuery.refetch({ includeArchived: true, ...getCurrentManilaEquipmentWindowVariables() });
 	};
 	const archiveFiltered =
 		viewTab === 'ARCHIVED'
