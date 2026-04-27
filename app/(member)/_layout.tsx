@@ -9,7 +9,7 @@ import {
 import { memberHasActiveGymMembership } from '@/utils/memberMembership';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter, useSegments } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,9 +17,30 @@ const MemberLayoutContent = () => {
 	const insets = useSafeAreaInsets();
 	const { user } = useAuth();
 	const hasMembership = memberHasActiveGymMembership(user);
-	const { openMembershipRequired } = useMemberMembershipModal();
+	const {
+		openMembershipRequired,
+		openMembershipExpiredFlow,
+		isMembershipExpiryFlowActive,
+	} = useMemberMembershipModal();
 	const router = useRouter();
 	const segments = useSegments();
+	const prevHadMembershipRef = useRef<boolean>(hasMembership);
+	const lastExpiryPromptKeyRef = useRef<string>('');
+
+	const membershipSnapshot = useMemo(() => {
+		const anyUser = user as any;
+		const tx = anyUser?.currentMembership || anyUser?.membershipDetails?.membershipTransaction;
+		const status = String(tx?.status || '').toUpperCase();
+		const expiresAt = tx?.expiresAt ? String(tx.expiresAt) : '';
+		const id = tx?.id ? String(tx.id) : '';
+		const expiredByStatus = status === 'EXPIRED';
+		const expiredByTime = status === 'ACTIVE' && expiresAt ? new Date(expiresAt).getTime() <= Date.now() : false;
+		return {
+			id,
+			expiresAt,
+			expired: expiredByStatus || expiredByTime,
+		};
+	}, [user]);
 
 	const tabbarHeight =
 		Platform.OS === 'android'
@@ -36,7 +57,21 @@ const MemberLayoutContent = () => {
 	};
 
 	useEffect(() => {
+		const previouslyHadMembership = prevHadMembershipRef.current;
+		prevHadMembershipRef.current = hasMembership;
 		if (hasMembership) return;
+		const justExpiredFromActive = previouslyHadMembership && !hasMembership;
+		const expiredFromSnapshot = membershipSnapshot.expired;
+		if (!justExpiredFromActive && !expiredFromSnapshot) return;
+		const promptKey = `${membershipSnapshot.id}|${membershipSnapshot.expiresAt}`;
+		if (promptKey && lastExpiryPromptKeyRef.current === promptKey) return;
+		lastExpiryPromptKeyRef.current = promptKey;
+		openMembershipExpiredFlow(membershipSnapshot.expiresAt || undefined);
+	}, [hasMembership, membershipSnapshot, openMembershipExpiredFlow]);
+
+	useEffect(() => {
+		if (hasMembership) return;
+		if (isMembershipExpiryFlowActive) return;
 		const currentLeaf = segments[segments.length - 1];
 		const isMembershipLockedTab =
 			currentLeaf === 'dashboard' ||
@@ -45,7 +80,13 @@ const MemberLayoutContent = () => {
 		if (!isMembershipLockedTab) return;
 		openMembershipRequired();
 		router.navigate('/(member)/workouts');
-	}, [hasMembership, segments, openMembershipRequired, router]);
+	}, [
+		hasMembership,
+		segments,
+		openMembershipRequired,
+		router,
+		isMembershipExpiryFlowActive,
+	]);
 
 	return (
 		<View style={{ flex: 1 }}>

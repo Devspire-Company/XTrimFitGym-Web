@@ -129,6 +129,19 @@ function statusColor(s: EquipmentStatusValue): string {
 	}
 }
 
+function getDisplayAvailabilityState(row: Pick<EquipmentRow, 'status' | 'isReservedInWindow'>): {
+	label: string;
+	color: string;
+} {
+	if (row.isReservedInWindow && row.status === 'AVAILABLE') {
+		return { label: 'In use now', color: '#F97316' };
+	}
+	return {
+		label: statusLabelCompact(row.status),
+		color: statusColor(row.status),
+	};
+}
+
 function normalizeStatus(raw: unknown): EquipmentStatusValue {
 	const u = String(raw ?? 'AVAILABLE').toUpperCase();
 	if (u === 'DAMAGED') return 'DAMAGED';
@@ -276,6 +289,9 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 						/>
 					}
 					renderItem={({ item }) => (
+						(() => {
+							const displayState = getDisplayAvailabilityState(item);
+							return (
 						<TouchableOpacity
 							activeOpacity={0.85}
 							onPress={() => setDetail(item)}
@@ -301,17 +317,10 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 									</View>
 									<View style={styles.statusRow}>
 										<View style={styles.statusPillWrap}>
-											<Text style={[styles.statusPill, { color: statusColor(item.status) }]}>
-												{statusLabelCompact(item.status)}
+											<Text style={[styles.statusPill, { color: displayState.color }]}>
+												{displayState.label}
 											</Text>
 										</View>
-										{item.isReservedInWindow ? (
-											<View style={[styles.statusPillWrap, { marginLeft: 6 }]}>
-												<Text style={[styles.statusPill, { color: '#F97316' }]}>
-													In use now
-												</Text>
-											</View>
-										) : null}
 									</View>
 									<View style={styles.stockRow}>
 										<Text style={styles.stockMeta}>Qty {item.quantity}</Text>
@@ -327,6 +336,8 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 								</View>
 							</View>
 						</TouchableOpacity>
+							);
+						})()
 					)}
 				/>
 			)}
@@ -341,6 +352,14 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 							</TouchableOpacity>
 						</View>
 						{detail ? (
+							(() => {
+								const displayState = getDisplayAvailabilityState(detail);
+								const activeUsage = (detail.upcomingUsages || []).find((slot) => {
+									const start = String(slot.startTime || '').trim();
+									const end = String(slot.endTime || '').trim();
+									return !!(start && end);
+								});
+								return (
 							<ScrollView showsVerticalScrollIndicator={false}>
 								<View style={styles.modalImageWrap}>
 									<Image
@@ -352,8 +371,8 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 								<Text style={styles.detailName}>{detail.name}</Text>
 								<View style={styles.detailStatusRow}>
 									<View style={styles.detailStatusPill}>
-										<Text style={[styles.detailStatus, { color: statusColor(detail.status) }]}>
-											{statusLabel(detail.status)}
+										<Text style={[styles.detailStatus, { color: displayState.color }]}>
+											{displayState.label}
 										</Text>
 									</View>
 									<Text style={[styles.detailBody, styles.detailQty]}>
@@ -375,9 +394,15 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 									</Text>
 								)}
 								{detail.isReservedInWindow ? (
-									<Text style={[styles.detailBody, { marginBottom: 14 }]}>
-										Reserved qty now: {detail.reservedQuantityInWindow || 0}
-									</Text>
+									<View style={{ marginBottom: 14 }}>
+										<Text style={styles.detailMeta}>Current reservation</Text>
+										<Text style={styles.detailBody}>
+											Until: {activeUsage?.endTime || 'End time not set'}
+										</Text>
+										<Text style={styles.detailBody}>
+											Reserved qty now: {detail.reservedQuantityInWindow || 0}
+										</Text>
+									</View>
 								) : null}
 								{(detail.upcomingUsages || []).length > 0 ? (
 									<View style={{ marginBottom: 14 }}>
@@ -400,6 +425,8 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 									{detail.notes?.trim() ? detail.notes : '—'}
 								</Text>
 							</ScrollView>
+								);
+							})()
 						) : null}
 					</View>
 				</View>

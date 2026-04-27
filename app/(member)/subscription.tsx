@@ -144,6 +144,26 @@ const MemberSubscription = () => {
 		return diffDays > 0 ? diffDays : 0;
 	};
 
+	const getDurationUnitLabel = (durationType: string | null | undefined) => {
+		const key = String(durationType || '').toUpperCase();
+		if (key === 'MINUTES') return 'minute promo';
+		if (key === 'DAILY') return 'day pass';
+		if (key === 'QUARTERLY') return 'quarter';
+		if (key === 'YEARLY') return 'year';
+		return 'month';
+	};
+
+	const getTimeRemainingLabel = (expiresAt: string) => {
+		const ms = new Date(expiresAt).getTime() - Date.now();
+		if (!Number.isFinite(ms) || ms <= 0) return 'Expired';
+		const minutes = Math.ceil(ms / (1000 * 60));
+		if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+		const hours = Math.ceil(minutes / 60);
+		if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''}`;
+		const days = Math.ceil(hours / 24);
+		return `${days} day${days !== 1 ? 's' : ''}`;
+	};
+
 	const handlePurchase = (membership: any) => {
 		setSelectedMembership(membership);
 		setShowPurchaseModal(true);
@@ -295,7 +315,7 @@ const MemberSubscription = () => {
 										{currentSubscription.membership?.name || 'Premium'}
 									</Text>
 									<Text className='text-white/80 text-sm'>
-										{currentSubscription.membership?.durationType} Plan
+										{currentSubscription.membership?.durationType || 'Membership'} Plan
 									</Text>
 								</View>
 								<Ionicons name='checkmark-circle' size={48} color='white' />
@@ -362,10 +382,10 @@ const MemberSubscription = () => {
 
 							<View className='mb-4 pb-4 border-b border-bg-darker/20'>
 								<Text className='text-text-secondary text-sm mb-2'>
-									Days Remaining
+									Time Remaining
 								</Text>
 								<Text className='text-[#F9C513] font-bold text-2xl'>
-									{calculateDaysRemaining(currentSubscription.expiresAt)} days
+									{getTimeRemainingLabel(currentSubscription.expiresAt)}
 								</Text>
 							</View>
 
@@ -462,7 +482,7 @@ const MemberSubscription = () => {
 											<Text className='text-3xl font-bold text-[#F9C513] mb-2'>
 												₱{membership.monthlyPrice.toLocaleString()}
 												<Text className='text-base text-text-secondary font-normal'>
-													/{membership.durationType?.toLowerCase() || 'month'}
+													/{getDurationUnitLabel(membership.durationType)}
 												</Text>
 											</Text>
 											{membership.description && (
@@ -650,7 +670,7 @@ const MemberSubscription = () => {
 									<Text className='text-3xl font-bold text-[#F9C513] mb-2'>
 										₱{membership.monthlyPrice.toLocaleString()}
 										<Text className='text-base text-text-secondary font-normal'>
-											/{membership.durationType?.toLowerCase() || 'month'}
+											/{getDurationUnitLabel(membership.durationType)}
 										</Text>
 									</Text>
 
