@@ -488,6 +488,10 @@ export function EquipmentPage() {
 			await legacyQuery.refetch();
 			return;
 		}
+		if (useEnhancedAvailabilityQuery) {
+			await enhancedQuery.refetch({ includeArchived: true, checkDate, checkStartTime, checkEndTime });
+			return;
+		}
 		await modernQuery.refetch({ includeArchived: true });
 	};
 	const archiveFiltered =
@@ -1295,11 +1299,17 @@ export function EquipmentPage() {
 				{visibleList.map((item) => (
 					(() => {
 						const availabilityMeta = getAvailabilityMeta(item);
+						const statusKey = String(item.status || '').toUpperCase();
+						const isUnavailable = statusKey === 'UNDERMAINTENANCE' || statusKey === 'DAMAGED';
 						const usageRows = Array.isArray(item.upcomingUsages) ? item.upcomingUsages.slice(0, 2) : [];
 						return (
 					<div
 						key={item.id}
-						className="group flex h-full min-h-[31rem] flex-col overflow-hidden rounded-[22px] border border-[rgba(249,197,19,0.22)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-[rgba(249,197,19,0.45)]"
+						className={`group flex h-full min-h-[31rem] flex-col overflow-hidden rounded-[22px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:-translate-y-0.5 ${
+							isUnavailable
+								? 'border-[rgba(148,163,184,0.22)] opacity-85 hover:border-[rgba(148,163,184,0.35)]'
+								: 'border-[rgba(249,197,19,0.22)] hover:border-[rgba(249,197,19,0.45)]'
+						}`}
 					>
 						<div
 							className="h-52 cursor-pointer bg-[var(--bg-darker)] md:h-56"
@@ -1348,8 +1358,12 @@ export function EquipmentPage() {
 										{availabilityMeta.badge}
 									</span>
 									</div>
-									{usageRows.length > 0 ? (
-										<div className="mt-2 border-t border-[rgba(255,255,255,0.06)] pt-2 space-y-1">
+									<div className="mt-2 border-t border-[rgba(255,255,255,0.06)] pt-2">
+										<div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+											Upcoming usage
+										</div>
+										{usageRows.length > 0 ? (
+											<div className="space-y-1">
 											{usageRows.map((slot: any) => (
 												<div
 													key={`${slot.sessionId}-${slot.startTime}`}
@@ -1359,8 +1373,13 @@ export function EquipmentPage() {
 													{slot.endTime ? ` - ${slot.endTime}` : ''} (qty {slot.quantity})
 												</div>
 											))}
-										</div>
-									) : null}
+											</div>
+										) : (
+											<div className="text-[11px] text-[var(--text-secondary)]/80">
+												No upcoming usage yet.
+											</div>
+										)}
+									</div>
 								</div>
 							</div>
 							{(item.description || item.notes) && (
@@ -1460,6 +1479,13 @@ export function EquipmentPage() {
 					<p className="text-sm text-[#FCD34D]">
 						Compatibility mode is active for your current API schema. Quantity updates use fallback
 						mutation logic.
+					</p>
+				</div>
+			) : !useEnhancedAvailabilityQuery ? (
+				<div className="rounded-xl border border-[rgba(245,158,11,0.35)] bg-[rgba(245,158,11,0.1)] px-4 py-3">
+					<p className="text-sm text-[#FCD34D]">
+						Availability compatibility mode is active. Upcoming usage details may be limited until the
+						latest API schema is deployed.
 					</p>
 				</div>
 			) : null}
