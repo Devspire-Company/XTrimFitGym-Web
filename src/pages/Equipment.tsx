@@ -402,17 +402,8 @@ export function EquipmentPage() {
 		}
 	};
 
-	const now = new Date();
-	const checkDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
-	const checkStartTime = now.toLocaleTimeString('en-US', {
-		timeZone: 'Asia/Manila',
-		hour: 'numeric',
-		minute: '2-digit',
-		hour12: true,
-	});
-	const checkEndTime = checkStartTime;
 	const enhancedQuery = useQuery(GET_EQUIPMENTS_WITH_AVAILABILITY, {
-		variables: { includeArchived: true, checkDate, checkStartTime, checkEndTime },
+		variables: { includeArchived: true },
 		errorPolicy: 'none',
 		skip: useLegacyApi || !useEnhancedAvailabilityQuery,
 	});
@@ -489,7 +480,7 @@ export function EquipmentPage() {
 			return;
 		}
 		if (useEnhancedAvailabilityQuery) {
-			await enhancedQuery.refetch({ includeArchived: true, checkDate, checkStartTime, checkEndTime });
+			await enhancedQuery.refetch({ includeArchived: true });
 			return;
 		}
 		await modernQuery.refetch({ includeArchived: true });
