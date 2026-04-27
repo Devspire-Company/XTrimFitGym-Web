@@ -184,7 +184,7 @@ export function MembershipFormModal({
 									<option value="Quarterly">Quarterly</option>
 									<option value="Yearly">Yearly</option>
 									<option value="Daily">Daily (fixed days / promos)</option>
-									<option value="Minutes">Minutes (quick expiry testing)</option>
+									<option value="Minutes">Minutes</option>
 								</select>
 							</div>
 
