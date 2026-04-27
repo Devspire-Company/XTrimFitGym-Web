@@ -489,15 +489,21 @@ export function EquipmentPage() {
 		variables: { includeArchived: true },
 		errorPolicy: 'none',
 		skip: useLegacyApi || !useEnhancedAvailabilityQuery,
+		pollInterval: 15000,
+		notifyOnNetworkStatusChange: true,
 	});
 	const modernQuery = useQuery(GET_EQUIPMENTS, {
 		variables: { includeArchived: true },
 		errorPolicy: 'none',
 		skip: useLegacyApi || useEnhancedAvailabilityQuery,
+		pollInterval: 15000,
+		notifyOnNetworkStatusChange: true,
 	});
 	const legacyQuery = useQuery(GET_EQUIPMENTS_LEGACY, {
 		errorPolicy: 'none',
 		skip: !useLegacyApi,
+		pollInterval: 15000,
+		notifyOnNetworkStatusChange: true,
 	});
 	useEffect(() => {
 		if (!enhancedQuery.error) return;
