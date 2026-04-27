@@ -86,6 +86,7 @@ const normalizeFilterValue = (value: string | null | undefined): string =>
 	(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 const LIVE_UPDATE_INTERVAL_MS = 1500;
+const PAUSED_AFTER_EXPIRY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 export function MembersPage() {
 	useEffect(() => {
@@ -133,7 +134,13 @@ export function MembersPage() {
 	const [expiredMemberModalName, setExpiredMemberModalName] = useState<string | null>(
 		null
 	);
+	const [nowMs, setNowMs] = useState(() => Date.now());
 	const prevExpirySnapshotRef = useRef<Map<string, boolean> | null>(null);
+
+	useEffect(() => {
+		const id = setInterval(() => setNowMs(Date.now()), LIVE_UPDATE_INTERVAL_MS);
+		return () => clearInterval(id);
+	}, []);
 
 	const closeMemberActionsMenu = () => setOpenDropdownId(null);
 
@@ -975,33 +982,51 @@ export function MembersPage() {
 											{member.joinDate}
 										</td>
 										<td className="px-4 py-5 text-sm">
-											{member.status === 'Active' && member.expiresAt ? (
-												(() => {
-													// Calculate days until expiration for color coding
-													const expiration = new Date(member.expiresAt);
-													const now = new Date();
-													const diffTime = expiration.getTime() - now.getTime();
-													const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-													const isExpiringSoon = daysUntil <= 7;
-													const isExpiringWithinMonth = daysUntil <= 30 && daysUntil > 7;
-													
+											{(() => {
+												if (!member.expiresAt) {
+													return <span className="text-[var(--text-secondary)]">—</span>;
+												}
+												const expirationMs = new Date(member.expiresAt).getTime();
+												if (!Number.isFinite(expirationMs)) {
+													return <span className="text-[var(--text-secondary)]">—</span>;
+												}
+												const isPausedWindow =
+													nowMs >= expirationMs &&
+													nowMs < expirationMs + PAUSED_AFTER_EXPIRY_WINDOW_MS;
+												if (isPausedWindow) {
 													return (
-												<span
-													className={`px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
-																isExpiringSoon
-															? 'bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]'
-																	: isExpiringWithinMonth
-																? 'bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]'
-																: 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
-													}`}
-												>
-															{member.endDate || 'N/A'}
-												</span>
+														<span className="relative inline-flex items-center group">
+															<span className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-[rgba(148,163,184,0.16)] text-[#E2E8F0] border border-[rgba(148,163,184,0.35)]">
+																Paused
+															</span>
+															<span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-max -translate-x-1/2 rounded-lg border border-[rgba(249,197,19,0.25)] bg-[rgba(16,18,24,0.96)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-primary)] opacity-0 shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-opacity duration-150 group-hover:opacity-100">
+																Recently expired - within 3 days
+															</span>
+														</span>
 													);
-												})()
-											) : (
-												<span className="text-[var(--text-secondary)]">—</span>
-											)}
+												}
+												if (member.status !== 'Active') {
+													return <span className="text-[var(--text-secondary)]">—</span>;
+												}
+
+												const diffTime = expirationMs - nowMs;
+												const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+												const isExpiringSoon = daysUntil <= 7;
+												const isExpiringWithinMonth = daysUntil <= 30 && daysUntil > 7;
+												return (
+													<span
+														className={`px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
+															isExpiringSoon
+																? 'bg-[rgba(239,68,68,0.15)] text-[#EF4444] border border-[rgba(239,68,68,0.3)]'
+																: isExpiringWithinMonth
+																	? 'bg-[rgba(249,197,19,0.15)] text-[var(--primary-yellow)] border border-[rgba(249,197,19,0.3)]'
+																	: 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
+														}`}
+													>
+														{member.endDate || 'N/A'}
+													</span>
+												);
+											})()}
 										</td>
 										<td className="px-4 py-5 text-center">
 											<Popover
