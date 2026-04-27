@@ -1,0 +1,7 @@
+{
+	"version": 2,
+	"installCommand": "npm install && npm --prefix \"../../WEB ADMIN\" install",
+	"buildCommand": "npm --prefix \"../../WEB ADMIN\" run build && rm -rf dist && mkdir -p dist && cp -r \"../../WEB ADMIN/dist/.\" dist/",
+	"outputDirectory": "dist",
+	"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
