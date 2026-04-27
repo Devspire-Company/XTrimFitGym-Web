@@ -309,6 +309,42 @@ function toEpoch(dateValue: string | null | undefined): number {
 	return Number.isFinite(t) ? t : 0;
 }
 
+function toManilaYmd(dateValue: Date): string {
+	return dateValue.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+}
+
+function formatUsageScheduleLabel(
+	dateIso: string | null | undefined,
+	startTime: string | null | undefined,
+	endTime: string | null | undefined
+): string {
+	const now = new Date();
+	const todayYmd = toManilaYmd(now);
+	const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+	const tomorrowYmd = toManilaYmd(tomorrow);
+	const usageDate = dateIso ? new Date(dateIso) : null;
+	const usageYmd = usageDate && Number.isFinite(usageDate.getTime()) ? toManilaYmd(usageDate) : '';
+
+	const dateLabel = usageYmd
+		? usageYmd === todayYmd
+			? 'Today'
+			: usageYmd === tomorrowYmd
+				? 'Tomorrow'
+				: usageDate!.toLocaleDateString('en-PH', {
+						timeZone: 'Asia/Manila',
+						year: 'numeric',
+						month: 'short',
+						day: 'numeric',
+				  })
+		: 'Scheduled';
+
+	const start = String(startTime || '').trim();
+	const end = String(endTime || '').trim();
+	if (start && end) return `${dateLabel}, ${start} - ${end}`;
+	if (start) return `${dateLabel}, ${start}`;
+	return dateLabel;
+}
+
 const ARCHIVE_REASON_OPTIONS = [
 	'Damaged beyond repair',
 	'Replaced by a new unit',
@@ -1360,8 +1396,13 @@ export function EquipmentPage() {
 													key={`${slot.sessionId}-${slot.startTime}`}
 													className="text-[11px] text-[var(--text-secondary)]"
 												>
-													{slot.sessionName}: {slot.startTime}
-													{slot.endTime ? ` - ${slot.endTime}` : ''} (qty {slot.quantity})
+													{slot.sessionName}: {' '}
+													{formatUsageScheduleLabel(
+														slot.date,
+														slot.startTime,
+														slot.endTime
+													)}{' '}
+													(qty {slot.quantity})
 												</div>
 											))}
 											</div>
