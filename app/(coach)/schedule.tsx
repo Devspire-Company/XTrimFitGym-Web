@@ -438,13 +438,15 @@ const OPEN_TIME_SCREENSHOT_MODE = true;
 		() => (endTime ? formatTimeToString(endTime) : undefined),
 		[endTime]
 	);
-	const { data: equipmentsData } = useQuery(GET_EQUIPMENTS_QUERY, {
+	const { data: equipmentsData, refetch: refetchEquipments } = useQuery(GET_EQUIPMENTS_QUERY, {
 		variables: {
 			checkDate: equipmentCheckDate,
 			checkStartTime: equipmentCheckStartTime,
 			checkEndTime: equipmentCheckEndTime,
 		},
 		fetchPolicy: 'cache-and-network',
+		pollInterval: 15000,
+		notifyOnNetworkStatusChange: true,
 	});
 
 	const { data: sessionLogData, refetch: refetchSessionLog } = useQuery(
@@ -610,6 +612,7 @@ const OPEN_TIME_SCREENSHOT_MODE = true;
 				resetForm();
 				refetch();
 				refetchTemplates();
+				refetchEquipments().catch(() => {});
 				setShowCreateSessionSuccess(true);
 			},
 			onError: (error) => {
@@ -628,6 +631,7 @@ const OPEN_TIME_SCREENSHOT_MODE = true;
 				setShowCreateModal(false);
 				resetForm();
 				refetch();
+				refetchEquipments().catch(() => {});
 				setShowTemplateSessionSuccess(true);
 			},
 			onError: (error) => {
@@ -731,7 +735,8 @@ const OPEN_TIME_SCREENSHOT_MODE = true;
 			onError: (error) => {
 				setAlertModal({ visible: true, title: 'Error', message: error.message, variant: 'danger' });
 			},
-		}
+		},
+		refetchEquipments
 	);
 
 	const resetForm = () => {

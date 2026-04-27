@@ -149,9 +149,9 @@ const authLink = setContext(async (_, { headers }) => {
 			),
 		]);
 		const stored = await storage.getItem('auth_token');
-		// Prefer app-stored token first (supports dev coach fallback JWT flow),
-		// then fallback to Clerk session token.
-		const token = stored || clerkToken;
+		// Prefer Clerk token first so API role checks use the active signed-in account.
+		// Fallback to stored token only when Clerk token is unavailable.
+		const token = clerkToken || stored;
 
 		if (token) {
 			return {

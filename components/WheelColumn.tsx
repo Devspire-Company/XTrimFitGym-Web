@@ -30,6 +30,7 @@ export type WheelColumnProps = {
 export function WheelColumn({ data, selectedIndex, onSelectIndex }: WheelColumnProps) {
 	const listRef = useRef<FlatList<string>>(null);
 	const [scrollY, setScrollY] = useState(() => selectedIndex * WHEEL_ITEM_HEIGHT);
+	const lastEmittedIndexRef = useRef<number>(Math.max(0, selectedIndex));
 
 	const scrollToIndex = useCallback(
 		(index: number, animated: boolean) => {
@@ -55,11 +56,25 @@ export function WheelColumn({ data, selectedIndex, onSelectIndex }: WheelColumnP
 				Math.min(data.length - 1, selectedIndex) * WHEEL_ITEM_HEIGHT,
 			),
 		);
+		lastEmittedIndexRef.current = Math.max(
+			0,
+			Math.min(data.length - 1, selectedIndex),
+		);
 	}, [selectedIndex, dataKey, data.length, scrollToIndex]);
 
-	const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-		setScrollY(e.nativeEvent.contentOffset.y);
-	}, []);
+	const onScroll = useCallback(
+		(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+			const y = e.nativeEvent.contentOffset.y;
+			setScrollY(y);
+			let i = Math.round(y / WHEEL_ITEM_HEIGHT);
+			i = Math.max(0, Math.min(data.length - 1, i));
+			if (i !== lastEmittedIndexRef.current) {
+				lastEmittedIndexRef.current = i;
+				onSelectIndex(i);
+			}
+		},
+		[data.length, onSelectIndex],
+	);
 
 	const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
 		const y = e.nativeEvent.contentOffset.y;

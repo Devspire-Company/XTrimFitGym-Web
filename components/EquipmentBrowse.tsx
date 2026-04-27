@@ -20,6 +20,46 @@ import {
 	View,
 } from 'react-native';
 
+function getManilaNowWindowVars(): {
+	checkDate: string;
+	checkStartTime: string;
+	checkEndTime: string;
+} {
+	const now = new Date();
+	const startParts = new Intl.DateTimeFormat('en-US', {
+		timeZone: 'Asia/Manila',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	}).formatToParts(now);
+	const endParts = new Intl.DateTimeFormat('en-US', {
+		timeZone: 'Asia/Manila',
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	}).formatToParts(new Date(now.getTime() + 60 * 1000));
+	const get = (parts: Intl.DateTimeFormatPart[], type: string) =>
+		parts.find((p) => p.type === type)?.value || '';
+	const year = get(startParts, 'year');
+	const month = get(startParts, 'month');
+	const day = get(startParts, 'day');
+	const checkDate = `${year}-${month}-${day}T12:00:00.000Z`;
+	const toTime = (parts: Intl.DateTimeFormatPart[]) => {
+		const h = get(parts, 'hour');
+		const m = get(parts, 'minute');
+		const ap = get(parts, 'dayPeriod').toUpperCase();
+		return `${h}:${m} ${ap}`;
+	};
+	return {
+		checkDate,
+		checkStartTime: toTime(startParts),
+		checkEndTime: toTime(endParts),
+	};
+}
+
 export type EquipmentStatusValue = 'AVAILABLE' | 'DAMAGED' | 'UNDERMAINTENANCE';
 
 export type EquipmentRow = {
@@ -139,14 +179,18 @@ type Props = { showTabHeader?: boolean };
 
 export function EquipmentBrowse({ showTabHeader = true }: Props) {
 	const [refreshing, setRefreshing] = useState(false);
+	const windowVars = getManilaNowWindowVars();
 	const { data, loading, error, refetch } = useQuery<GetEquipmentsQuery>(GET_EQUIPMENTS_QUERY, {
+		variables: windowVars,
 		fetchPolicy: 'cache-and-network',
+		pollInterval: 15000,
+		notifyOnNetworkStatusChange: true,
 	});
 
 	const onRefresh = useCallback(async () => {
 		setRefreshing(true);
 		try {
-			await refetch();
+			await refetch(getManilaNowWindowVars());
 		} finally {
 			setRefreshing(false);
 		}
