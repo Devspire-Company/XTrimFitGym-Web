@@ -660,6 +660,30 @@ export function MembersPage() {
 		});
 	}, [apiMembers, searchTerm, statusFilter, membershipFilter]);
 
+	const isMemberInPausedWindow = (member: Member): boolean => {
+		const pausedMarkedAt = pausedMarkersByMemberId[member.id];
+		const pausedByMarker =
+			typeof pausedMarkedAt === 'number' &&
+			nowMs < pausedMarkedAt + PAUSED_AFTER_EXPIRY_WINDOW_MS;
+		const normalizedMembership = String(member.membership || '')
+			.trim()
+			.toLowerCase();
+		const looksNoPlan = normalizedMembership === 'no plan';
+		const updatedAtMs = member.updatedAt ? new Date(member.updatedAt).getTime() : NaN;
+		const pausedByRecentInactiveUpdate =
+			member.status === 'Inactive' &&
+			looksNoPlan &&
+			Number.isFinite(updatedAtMs) &&
+			nowMs - updatedAtMs >= 0 &&
+			nowMs - updatedAtMs < PAUSED_AFTER_EXPIRY_WINDOW_MS;
+		const pausedFromExpiresAt =
+			typeof member.expiresAt === 'string' &&
+			Number.isFinite(new Date(member.expiresAt).getTime()) &&
+			nowMs >= new Date(member.expiresAt).getTime() &&
+			nowMs < new Date(member.expiresAt).getTime() + PAUSED_AFTER_EXPIRY_WINDOW_MS;
+		return pausedByMarker || pausedByRecentInactiveUpdate || pausedFromExpiresAt;
+	};
+
 	const memberExportHead = ['Member', 'Email', 'Phone', 'Membership', 'Status', 'Disabled Reason', 'Join Date', 'Expires'];
 	const memberExportRows = filteredMembers.map((member) => [
 		member.name,
@@ -1053,50 +1077,14 @@ export function MembersPage() {
 											</span>
 										</td>
 										<td className="px-4 py-5 text-center">
-											<span
-												className={`status-badge inline-flex min-w-[90px] items-center justify-center px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
-													member.status === 'Active'
-														? 'active bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
-															: member.status === 'Inactive'
-															? 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
-																: member.status === 'Pending'
-																	? 'bg-[rgba(59,130,246,0.15)] text-[#93C5FD] border border-[rgba(59,130,246,0.3)]'
-															: 'suspended bg-[rgba(148,163,184,0.16)] text-[#E2E8F0] border border-[rgba(148,163,184,0.35)]'
-												}`}
-											>
-												{member.status}
-											</span>
-										</td>
-										<td className="px-4 py-5 text-sm text-[var(--text-secondary)]">
-											{member.joinDate}
-										</td>
-										<td className="px-4 py-5 text-sm">
 											{(() => {
-												const pausedMarkedAt = pausedMarkersByMemberId[member.id];
-												const pausedByMarker =
-													typeof pausedMarkedAt === 'number' &&
-													nowMs < pausedMarkedAt + PAUSED_AFTER_EXPIRY_WINDOW_MS;
-												const normalizedMembership = String(member.membership || '')
-													.trim()
-													.toLowerCase();
-												const looksNoPlan = normalizedMembership === 'no plan';
-												const updatedAtMs = member.updatedAt
-													? new Date(member.updatedAt).getTime()
-													: NaN;
-												const pausedByRecentInactiveUpdate =
-													member.status === 'Inactive' &&
-													looksNoPlan &&
-													Number.isFinite(updatedAtMs) &&
-													nowMs - updatedAtMs >= 0 &&
-													nowMs - updatedAtMs < PAUSED_AFTER_EXPIRY_WINDOW_MS;
-												const shouldShowPaused = pausedByMarker || pausedByRecentInactiveUpdate;
-												if (!member.expiresAt) {
-													if (!shouldShowPaused) {
-														return <span className="text-[var(--text-secondary)]">—</span>;
-													}
+												const displayStatus = isMemberInPausedWindow(member)
+													? 'Paused'
+													: member.status;
+												if (displayStatus === 'Paused') {
 													return (
 														<span className="relative inline-flex items-center group">
-															<span className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-[rgba(148,163,184,0.16)] text-[#E2E8F0] border border-[rgba(148,163,184,0.35)]">
+															<span className="status-badge inline-flex min-w-[90px] items-center justify-center px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-[rgba(245,158,11,0.16)] text-[#FBBF24] border border-[rgba(245,158,11,0.35)]">
 																Paused
 															</span>
 															<span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-max -translate-x-1/2 rounded-lg border border-[rgba(249,197,19,0.25)] bg-[rgba(16,18,24,0.96)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-primary)] opacity-0 shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-opacity duration-150 group-hover:opacity-100">
@@ -1104,6 +1092,31 @@ export function MembersPage() {
 															</span>
 														</span>
 													);
+												}
+												return (
+											<span
+												className={`status-badge inline-flex min-w-[90px] items-center justify-center px-2.5 py-1.5 text-xs rounded-lg font-semibold ${
+													displayStatus === 'Active'
+														? 'active bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[rgba(16,185,129,0.3)]'
+														: displayStatus === 'Inactive'
+															? 'inactive bg-[rgba(107,114,128,0.15)] text-[#9CA3AF] border border-[rgba(107,114,128,0.3)]'
+															: displayStatus === 'Pending'
+																	? 'bg-[rgba(59,130,246,0.15)] text-[#93C5FD] border border-[rgba(59,130,246,0.3)]'
+															: 'suspended bg-[rgba(148,163,184,0.16)] text-[#E2E8F0] border border-[rgba(148,163,184,0.35)]'
+												}`}
+											>
+												{displayStatus}
+											</span>
+												);
+											})()}
+										</td>
+										<td className="px-4 py-5 text-sm text-[var(--text-secondary)]">
+											{member.joinDate}
+										</td>
+										<td className="px-4 py-5 text-sm">
+											{(() => {
+												if (!member.expiresAt) {
+													return <span className="text-[var(--text-secondary)]">—</span>;
 												}
 												const expirationMs = new Date(member.expiresAt).getTime();
 												if (!Number.isFinite(expirationMs)) {
@@ -1112,19 +1125,7 @@ export function MembersPage() {
 												const isPausedWindow =
 													nowMs >= expirationMs &&
 													nowMs < expirationMs + PAUSED_AFTER_EXPIRY_WINDOW_MS;
-												if (isPausedWindow || shouldShowPaused) {
-													return (
-														<span className="relative inline-flex items-center group">
-															<span className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-[rgba(148,163,184,0.16)] text-[#E2E8F0] border border-[rgba(148,163,184,0.35)]">
-																Paused
-															</span>
-															<span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-max -translate-x-1/2 rounded-lg border border-[rgba(249,197,19,0.25)] bg-[rgba(16,18,24,0.96)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-primary)] opacity-0 shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-opacity duration-150 group-hover:opacity-100">
-																Recently expired - within 3 days
-															</span>
-														</span>
-													);
-												}
-												if (member.status !== 'Active') {
+												if (member.status !== 'Active' || isPausedWindow) {
 													return <span className="text-[var(--text-secondary)]">—</span>;
 												}
 
