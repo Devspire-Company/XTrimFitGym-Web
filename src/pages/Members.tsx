@@ -232,7 +232,6 @@ export function MembersPage() {
 				const tx = (member.currentMembership ||
 					(member.membershipDetails as Record<string, unknown> | undefined)
 						?.membershipTransaction) as
-					| { status?: string | null }
 					| { status?: string | null; expiresAt?: string | null }
 					| null
 					| undefined;
