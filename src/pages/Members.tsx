@@ -80,6 +80,7 @@ interface Member {
 	subscriptionStartedAt?: string;
 	disableReason?: string;
 	disabledAt?: string;
+	updatedAt?: string;
 }
 
 const normalizeFilterValue = (value: string | null | undefined): string =>
@@ -609,6 +610,7 @@ export function MembersPage() {
 				typeof membershipTransaction?.startedAt === 'string' ? membershipTransaction.startedAt : undefined,
 			disableReason: typeof m.disableReason === 'string' ? m.disableReason : '',
 			disabledAt: typeof m.disabledAt === 'string' ? m.disabledAt : undefined,
+			updatedAt: typeof m.updatedAt === 'string' ? m.updatedAt : undefined,
 		};
 	});
 
@@ -1075,8 +1077,22 @@ export function MembersPage() {
 												const pausedByMarker =
 													typeof pausedMarkedAt === 'number' &&
 													nowMs < pausedMarkedAt + PAUSED_AFTER_EXPIRY_WINDOW_MS;
+												const normalizedMembership = String(member.membership || '')
+													.trim()
+													.toLowerCase();
+												const looksNoPlan = normalizedMembership === 'no plan';
+												const updatedAtMs = member.updatedAt
+													? new Date(member.updatedAt).getTime()
+													: NaN;
+												const pausedByRecentInactiveUpdate =
+													member.status === 'Inactive' &&
+													looksNoPlan &&
+													Number.isFinite(updatedAtMs) &&
+													nowMs - updatedAtMs >= 0 &&
+													nowMs - updatedAtMs < PAUSED_AFTER_EXPIRY_WINDOW_MS;
+												const shouldShowPaused = pausedByMarker || pausedByRecentInactiveUpdate;
 												if (!member.expiresAt) {
-													if (!pausedByMarker) {
+													if (!shouldShowPaused) {
 														return <span className="text-[var(--text-secondary)]">—</span>;
 													}
 													return (
@@ -1097,7 +1113,7 @@ export function MembersPage() {
 												const isPausedWindow =
 													nowMs >= expirationMs &&
 													nowMs < expirationMs + PAUSED_AFTER_EXPIRY_WINDOW_MS;
-												if (isPausedWindow || pausedByMarker) {
+												if (isPausedWindow || shouldShowPaused) {
 													return (
 														<span className="relative inline-flex items-center group">
 															<span className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-[rgba(148,163,184,0.16)] text-[#E2E8F0] border border-[rgba(148,163,184,0.35)]">
