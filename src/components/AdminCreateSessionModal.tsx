@@ -1,10 +1,10 @@
 import { useMemo, useEffect, useState } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
+import { gql, useMutation, useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { X, Calendar as CalendarIcon, Clock3, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CREATE_SESSION, GET_EQUIPMENTS, GET_USERS } from '@/graphql/operations/index';
+import { CREATE_SESSION, GET_USERS } from '@/graphql/operations/index';
 import type { GetUsersQuery } from '@/graphql/generated/graphql';
 import { RoleType, SessionKind, TransactionStatus } from '@/graphql/generated/graphql';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -39,6 +39,29 @@ const GYM_AREAS = [
 	{ label: 'Cardio Zone', value: 'Cardio Zone' },
 	{ label: 'Free Weights Area', value: 'Free Weights Area' },
 ];
+
+const GET_EQUIPMENTS_FOR_SESSION_WINDOW = gql`
+	query GetEquipmentsForSessionWindow(
+		$includeArchived: Boolean
+		$checkDate: String
+		$checkStartTime: String
+		$checkEndTime: String
+	) {
+		getEquipments(
+			includeArchived: $includeArchived
+			checkDate: $checkDate
+			checkStartTime: $checkStartTime
+			checkEndTime: $checkEndTime
+		) {
+			id
+			name
+			status
+			quantity
+			isReservedInWindow
+			reservedQuantityInWindow
+		}
+	}
+`;
 
 function sessionCalendarDateToIso(d: Date): string {
 	const y = d.getFullYear();
@@ -233,8 +256,20 @@ export function AdminCreateSessionModal({
 		variables: { role: RoleType.Member, includeDisabled: false },
 		skip: !isOpen,
 	});
-	const { data: equipmentsData } = useQuery(GET_EQUIPMENTS, {
-		variables: { includeArchived: false },
+	const hasReservationWindow = !!date && !!startTimeStr.trim();
+	const checkStartTime = startTimeStr.trim()
+		? formatTimeToString(parseTimeInputToDate(startTimeStr) || new Date(2000, 0, 1, 9, 0))
+		: undefined;
+	const checkEndTime = endTimeStr.trim()
+		? formatTimeToString(parseTimeInputToDate(endTimeStr) || new Date(2000, 0, 1, 10, 0))
+		: checkStartTime;
+	const { data: equipmentsData } = useQuery(GET_EQUIPMENTS_FOR_SESSION_WINDOW, {
+		variables: {
+			includeArchived: false,
+			checkDate: hasReservationWindow && date ? sessionCalendarDateToIso(date) : undefined,
+			checkStartTime: hasReservationWindow ? checkStartTime : undefined,
+			checkEndTime: hasReservationWindow ? checkEndTime : undefined,
+		},
 		skip: !isOpen,
 	});
 
@@ -263,14 +298,23 @@ export function AdminCreateSessionModal({
 			.map((x) => {
 				const status = String(x.status || 'AVAILABLE').toUpperCase();
 				const quantity = Math.max(0, Number(x.quantity || 0));
+				const reserved = hasReservationWindow
+					? Math.max(0, Number(x.reservedQuantityInWindow || 0))
+					: 0;
+				const availableUnits = Math.max(0, quantity - reserved);
 				const unavailableByStatus =
 					status === 'UNDERMAINTENANCE' || status === 'DAMAGED';
-				const selectable = !unavailableByStatus && quantity > 0;
+				const unavailableByWindow = hasReservationWindow && reserved > 0 && availableUnits <= 0;
+				const selectable = !unavailableByStatus && quantity > 0 && !unavailableByWindow;
 				const rightText = unavailableByStatus
 					? status === 'UNDERMAINTENANCE'
 						? 'Maintenance'
 						: 'Damaged'
-					: `${quantity}`;
+					: unavailableByWindow
+						? 'In Use'
+						: hasReservationWindow && reserved > 0
+							? `${availableUnits}/${quantity}`
+							: `${quantity}/${quantity}`;
 				return {
 					id: String(x.id),
 					name: String(x.name),
@@ -286,7 +330,7 @@ export function AdminCreateSessionModal({
 				if (aRank !== bRank) return aRank - bRank;
 				return a.name.localeCompare(b.name);
 			});
-	}, [equipmentsData?.getEquipments]);
+	}, [equipmentsData?.getEquipments, hasReservationWindow]);
 
 	const equipmentById = useMemo(
 		() => new Map(equipmentOptions.map((eq) => [eq.id, eq])),
