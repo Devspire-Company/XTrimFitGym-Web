@@ -151,6 +151,9 @@ export function MembersPage() {
 		}
 	);
 	const prevExpirySnapshotRef = useRef<Map<string, boolean> | null>(null);
+	const prevMembershipTxByMemberIdRef = useRef<
+		Map<string, { status: string; expiresAt: string | null }>
+	>(new Map());
 
 	useEffect(() => {
 		const id = setInterval(() => setNowMs(Date.now()), LIVE_UPDATE_INTERVAL_MS);
@@ -225,18 +228,43 @@ export function MembersPage() {
 			for (const member of currentList) {
 				const id = member.id;
 				if (typeof id !== 'string') continue;
-				if (isMembershipExpiredForNotification(member) && !next[id]) {
-					next[id] = Date.now();
-				}
 				const tx = (member.currentMembership ||
 					(member.membershipDetails as Record<string, unknown> | undefined)
 						?.membershipTransaction) as
 					| { status?: string | null }
+					| { status?: string | null; expiresAt?: string | null }
 					| null
 					| undefined;
 				const txStatus = String(tx?.status || '').toUpperCase();
+				const txExpiresAt = tx?.expiresAt ? String(tx.expiresAt) : null;
+				const previousTx = prevMembershipTxByMemberIdRef.current.get(id);
+
+				// Case 1: Current payload explicitly says expired.
+				if (isMembershipExpiredForNotification(member) && !next[id]) {
+					next[id] = Date.now();
+				}
+				// Case 2: Current tx disappeared, but previous snapshot had active tx that is already past expiry.
+				if (!tx && previousTx) {
+					const prevStatus = String(previousTx.status || '').toUpperCase();
+					const prevExpMs = previousTx.expiresAt
+						? new Date(previousTx.expiresAt).getTime()
+						: NaN;
+					const prevAlreadyExpired = Number.isFinite(prevExpMs) && prevExpMs <= Date.now();
+					if ((prevStatus === 'ACTIVE' && prevAlreadyExpired) || prevStatus === 'EXPIRED') {
+						if (!next[id]) next[id] = Date.now();
+					}
+				}
 				if (txStatus === 'ACTIVE' && next[id]) {
 					delete next[id];
+				}
+
+				if (tx) {
+					prevMembershipTxByMemberIdRef.current.set(id, {
+						status: txStatus,
+						expiresAt: txExpiresAt,
+					});
+				} else {
+					prevMembershipTxByMemberIdRef.current.delete(id);
 				}
 			}
 			return next;
