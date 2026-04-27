@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, gql } from '@apollo/client';
 import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { Button } from '@/components/ui/button';
 import { Plus, Dumbbell, AlertTriangle } from 'lucide-react';
@@ -31,6 +31,54 @@ import {
 
 const LEGACY_ARCHIVE_PREFIX = '__ARCHIVED__|';
 const normalizeEquipmentName = (raw: string) => raw.trim().toLowerCase();
+const GET_EQUIPMENTS_WITH_AVAILABILITY = gql`
+	query GetEquipmentsWithAvailability(
+		$includeArchived: Boolean
+		$checkDate: String
+		$checkStartTime: String
+		$checkEndTime: String
+	) {
+		getEquipments(
+			includeArchived: $includeArchived
+			checkDate: $checkDate
+			checkStartTime: $checkStartTime
+			checkEndTime: $checkEndTime
+		) {
+			id
+			name
+			imageUrl
+			description
+			notes
+			acquiredAt
+			sortOrder
+			status
+			quantity
+			maintenanceStartedAt
+			isArchived
+			archivedAt
+			archiveReason
+			reservedQuantityInWindow
+			isReservedInWindow
+			upcomingUsages {
+				sessionId
+				sessionName
+				date
+				startTime
+				endTime
+				quantity
+			}
+			lifecycleLogs {
+				action
+				notes
+				status
+				changedAt
+				changedById
+			}
+			createdAt
+			updatedAt
+		}
+	}
+`;
 
 function parseLegacyArchiveMeta(rawNotes: string | null | undefined) {
 	if (!rawNotes) {
@@ -299,6 +347,7 @@ export function EquipmentPage() {
 	const [useLegacyApi, setUseLegacyApi] = useState(
 		import.meta.env.VITE_ENABLE_MODERN_ARCHIVE_API === 'false'
 	);
+	const [useEnhancedAvailabilityQuery, setUseEnhancedAvailabilityQuery] = useState(true);
 	const [archiveReasonOption, setArchiveReasonOption] = useState<(typeof ARCHIVE_REASON_OPTIONS)[number]>(
 		'Damaged beyond repair'
 	);
@@ -357,15 +406,45 @@ export function EquipmentPage() {
 		}
 	};
 
+	const now = new Date();
+	const checkDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+	const checkStartTime = now.toLocaleTimeString('en-US', {
+		timeZone: 'Asia/Manila',
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	});
+	const checkEndTime = checkStartTime;
+	const enhancedQuery = useQuery(GET_EQUIPMENTS_WITH_AVAILABILITY, {
+		variables: { includeArchived: true, checkDate, checkStartTime, checkEndTime },
+		errorPolicy: 'none',
+		skip: useLegacyApi || !useEnhancedAvailabilityQuery,
+	});
 	const modernQuery = useQuery(GET_EQUIPMENTS, {
 		variables: { includeArchived: true },
 		errorPolicy: 'none',
-		skip: useLegacyApi,
+		skip: useLegacyApi || useEnhancedAvailabilityQuery,
 	});
 	const legacyQuery = useQuery(GET_EQUIPMENTS_LEGACY, {
 		errorPolicy: 'none',
 		skip: !useLegacyApi,
 	});
+	useEffect(() => {
+		if (!enhancedQuery.error) return;
+		const msg = enhancedQuery.error.message || '';
+		if (
+			msg.includes('Cannot query field') ||
+			msg.includes('Unknown argument') ||
+			msg.includes('reservedQuantityInWindow') ||
+			msg.includes('isReservedInWindow') ||
+			msg.includes('upcomingUsages') ||
+			msg.includes('checkDate') ||
+			msg.includes('checkStartTime') ||
+			msg.includes('checkEndTime')
+		) {
+			setUseEnhancedAvailabilityQuery(false);
+		}
+	}, [enhancedQuery.error]);
 	useEffect(() => {
 		if (!modernQuery.error) return;
 		const msg = modernQuery.error.message || '';
@@ -379,9 +458,21 @@ export function EquipmentPage() {
 			setUseLegacyApi(true);
 		}
 	}, [modernQuery.error]);
-	const data = useLegacyApi ? legacyQuery.data : modernQuery.data;
-	const loading = useLegacyApi ? legacyQuery.loading : modernQuery.loading;
-	const error = useLegacyApi ? legacyQuery.error : modernQuery.error;
+	const data = useLegacyApi
+		? legacyQuery.data
+		: useEnhancedAvailabilityQuery
+			? (enhancedQuery.data as any)
+			: modernQuery.data;
+	const loading = useLegacyApi
+		? legacyQuery.loading
+		: useEnhancedAvailabilityQuery
+			? enhancedQuery.loading
+			: modernQuery.loading;
+	const error = useLegacyApi
+		? legacyQuery.error
+		: useEnhancedAvailabilityQuery
+			? enhancedQuery.error
+			: modernQuery.error;
 	const list = (data?.getEquipments ?? []) as any[];
 	const normalizedList = useLegacyApi
 		? list.map((item) => {
@@ -422,10 +513,40 @@ export function EquipmentPage() {
 			return searchable.includes(normalizedSearch);
 		})
 		.sort((a, b) => {
+			const aStatus = String(a.status || '').toUpperCase();
+			const bStatus = String(b.status || '').toUpperCase();
+			const aUnavailable = aStatus === 'UNDERMAINTENANCE' || aStatus === 'DAMAGED';
+			const bUnavailable = bStatus === 'UNDERMAINTENANCE' || bStatus === 'DAMAGED';
+			if (aUnavailable !== bUnavailable) return aUnavailable ? 1 : -1;
 			const aTime = toEpoch(a.createdAt || a.updatedAt);
 			const bTime = toEpoch(b.createdAt || b.updatedAt);
 			return bTime - aTime;
 		});
+	const getAvailabilityMeta = (item: any) => {
+		const status = String(item.status || 'AVAILABLE').toUpperCase();
+		const total = Math.max(0, Number(item.quantity ?? 0));
+		const reserved = Math.max(0, Number(item.reservedQuantityInWindow ?? 0));
+		const availableUnits = Math.max(0, total - reserved);
+		if (status === 'UNDERMAINTENANCE') {
+			return { badge: 'Unavailable - Maintenance', textClass: 'text-[#F59E0B]' };
+		}
+		if (status === 'DAMAGED') {
+			return { badge: 'Unavailable - Damaged', textClass: 'text-[#F87171]' };
+		}
+		if (total <= 0) {
+			return { badge: 'Unavailable - Out of stock', textClass: 'text-[#F87171]' };
+		}
+		if (item.isReservedInWindow && availableUnits <= 0) {
+			return { badge: 'In Use Now', textClass: 'text-[#F87171]' };
+		}
+		if (item.isReservedInWindow && availableUnits > 0) {
+			return {
+				badge: `Partially Available ${availableUnits}/${total}`,
+				textClass: 'text-[#F59E0B]',
+			};
+		}
+		return { badge: `Available ${availableUnits}/${total}`, textClass: 'text-[#34D399]' };
+	};
 	const maintenanceSetAtByEquipmentId = useMemo(() => {
 		const map: Record<string, string> = {};
 		normalizedList.forEach((item) => {
@@ -1176,6 +1297,10 @@ export function EquipmentPage() {
 
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 				{visibleList.map((item) => (
+					(() => {
+						const availabilityMeta = getAvailabilityMeta(item);
+						const usageRows = Array.isArray(item.upcomingUsages) ? item.upcomingUsages.slice(0, 2) : [];
+						return (
 					<div
 						key={item.id}
 						className="group flex h-full min-h-[31rem] flex-col overflow-hidden rounded-[22px] border border-[rgba(249,197,19,0.22)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-[rgba(249,197,19,0.45)]"
@@ -1222,15 +1347,24 @@ export function EquipmentPage() {
 									<div className="mt-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
 										<span>Availability</span>
 									<span
-										className={
-											Math.max(0, Number(item.quantity ?? 0)) > 0
-													? 'font-semibold text-[#34D399]'
-													: 'font-semibold text-[#F87171]'
-										}
+										className={`font-semibold ${availabilityMeta.textClass}`}
 									>
-										{availabilityLabel(Math.max(0, Number(item.quantity ?? 0)))}
+										{availabilityMeta.badge}
 									</span>
 									</div>
+									{usageRows.length > 0 ? (
+										<div className="mt-2 border-t border-[rgba(255,255,255,0.06)] pt-2 space-y-1">
+											{usageRows.map((slot: any) => (
+												<div
+													key={`${slot.sessionId}-${slot.startTime}`}
+													className="text-[11px] text-[var(--text-secondary)]"
+												>
+													{slot.sessionName}: {slot.startTime}
+													{slot.endTime ? ` - ${slot.endTime}` : ''} (qty {slot.quantity})
+												</div>
+											))}
+										</div>
+									) : null}
 								</div>
 							</div>
 							{(item.description || item.notes) && (
@@ -1320,6 +1454,8 @@ export function EquipmentPage() {
 							</div>
 						</div>
 					</div>
+						);
+					})()
 				))}
 			</div>
 

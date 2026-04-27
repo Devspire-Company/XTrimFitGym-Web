@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { X, Calendar as CalendarIcon, Clock3, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CREATE_SESSION, GET_USERS } from '@/graphql/operations/index';
+import { CREATE_SESSION, GET_EQUIPMENTS, GET_USERS } from '@/graphql/operations/index';
 import type { GetUsersQuery } from '@/graphql/generated/graphql';
 import { RoleType, SessionKind, TransactionStatus } from '@/graphql/generated/graphql';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -223,10 +223,18 @@ export function AdminCreateSessionModal({
 	const [note, setNote] = useState('');
 	const [isGroupClass, setIsGroupClass] = useState(false);
 	const [maxParticipants, setMaxParticipants] = useState('20');
+	const [equipmentPickerValue, setEquipmentPickerValue] = useState('');
+	const [manualEquipmentSelections, setManualEquipmentSelections] = useState<
+		{ equipmentId: string; quantity: number }[]
+	>([]);
 	const [formError, setFormError] = useState('');
 
 	const { data: membersData } = useQuery(GET_USERS, {
 		variables: { role: RoleType.Member, includeDisabled: false },
+		skip: !isOpen,
+	});
+	const { data: equipmentsData } = useQuery(GET_EQUIPMENTS, {
+		variables: { includeArchived: false },
 		skip: !isOpen,
 	});
 
@@ -243,7 +251,81 @@ export function AdminCreateSessionModal({
 		setNote('');
 		setIsGroupClass(false);
 		setMaxParticipants('20');
+		setEquipmentPickerValue('');
+		setManualEquipmentSelections([]);
 		setFormError('');
+	};
+
+	const equipmentOptions = useMemo(() => {
+		const rows = (equipmentsData?.getEquipments || []) as any[];
+		return rows
+			.filter((x) => x?.id && x?.name)
+			.map((x) => {
+				const status = String(x.status || 'AVAILABLE').toUpperCase();
+				const quantity = Math.max(0, Number(x.quantity || 0));
+				const unavailableByStatus =
+					status === 'UNDERMAINTENANCE' || status === 'DAMAGED';
+				const selectable = !unavailableByStatus && quantity > 0;
+				const rightText = unavailableByStatus
+					? status === 'UNDERMAINTENANCE'
+						? 'Maintenance'
+						: 'Damaged'
+					: `${quantity}`;
+				return {
+					id: String(x.id),
+					name: String(x.name),
+					quantity,
+					status,
+					selectable,
+					rightText,
+				};
+			})
+			.sort((a, b) => {
+				const aRank = a.selectable ? 0 : 1;
+				const bRank = b.selectable ? 0 : 1;
+				if (aRank !== bRank) return aRank - bRank;
+				return a.name.localeCompare(b.name);
+			});
+	}, [equipmentsData?.getEquipments]);
+
+	const equipmentById = useMemo(
+		() => new Map(equipmentOptions.map((eq) => [eq.id, eq])),
+		[equipmentOptions]
+	);
+
+	const availableEquipmentOptions = useMemo(() => {
+		const selectedIds = new Set(manualEquipmentSelections.map((x) => x.equipmentId));
+		return equipmentOptions.filter((eq) => !selectedIds.has(eq.id));
+	}, [equipmentOptions, manualEquipmentSelections]);
+
+	const addEquipment = (equipmentId: string) => {
+		if (!equipmentId) return;
+		const target = equipmentById.get(equipmentId);
+		if (!target) return;
+		if (!target.selectable) {
+			setFormError(`${target.name} is currently unavailable (${target.rightText}).`);
+			setEquipmentPickerValue('');
+			return;
+		}
+		setManualEquipmentSelections((prev) =>
+			prev.some((x) => x.equipmentId === equipmentId)
+				? prev
+				: [...prev, { equipmentId, quantity: 1 }]
+		);
+		setEquipmentPickerValue('');
+	};
+
+	const removeEquipment = (equipmentId: string) => {
+		setManualEquipmentSelections((prev) =>
+			prev.filter((x) => x.equipmentId !== equipmentId)
+		);
+	};
+
+	const updateEquipmentQty = (equipmentId: string, quantityRaw: string) => {
+		const clean = Math.max(1, Number.parseInt(quantityRaw || '1', 10) || 1);
+		setManualEquipmentSelections((prev) =>
+			prev.map((x) => (x.equipmentId === equipmentId ? { ...x, quantity: clean } : x))
+		);
 	};
 
 	const [createSession, { loading: submitting }] = useMutation(CREATE_SESSION, {
@@ -364,6 +446,15 @@ export function AdminCreateSessionModal({
 						maxParticipants: mp,
 						invitedClientIds:
 							selectedMemberIds.length > 0 ? selectedMemberIds : undefined,
+						equipmentReservations:
+							manualEquipmentSelections.length > 0
+								? manualEquipmentSelections.map((row) => ({
+										equipmentId: row.equipmentId,
+										quantity: row.quantity,
+										reservedStartTime: startTimeString,
+										reservedEndTime: endTimeString,
+								  }))
+								: undefined,
 					} as any,
 				},
 			});
@@ -388,6 +479,15 @@ export function AdminCreateSessionModal({
 					scheduleDays: normalizedScheduleDays,
 					note: note.trim() || undefined,
 					sessionKind: SessionKind.Personal,
+					equipmentReservations:
+						manualEquipmentSelections.length > 0
+							? manualEquipmentSelections.map((row) => ({
+									equipmentId: row.equipmentId,
+									quantity: row.quantity,
+									reservedStartTime: startTimeString,
+									reservedEndTime: endTimeString,
+							  }))
+							: undefined,
 				} as any,
 			},
 		});
@@ -691,6 +791,75 @@ export function AdminCreateSessionModal({
 									: 'No days selected yet.'}
 							</div>
 						</div>
+					</div>
+
+					<div className="form-group">
+						<label htmlFor="admin-session-equipment-picker">Add equipment manually</label>
+						<select
+							id="admin-session-equipment-picker"
+							value={equipmentPickerValue}
+							onChange={(e) => {
+								setEquipmentPickerValue(e.target.value);
+								addEquipment(e.target.value);
+							}}
+							title="Add equipment manually"
+							aria-label="Add equipment manually"
+							className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)]"
+						>
+							<option value="">
+								{manualEquipmentSelections.length > 0
+									? `${manualEquipmentSelections.length} equipment selected`
+									: 'Choose equipment'}
+							</option>
+							{availableEquipmentOptions.map((eq) => (
+								<option key={eq.id} value={eq.id} disabled={!eq.selectable}>
+									{`${eq.name} (${eq.rightText})`}
+								</option>
+							))}
+						</select>
+						{manualEquipmentSelections.length > 0 ? (
+							<div className="mt-2 space-y-2">
+								{manualEquipmentSelections.map((row) => {
+									const eq = equipmentById.get(row.equipmentId);
+									if (!eq) return null;
+									return (
+										<div
+											key={row.equipmentId}
+											className="rounded-xl border border-[var(--card-border)] bg-[rgba(255,255,255,0.03)] p-3"
+										>
+											<div className="flex items-center justify-between gap-2">
+												<div className="text-sm font-medium text-[var(--text-primary)]">
+													{eq.name}
+												</div>
+												<button
+													type="button"
+													onClick={() => removeEquipment(row.equipmentId)}
+													className="h-7 w-7 rounded-full border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.12)] text-[#F87171] inline-flex items-center justify-center"
+													aria-label={`Remove ${eq.name}`}
+													title="Remove"
+												>
+													<X className="w-4 h-4" />
+												</button>
+											</div>
+											<div className="mt-2 flex items-center justify-between gap-3">
+												<span className="text-xs text-[var(--text-secondary)]">Qty</span>
+												<input
+													type="number"
+													min={1}
+													value={row.quantity}
+													onChange={(e) =>
+														updateEquipmentQty(row.equipmentId, e.target.value)
+													}
+													title={`Quantity for ${eq.name}`}
+													aria-label={`Quantity for ${eq.name}`}
+													className="w-24 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+												/>
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						) : null}
 					</div>
 
 					<div className="form-group">
