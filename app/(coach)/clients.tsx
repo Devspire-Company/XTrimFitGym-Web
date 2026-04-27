@@ -43,7 +43,12 @@ const CoachClients = () => {
 		variant: 'danger' | 'neutral' | 'success';
 	}>({ visible: false, title: '', message: '', variant: 'neutral' });
 
-	const { data: clientsData, loading, refetch: refetchClients } = useQuery<
+	const {
+		data: clientsData,
+		loading,
+		error: clientsError,
+		refetch: refetchClients,
+	} = useQuery<
 		GetUsersQuery,
 		GetUsersQueryVariables
 	>(GET_USERS_QUERY, {
@@ -68,28 +73,10 @@ const CoachClients = () => {
 	};
 
 	const allClients = useMemo(() => {
-		if (!clientsData?.getUsers) {
-			return [];
-		}
-		const coachClientIds = user?.coachDetails?.clientsIds || [];
-		if (!coachClientIds || coachClientIds.length === 0) {
-			return [];
-		}
-
-		const normalizedCoachClientIds = coachClientIds
-			.filter((id: any) => id != null)
-			.map((id: any) => String(id));
-
-		if (normalizedCoachClientIds.length === 0) {
-			return [];
-		}
-
-		return clientsData.getUsers.filter((client: any) => {
-			if (!client || !client.id) return false;
-			const normalizedClientId = String(client.id);
-			return normalizedCoachClientIds.includes(normalizedClientId);
-		});
-	}, [clientsData, user?.coachDetails?.clientsIds]);
+		// For coach users, backend getUsers(role: member) already scopes to assigned clients.
+		if (!clientsData?.getUsers) return [];
+		return clientsData.getUsers.filter((client: any) => client?.id);
+	}, [clientsData]);
 
 	// Filter clients by search query
 	const filteredClients = useMemo(() => {
@@ -97,9 +84,15 @@ const CoachClients = () => {
 		const query = searchQuery.toLowerCase();
 		return allClients.filter(
 			(client: any) =>
-				client.firstName.toLowerCase().includes(query) ||
-				client.lastName.toLowerCase().includes(query) ||
-				client.email.toLowerCase().includes(query)
+				String(client.firstName || '')
+					.toLowerCase()
+					.includes(query) ||
+				String(client.lastName || '')
+					.toLowerCase()
+					.includes(query) ||
+				String(client.email || '')
+					.toLowerCase()
+					.includes(query)
 		);
 	}, [allClients, searchQuery]);
 
@@ -262,6 +255,16 @@ const CoachClients = () => {
 					<View className='bg-bg-primary rounded-xl border border-[#F9C513]/20 overflow-hidden'>
 						<PremiumLoadingContent embedded message='Please wait..' />
 					</View>
+				) : clientsError ? (
+					<View className='bg-bg-primary rounded-xl p-6 items-center border border-[#F9C513]/20'>
+						<Ionicons name='warning-outline' size={40} color='#FF3B30' />
+						<Text className='text-red-400 mt-3 text-center'>
+							{clientsError.message || 'Could not load clients.'}
+						</Text>
+						<Text className='text-text-secondary text-xs mt-2 text-center'>
+							Try refreshing or sign in again as coach.
+						</Text>
+					</View>
 				) : filteredClients.length === 0 ? (
 					<View className='bg-bg-primary rounded-xl p-6 items-center border border-[#F9C513]/20'>
 						<Ionicons name='people-outline' size={48} color='#8E8E93' />
@@ -270,12 +273,6 @@ const CoachClients = () => {
 								? 'No clients yet. Accept coach requests to see your clients here.'
 								: 'No clients found matching your search'}
 						</Text>
-						{user?.coachDetails?.clientsIds && user.coachDetails.clientsIds.length > 0 && (
-							<Text className='text-text-secondary text-xs mt-2 text-center'>
-								You have {user.coachDetails.clientsIds.length} client ID
-								{user.coachDetails.clientsIds.length !== 1 ? 's' : ''} in your profile
-							</Text>
-						)}
 					</View>
 				) : (
 					<FlatList

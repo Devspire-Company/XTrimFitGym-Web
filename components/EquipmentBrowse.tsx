@@ -42,6 +42,7 @@ export type EquipmentRow = {
 	upcomingUsages?: Array<{
 		sessionId: string;
 		sessionName: string;
+		coachName?: string | null;
 		date: string;
 		startTime: string;
 		endTime?: string | null;
@@ -336,7 +337,8 @@ export function EquipmentBrowse({ showTabHeader = true }: Props) {
 										<Text style={styles.detailMeta}>Upcoming usage</Text>
 										{(detail.upcomingUsages || []).slice(0, 3).map((slot) => (
 											<Text key={`${slot.sessionId}-${slot.startTime}`} style={styles.detailBody}>
-												{slot.sessionName}: {slot.startTime}
+												{slot.sessionName}
+												{slot.coachName ? ` (Coach: ${slot.coachName})` : ''}: {slot.startTime}
 												{slot.endTime ? ` - ${slot.endTime}` : ''} (qty {slot.quantity})
 											</Text>
 										))}

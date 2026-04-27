@@ -214,12 +214,10 @@ const CoachSchedule = () => {
 			reps: string;
 		}[]
 	>([]);
-	const [autoMatchWorkoutEquipment, setAutoMatchWorkoutEquipment] = useState(false);
 	const [manualEquipmentSelections, setManualEquipmentSelections] = useState<
 		{ equipmentId: string; quantity: number }[]
 	>([]);
-	const [equipmentSearch, setEquipmentSearch] = useState('');
-	const [showAllEquipmentRows, setShowAllEquipmentRows] = useState(false);
+	const [equipmentPickerValue, setEquipmentPickerValue] = useState('');
 	const [preferredTimeLabel, setPreferredTimeLabel] = useState<string | null>(
 		null
 	);
@@ -379,7 +377,34 @@ const CoachSchedule = () => {
 		fetchPolicy: 'cache-and-network',
 	});
 
+	const formatTimeToString = (time: Date | undefined): string => {
+		if (!time) return '';
+		const hours = time.getHours();
+		const minutes = time.getMinutes();
+		const ampm = hours >= 12 ? 'PM' : 'AM';
+		const displayHours = hours % 12 || 12;
+		const displayMinutes = minutes.toString().padStart(2, '0');
+		return `${displayHours}:${displayMinutes} ${ampm}`;
+	};
+
+	const equipmentCheckDate = useMemo(
+		() => (date ? sessionCalendarDateToIso(date) : undefined),
+		[date]
+	);
+	const equipmentCheckStartTime = useMemo(
+		() => (startTime ? formatTimeToString(startTime) : undefined),
+		[startTime]
+	);
+	const equipmentCheckEndTime = useMemo(
+		() => (endTime ? formatTimeToString(endTime) : undefined),
+		[endTime]
+	);
 	const { data: equipmentsData } = useQuery(GET_EQUIPMENTS_QUERY, {
+		variables: {
+			checkDate: equipmentCheckDate,
+			checkStartTime: equipmentCheckStartTime,
+			checkEndTime: equipmentCheckEndTime,
+		},
 		fetchPolicy: 'cache-and-network',
 	});
 
@@ -689,10 +714,8 @@ const CoachSchedule = () => {
 		setSelectedTemplateId('');
 		setErrors({});
 		setSelectedWorkouts([]);
-		setAutoMatchWorkoutEquipment(false);
 		setManualEquipmentSelections([]);
-		setEquipmentSearch('');
-		setShowAllEquipmentRows(false);
+		setEquipmentPickerValue('');
 	};
 
 	const handleAddWorkout = (exercise: any) => {
@@ -937,43 +960,65 @@ const CoachSchedule = () => {
 		return Object.keys(newErrors).length === 0;
 	};
 
-	const formatTimeToString = (time: Date | undefined): string => {
-		if (!time) return '';
-		const hours = time.getHours();
-		const minutes = time.getMinutes();
-		const ampm = hours >= 12 ? 'PM' : 'AM';
-		const displayHours = hours % 12 || 12;
-		const displayMinutes = minutes.toString().padStart(2, '0');
-		return `${displayHours}:${displayMinutes} ${ampm}`;
-	};
-
 	const equipmentOptions = useMemo(() => {
 		const rows = (equipmentsData?.getEquipments || []) as any[];
 		const byName = new Map<
 			string,
-			{ id: string; name: string; quantity: number }
+			{
+				id: string;
+				name: string;
+				quantity: number;
+				isReservedInWindow: boolean;
+				reservedQuantityInWindow: number;
+				upcomingUsages: Array<{
+					sessionId: string;
+					sessionName: string;
+					startTime: string;
+					endTime?: string | null;
+					quantity: number;
+				}>;
+			}
 		>();
 		for (const x of rows) {
 			if (!x?.id) continue;
 			const name = String(x.name || 'Equipment').trim();
 			const key = name.toLowerCase();
 			const quantity = Math.max(0, Number(x.quantity ?? 0));
+			const reservedQuantityInWindow = Math.max(
+				0,
+				Number(x.reservedQuantityInWindow ?? 0)
+			);
 			const existing = byName.get(key);
 			if (!existing || quantity > existing.quantity) {
-				byName.set(key, { id: String(x.id), name, quantity });
+				byName.set(key, {
+					id: String(x.id),
+					name,
+					quantity,
+					isReservedInWindow: !!x.isReservedInWindow,
+					reservedQuantityInWindow,
+					upcomingUsages: Array.isArray(x.upcomingUsages) ? x.upcomingUsages : [],
+				});
 			}
 		}
 		return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
 	}, [equipmentsData]);
 
-	const filteredEquipmentOptions = useMemo(() => {
-		const q = equipmentSearch.trim().toLowerCase();
-		const rows = q
-			? equipmentOptions.filter((x) => x.name.toLowerCase().includes(q))
-			: equipmentOptions;
-		if (showAllEquipmentRows || rows.length <= 8) return rows;
-		return rows.slice(0, 8);
-	}, [equipmentOptions, equipmentSearch, showAllEquipmentRows]);
+	const equipmentById = useMemo(() => {
+		return new Map(equipmentOptions.map((x) => [String(x.id), x]));
+	}, [equipmentOptions]);
+
+	const availableEquipmentSelectOptions = useMemo(() => {
+		return equipmentOptions
+			.filter((eq) => !manualEquipmentSelections.some((m) => m.equipmentId === eq.id))
+			.map((eq) => {
+				const availableUnits = Math.max(
+					0,
+					Number(eq.quantity || 0) - Number(eq.reservedQuantityInWindow || 0)
+				);
+				const label = `${eq.name} • ${availableUnits}/${eq.quantity} available`;
+				return { label, value: eq.id };
+			});
+	}, [equipmentOptions, manualEquipmentSelections]);
 
 	const toggleManualEquipment = (equipmentId: string) => {
 		setManualEquipmentSelections((prev) => {
@@ -981,6 +1026,15 @@ const CoachSchedule = () => {
 			if (exists) return prev.filter((x) => x.equipmentId !== equipmentId);
 			return [...prev, { equipmentId, quantity: 1 }];
 		});
+	};
+
+	const addManualEquipment = (equipmentId: string) => {
+		if (!equipmentId) return;
+		setManualEquipmentSelections((prev) => {
+			if (prev.some((x) => x.equipmentId === equipmentId)) return prev;
+			return [...prev, { equipmentId, quantity: 1 }];
+		});
+		setEquipmentPickerValue('');
 	};
 
 	const updateManualEquipmentQuantity = (equipmentId: string, nextQty: number) => {
@@ -997,29 +1051,9 @@ const CoachSchedule = () => {
 		fallbackStartTime: string,
 		fallbackEndTime?: string
 	) => {
-		const equipments = (equipmentsData?.getEquipments || []) as any[];
-		if (!equipments.length) return undefined;
-		const byName = new Map<string, any>();
-		const byId = new Map<string, any>();
-		for (const eq of equipments) {
-			const key = String(eq?.name || '').trim().toLowerCase();
-			if (!key) continue;
-			byName.set(key, eq);
-			if (eq?.id) byId.set(String(eq.id), eq);
-		}
 		const grouped = new Map<string, number>();
-		if (autoMatchWorkoutEquipment) {
-			for (const w of selectedWorkouts) {
-				const raw = String(w?.equipment || '').trim().toLowerCase();
-				if (!raw || raw === 'body weight' || raw === 'bodyweight') continue;
-				const found = byName.get(raw);
-				if (!found?.id) continue;
-				const id = String(found.id);
-				grouped.set(id, (grouped.get(id) || 0) + 1);
-			}
-		}
 		for (const row of manualEquipmentSelections) {
-			if (!row?.equipmentId || !byId.has(String(row.equipmentId))) continue;
+			if (!row?.equipmentId || !equipmentById.has(String(row.equipmentId))) continue;
 			const id = String(row.equipmentId);
 			const q = Math.max(1, Number(row.quantity || 1));
 			grouped.set(id, (grouped.get(id) || 0) + q);
@@ -1031,6 +1065,93 @@ const CoachSchedule = () => {
 			reservedStartTime: fallbackStartTime,
 			reservedEndTime: fallbackEndTime || undefined,
 		}));
+	};
+
+	const renderEquipmentReservationsSection = () => {
+		const selectedTotal = manualEquipmentSelections.length;
+		const equipmentPickerPlaceholder =
+			selectedTotal <= 0
+				? 'Choose equipment'
+				: selectedTotal === 1
+					? '1 equipment selected'
+					: `${selectedTotal} equipments selected`;
+		return (
+			<View className='mt-3'>
+				<Text className='text-text-primary font-semibold mb-2'>Equipment reservations</Text>
+				<Text className='text-text-secondary text-xs mt-2 mb-2'>
+					Selected equipment: {selectedTotal}
+				</Text>
+
+				<Select
+					label='Add equipment manually'
+					options={availableEquipmentSelectOptions}
+					value={equipmentPickerValue}
+					onChange={(value) => addManualEquipment(value)}
+					placeholder={equipmentPickerPlaceholder}
+				/>
+				{equipmentOptions.length === 0 ? (
+					<Text className='text-text-secondary text-xs -mt-3 mb-2'>
+						No equipment loaded yet. Pull to refresh or check API connection.
+					</Text>
+				) : null}
+
+				{manualEquipmentSelections.map((row) => {
+					const eq = equipmentById.get(String(row.equipmentId));
+					if (!eq) return null;
+					const availableUnits = Math.max(
+						0,
+						Number(eq.quantity || 0) - Number(eq.reservedQuantityInWindow || 0)
+					);
+					return (
+						<View
+							key={`manual-${eq.id}`}
+							className='bg-bg-darker rounded-lg p-3 mb-2 border border-[#F9C513]'
+							style={{ borderWidth: 0.5 }}
+						>
+							<View className='flex-row items-center justify-between'>
+								<Text className='text-text-primary font-semibold'>{eq.name}</Text>
+								<TouchableOpacity
+									onPress={() => toggleManualEquipment(eq.id)}
+									className='w-8 h-8 rounded-full items-center justify-center border border-red-400/40 bg-red-500/10'
+									style={{ borderWidth: 0.5 }}
+									hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+									accessibilityRole='button'
+									accessibilityLabel={`Remove ${eq.name}`}
+								>
+									<Ionicons name='close' size={16} color='#F87171' />
+								</TouchableOpacity>
+							</View>
+							<Text className='text-text-secondary text-xs mt-1'>
+								{availableUnits > 0
+									? `Available now: ${availableUnits}/${eq.quantity}`
+									: `Unavailable now: reserved ${eq.reservedQuantityInWindow}/${eq.quantity}`}
+							</Text>
+							{eq.upcomingUsages?.slice(0, 2).map((slot) => (
+								<Text key={`${eq.id}-${slot.sessionId}-${slot.startTime}`} className='text-text-secondary text-xs mt-1'>
+									Reserved in "{slot.sessionName}" at {slot.startTime}
+									{slot.endTime ? ` - ${slot.endTime}` : ''} (qty {slot.quantity})
+								</Text>
+							))}
+							<View className='mt-2 flex-row items-center'>
+								<Text className='text-text-secondary mr-2'>Qty</Text>
+								<TextInput
+									value={String(row.quantity)}
+									onChangeText={(t) =>
+										updateManualEquipmentQuantity(
+											eq.id,
+											parseInt(t.replace(/[^0-9]/g, ''), 10) || 1
+										)
+									}
+									keyboardType='number-pad'
+									className='bg-bg-primary rounded-lg p-2 text-text-primary border border-[#F9C513] w-20'
+									style={{ borderWidth: 0.5 }}
+								/>
+							</View>
+						</View>
+					);
+				})}
+			</View>
+		);
 	};
 
 	const handleCreateSession = () => {
@@ -2144,98 +2265,7 @@ const CoachSchedule = () => {
 												))}
 											</View>
 										)}
-										<View className='mt-3'>
-											<Text className='text-text-primary font-semibold mb-2'>
-												Equipment reservations
-											</Text>
-											<TouchableOpacity
-												onPress={() =>
-													setAutoMatchWorkoutEquipment((prev) => !prev)
-												}
-												className={`p-3 rounded-lg border border-[#F9C513] ${
-													autoMatchWorkoutEquipment
-														? 'bg-[#F9C513]/20'
-														: 'bg-bg-darker'
-												}`}
-												style={{ borderWidth: 0.5 }}
-											>
-												<Text className='text-text-primary'>
-													Auto-match equipment from selected workouts:{' '}
-													{autoMatchWorkoutEquipment ? 'ON' : 'OFF'}
-												</Text>
-											</TouchableOpacity>
-											<Text className='text-text-secondary text-xs mt-2 mb-2'>
-												You can also manually reserve equipment below.
-											</Text>
-											<TextInput
-												value={equipmentSearch}
-												onChangeText={setEquipmentSearch}
-												placeholder='Search equipment...'
-												placeholderTextColor='#8E8E93'
-												className='bg-bg-primary rounded-lg p-3 text-text-primary border border-[#F9C513] mb-2'
-												style={{ borderWidth: 0.5 }}
-											/>
-											<View className='mb-2'>
-												<Text className='text-text-secondary text-xs'>
-													Selected: {manualEquipmentSelections.length}
-												</Text>
-											</View>
-											{filteredEquipmentOptions.map((eq) => {
-												const selected = manualEquipmentSelections.find(
-													(x) => x.equipmentId === eq.id
-												);
-												return (
-													<View
-														key={eq.id}
-														className='bg-bg-darker rounded-lg p-3 mb-2 border border-[#F9C513]'
-														style={{ borderWidth: 0.5 }}
-													>
-														<TouchableOpacity
-															onPress={() => toggleManualEquipment(eq.id)}
-															className='flex-row items-center justify-between'
-														>
-															<Text className='text-text-primary font-semibold'>
-																{eq.name}
-															</Text>
-															<Text className='text-text-secondary text-xs'>
-																Stock {eq.quantity}
-															</Text>
-														</TouchableOpacity>
-														{selected ? (
-															<View className='mt-2 flex-row items-center'>
-																<Text className='text-text-secondary mr-2'>
-																	Qty
-																</Text>
-																<TextInput
-																	value={String(selected.quantity)}
-																	onChangeText={(t) =>
-																		updateManualEquipmentQuantity(
-																			eq.id,
-																			parseInt(t.replace(/[^0-9]/g, ''), 10) || 1
-																		)
-																	}
-																	keyboardType='number-pad'
-																	className='bg-bg-primary rounded-lg p-2 text-text-primary border border-[#F9C513] w-20'
-																	style={{ borderWidth: 0.5 }}
-																/>
-															</View>
-														) : null}
-													</View>
-												);
-											})}
-											{equipmentOptions.length > 8 ? (
-												<TouchableOpacity
-													onPress={() => setShowAllEquipmentRows((prev) => !prev)}
-													className='mt-1 py-2'
-												>
-													<Text className='text-[#F9C513] font-semibold'>
-														{showAllEquipmentRows
-															? 'Show fewer equipment'
-															: 'Show all equipment'}
-													</Text>
-												</TouchableOpacity>
-											) : null}
-										</View>
+										{renderEquipmentReservationsSection()}
 									</View>
 									<GradientButton
 										onPress={handleCreateSession}
@@ -2547,73 +2577,7 @@ const CoachSchedule = () => {
 												))}
 											</View>
 										)}
-										<View className='mt-3'>
-											<Text className='text-text-primary font-semibold mb-2'>
-												Equipment reservations
-											</Text>
-											<TouchableOpacity
-												onPress={() =>
-													setAutoMatchWorkoutEquipment((prev) => !prev)
-												}
-												className={`p-3 rounded-lg border border-[#F9C513] ${
-													autoMatchWorkoutEquipment
-														? 'bg-[#F9C513]/20'
-														: 'bg-bg-darker'
-												}`}
-												style={{ borderWidth: 0.5 }}
-											>
-												<Text className='text-text-primary'>
-													Auto-match equipment from selected workouts:{' '}
-													{autoMatchWorkoutEquipment ? 'ON' : 'OFF'}
-												</Text>
-											</TouchableOpacity>
-											<Text className='text-text-secondary text-xs mt-2 mb-2'>
-												You can also manually reserve equipment below.
-											</Text>
-											{equipmentOptions.map((eq) => {
-												const selected = manualEquipmentSelections.find(
-													(x) => x.equipmentId === eq.id
-												);
-												return (
-													<View
-														key={eq.id}
-														className='bg-bg-darker rounded-lg p-3 mb-2 border border-[#F9C513]'
-														style={{ borderWidth: 0.5 }}
-													>
-														<TouchableOpacity
-															onPress={() => toggleManualEquipment(eq.id)}
-															className='flex-row items-center justify-between'
-														>
-															<Text className='text-text-primary font-semibold'>
-																{eq.name}
-															</Text>
-															<Text className='text-text-secondary text-xs'>
-																Stock {eq.quantity}
-															</Text>
-														</TouchableOpacity>
-														{selected ? (
-															<View className='mt-2 flex-row items-center'>
-																<Text className='text-text-secondary mr-2'>
-																	Qty
-																</Text>
-																<TextInput
-																	value={String(selected.quantity)}
-																	onChangeText={(t) =>
-																		updateManualEquipmentQuantity(
-																			eq.id,
-																			parseInt(t.replace(/[^0-9]/g, ''), 10) || 1
-																		)
-																	}
-																	keyboardType='number-pad'
-																	className='bg-bg-primary rounded-lg p-2 text-text-primary border border-[#F9C513] w-20'
-																	style={{ borderWidth: 0.5 }}
-																/>
-															</View>
-														) : null}
-													</View>
-												);
-											})}
-										</View>
+										{renderEquipmentReservationsSection()}
 									</View>
 
 									<DatePicker

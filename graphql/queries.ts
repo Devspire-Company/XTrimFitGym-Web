@@ -943,6 +943,7 @@ export const GET_EQUIPMENTS_QUERY = gql`
 			upcomingUsages {
 				sessionId
 				sessionName
+				coachName
 				date
 				startTime
 				endTime
