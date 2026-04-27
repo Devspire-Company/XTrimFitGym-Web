@@ -75,6 +75,8 @@ function formatDurationLabel(durationType: string | null | undefined): string {
 			return 'year';
 		case 'DAILY':
 			return 'day pass';
+		case 'MINUTES':
+			return 'minute promo';
 		default:
 			return durationType || 'N/A';
 	}

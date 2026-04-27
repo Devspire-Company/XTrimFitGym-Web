@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNotifyMembershipExpiry } from '@/hooks/useNotifyMembershipExpiry';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import {
@@ -38,6 +38,10 @@ import { AdjustSubscriptionDurationModal } from '@/components/modals/AdjustSubsc
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { exportTableCsv } from '@/lib/csvExport';
 import { exportTablePdf } from '@/lib/pdfExport';
+import {
+	isMembershipExpiredForNotification,
+	memberDisplayName,
+} from '@/lib/membershipExpiry';
 
 interface Member {
 	id: string;
@@ -126,6 +130,10 @@ export function MembersPage() {
 		currentStartedAtIso?: string;
 	} | null>(null);
 	const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+	const [expiredMemberModalName, setExpiredMemberModalName] = useState<string | null>(
+		null
+	);
+	const prevExpirySnapshotRef = useRef<Map<string, boolean> | null>(null);
 
 	const closeMemberActionsMenu = () => setOpenDropdownId(null);
 
@@ -168,6 +176,38 @@ export function MembersPage() {
 	}, [data?.getUsers, subscriptionData?.usersUpdated]);
 
 	useNotifyMembershipExpiry(membersData, loading);
+	useEffect(() => {
+		if (loading) return;
+		const currentList = (membersData || []) as Record<string, unknown>[];
+		if (prevExpirySnapshotRef.current === null) {
+			const initMap = new Map<string, boolean>();
+			for (const member of currentList) {
+				const id = member.id;
+				if (typeof id !== 'string') continue;
+				initMap.set(id, isMembershipExpiredForNotification(member));
+			}
+			prevExpirySnapshotRef.current = initMap;
+			return;
+		}
+
+		const previous = prevExpirySnapshotRef.current;
+		const nextMap = new Map<string, boolean>();
+		let newlyExpiredMemberName: string | null = null;
+		for (const member of currentList) {
+			const id = member.id;
+			if (typeof id !== 'string') continue;
+			const nowExpired = isMembershipExpiredForNotification(member);
+			nextMap.set(id, nowExpired);
+			const wasExpired = previous.get(id) ?? false;
+			if (nowExpired && !wasExpired && !newlyExpiredMemberName) {
+				newlyExpiredMemberName = memberDisplayName(member);
+			}
+		}
+		prevExpirySnapshotRef.current = nextMap;
+		if (newlyExpiredMemberName) {
+			setExpiredMemberModalName(newlyExpiredMemberName);
+		}
+	}, [membersData, loading]);
 
 	const [disableUserMutation] = useMutation(DISABLE_USER, {
 		refetchQueries: [{ query: GET_USERS, variables: { role: RoleType.Member, includeDisabled: true } }],
@@ -1411,6 +1451,37 @@ export function MembersPage() {
 											Renew
 										</>
 									)}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
+			{expiredMemberModalName && (
+				<div
+					className="modal-overlay active"
+					onClick={() => setExpiredMemberModalName(null)}
+				>
+					<div className="modal modal-center" onClick={(e) => e.stopPropagation()}>
+						<div className="modal-body">
+							<div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+								<div className="modal-success-icon-large bg-[rgba(245,158,11,0.16)] border border-[rgba(245,158,11,0.35)]">
+									<Clock size={40} className="text-amber-400" />
+								</div>
+							</div>
+							<h2 className="modal-title" style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+								Membership ended
+							</h2>
+							<p className="modal-text" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+								{expiredMemberModalName}&apos;s membership has just expired. You can renew from Member Management.
+							</p>
+							<div className="modal-actions" style={{ display: 'flex', justifyContent: 'center' }}>
+								<button
+									type="button"
+									className="btn-primary"
+									onClick={() => setExpiredMemberModalName(null)}
+								>
+									Got it
 								</button>
 							</div>
 						</div>

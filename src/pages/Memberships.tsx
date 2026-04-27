@@ -152,6 +152,7 @@ export function MembershipsPage() {
 			'Quarterly': DurationType.Quarterly,
 			'Yearly': DurationType.Yearly,
 			'Daily': DurationType.Daily,
+			'Minutes': 'MINUTES' as DurationType,
 		};
 
 		const status = statusMap[formData.status] ?? MembershipStatus.Active;
@@ -267,6 +268,7 @@ export function MembershipsPage() {
 		QUARTERLY: 'quarter',
 		YEARLY: 'year',
 		DAILY: 'day pass',
+		MINUTES: 'minute promo',
 	};
 
 	const handleExportPdf = () => {

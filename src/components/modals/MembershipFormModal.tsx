@@ -17,7 +17,7 @@ export interface MembershipFormData {
 	features: string[];
 	status: 'Active' | 'Inactive' | 'Coming Soon';
 	statusEffectiveAt: string;
-	durationType: 'Monthly' | 'Quarterly' | 'Yearly' | 'Daily';
+	durationType: 'Monthly' | 'Quarterly' | 'Yearly' | 'Daily' | 'Minutes';
 	monthDuration: number;
 }
 
@@ -106,6 +106,7 @@ export function MembershipFormModal({
 		QUARTERLY: 'Quarterly',
 		YEARLY: 'Yearly',
 		DAILY: 'Daily',
+		MINUTES: 'Minutes',
 	};
 
 	const defaultStatus =
@@ -183,6 +184,7 @@ export function MembershipFormModal({
 									<option value="Quarterly">Quarterly</option>
 									<option value="Yearly">Yearly</option>
 									<option value="Daily">Daily (fixed days / promos)</option>
+									<option value="Minutes">Minutes (quick expiry testing)</option>
 								</select>
 							</div>
 
@@ -199,13 +201,13 @@ export function MembershipFormModal({
 									value={planLengthInput}
 									onChange={(e) => setPlanLengthInput(e.target.value.replace(/[^\d]/g, ''))}
 									required
-									placeholder="e.g., 3 for monthly plans, 15 for daily promo"
+									placeholder="e.g., 3 months, 15 days, or 5 minutes"
 								/>
 								<small
 									id="monthDurationHint"
 									style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'block' }}
 								>
-									For Monthly / Quarterly / Yearly: length in months. For Daily: length in calendar days.
+									For Monthly / Quarterly / Yearly: length in months. For Daily: calendar days. For Minutes: exact minutes (e.g., 5 or 10).
 								</small>
 							</div>
 
