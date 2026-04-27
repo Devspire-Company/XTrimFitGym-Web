@@ -87,6 +87,7 @@ const normalizeFilterValue = (value: string | null | undefined): string =>
 
 const LIVE_UPDATE_INTERVAL_MS = 1500;
 const PAUSED_AFTER_EXPIRY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+const PAUSED_MARKER_STORAGE_KEY = 'members.pausedAfterExpiry.v1';
 
 export function MembersPage() {
 	useEffect(() => {
@@ -135,12 +136,38 @@ export function MembersPage() {
 		null
 	);
 	const [nowMs, setNowMs] = useState(() => Date.now());
+	const [pausedMarkersByMemberId, setPausedMarkersByMemberId] = useState<Record<string, number>>(
+		() => {
+			try {
+				if (typeof window === 'undefined') return {};
+				const raw = window.localStorage.getItem(PAUSED_MARKER_STORAGE_KEY);
+				if (!raw) return {};
+				const parsed = JSON.parse(raw) as Record<string, number>;
+				if (!parsed || typeof parsed !== 'object') return {};
+				return parsed;
+			} catch {
+				return {};
+			}
+		}
+	);
 	const prevExpirySnapshotRef = useRef<Map<string, boolean> | null>(null);
 
 	useEffect(() => {
 		const id = setInterval(() => setNowMs(Date.now()), LIVE_UPDATE_INTERVAL_MS);
 		return () => clearInterval(id);
 	}, []);
+
+	useEffect(() => {
+		try {
+			if (typeof window === 'undefined') return;
+			window.localStorage.setItem(
+				PAUSED_MARKER_STORAGE_KEY,
+				JSON.stringify(pausedMarkersByMemberId)
+			);
+		} catch {
+			/* ignore persistence issues */
+		}
+	}, [pausedMarkersByMemberId]);
 
 	const closeMemberActionsMenu = () => setOpenDropdownId(null);
 
@@ -183,6 +210,39 @@ export function MembersPage() {
 	}, [data?.getUsers, subscriptionData?.usersUpdated]);
 
 	useNotifyMembershipExpiry(membersData, loading);
+
+	useEffect(() => {
+		if (loading) return;
+		const currentList = (membersData || []) as Record<string, unknown>[];
+		setPausedMarkersByMemberId((prev) => {
+			const next: Record<string, number> = {};
+			const cutoff = Date.now() - PAUSED_AFTER_EXPIRY_WINDOW_MS;
+			for (const [id, ts] of Object.entries(prev)) {
+				if (typeof ts === 'number' && ts >= cutoff) {
+					next[id] = ts;
+				}
+			}
+			for (const member of currentList) {
+				const id = member.id;
+				if (typeof id !== 'string') continue;
+				if (isMembershipExpiredForNotification(member) && !next[id]) {
+					next[id] = Date.now();
+				}
+				const tx = (member.currentMembership ||
+					(member.membershipDetails as Record<string, unknown> | undefined)
+						?.membershipTransaction) as
+					| { status?: string | null }
+					| null
+					| undefined;
+				const txStatus = String(tx?.status || '').toUpperCase();
+				if (txStatus === 'ACTIVE' && next[id]) {
+					delete next[id];
+				}
+			}
+			return next;
+		});
+	}, [membersData, loading]);
+
 	useEffect(() => {
 		if (loading) return;
 		const currentList = (membersData || []) as Record<string, unknown>[];
@@ -983,8 +1043,24 @@ export function MembersPage() {
 										</td>
 										<td className="px-4 py-5 text-sm">
 											{(() => {
+												const pausedMarkedAt = pausedMarkersByMemberId[member.id];
+												const pausedByMarker =
+													typeof pausedMarkedAt === 'number' &&
+													nowMs < pausedMarkedAt + PAUSED_AFTER_EXPIRY_WINDOW_MS;
 												if (!member.expiresAt) {
-													return <span className="text-[var(--text-secondary)]">—</span>;
+													if (!pausedByMarker) {
+														return <span className="text-[var(--text-secondary)]">—</span>;
+													}
+													return (
+														<span className="relative inline-flex items-center group">
+															<span className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-[rgba(148,163,184,0.16)] text-[#E2E8F0] border border-[rgba(148,163,184,0.35)]">
+																Paused
+															</span>
+															<span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-max -translate-x-1/2 rounded-lg border border-[rgba(249,197,19,0.25)] bg-[rgba(16,18,24,0.96)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-primary)] opacity-0 shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-opacity duration-150 group-hover:opacity-100">
+																Recently expired - within 3 days
+															</span>
+														</span>
+													);
 												}
 												const expirationMs = new Date(member.expiresAt).getTime();
 												if (!Number.isFinite(expirationMs)) {
@@ -993,7 +1069,7 @@ export function MembersPage() {
 												const isPausedWindow =
 													nowMs >= expirationMs &&
 													nowMs < expirationMs + PAUSED_AFTER_EXPIRY_WINDOW_MS;
-												if (isPausedWindow) {
+												if (isPausedWindow || pausedByMarker) {
 													return (
 														<span className="relative inline-flex items-center group">
 															<span className="px-2.5 py-1.5 text-xs rounded-lg font-semibold bg-[rgba(148,163,184,0.16)] text-[#E2E8F0] border border-[rgba(148,163,184,0.35)]">
