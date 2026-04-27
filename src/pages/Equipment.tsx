@@ -207,10 +207,6 @@ function statusLabel(s: EquipmentStatus): string {
 	}
 }
 
-function availabilityLabel(quantity: number): string {
-	return quantity > 0 ? 'In stock' : 'Out of stock';
-}
-
 function statusBadgeClass(s: EquipmentStatus): string {
 	switch (s) {
 		case EquipmentStatus.Damaged:
