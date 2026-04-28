@@ -12,7 +12,6 @@ import {
 	XCircle,
 	CalendarDays,
 	WifiOff,
-	Wifi,
 } from 'lucide-react';
 import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -908,8 +907,7 @@ export function AttendancePage() {
 
 	const totalPages = Math.ceil(totalCount / recordsPerPage);
 	const showBiometricDisconnectedNotice =
-		!useAttendanceMockData && !subscriptionLoading && !subscriptionConnected;
-	const showBiometricConnectedNotice = useAttendanceMockData;
+		useAttendanceMockData || (!subscriptionLoading && !subscriptionConnected);
 
 	const applyTodayRange = () => {
 		const today = getTodayYmdManila();
@@ -1233,23 +1231,6 @@ export function AttendancePage() {
 
 			{/* Filters */}
 			<div className="bg-[var(--bg-secondary)] rounded-lg p-4 space-y-4">
-				{showBiometricConnectedNotice ? (
-					<div className="rounded-xl border border-[rgba(16,185,129,0.36)] bg-[rgba(16,185,129,0.1)] px-3 py-2.5">
-						<div className="flex items-start gap-2">
-							<div className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.18)]">
-								<Wifi className="h-3.5 w-3.5 text-[#34D399]" />
-							</div>
-							<div>
-								<p className="text-xs font-semibold text-[#6EE7B7]">
-									Biometric connection active
-								</p>
-								<p className="text-xs text-[var(--text-secondary)]">
-									Biometric device is connected. Live attendance monitoring is available.
-								</p>
-							</div>
-						</div>
-					</div>
-				) : null}
 				{showBiometricDisconnectedNotice ? (
 					<div className="rounded-xl border border-[rgba(239,68,68,0.36)] bg-[rgba(239,68,68,0.1)] px-3 py-2.5">
 						<div className="flex items-start gap-2">
