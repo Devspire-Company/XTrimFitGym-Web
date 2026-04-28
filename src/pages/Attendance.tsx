@@ -654,6 +654,7 @@ export function AttendancePage() {
 		type Group = {
 			personName: string;
 			cardNo: string;
+			dateKey: string;
 			events: AttendanceEvent[];
 			latestAuthMs: number;
 		};
@@ -661,6 +662,7 @@ export function AttendancePage() {
 			key: string;
 			personName: string;
 			cardNo: string;
+			dateKey: string;
 			date: string;
 			timeIn: string;
 			timeOut: string;
@@ -675,10 +677,12 @@ export function AttendancePage() {
 				record.cardNo != null && String(record.cardNo).trim() !== ''
 					? String(record.cardNo).trim()
 					: '';
-			const groupKey = `${personName}__${cardNo || 'no-card'}`;
+			const dateKey = getDateKeyManila(record.authDateTime);
+			const groupKey = `${personName}__${cardNo || 'no-card'}__${dateKey}`;
 			const existing = groups.get(groupKey) ?? {
 				personName,
 				cardNo,
+				dateKey,
 				events: [],
 				latestAuthMs: 0,
 			};
@@ -692,24 +696,13 @@ export function AttendancePage() {
 		}
 
 		const rows: SummaryRow[] = Array.from(groups.entries()).map(([groupKey, group]) => {
-			const latestDateKey = new Date(group.latestAuthMs).toLocaleDateString('en-CA', {
-				timeZone: 'Asia/Manila',
-			});
-			const latestDateEvents = group.events
-				.filter(
-					(event) =>
-						new Date(event.authDateTime).toLocaleDateString('en-CA', {
-							timeZone: 'Asia/Manila',
-						}) === latestDateKey
-				)
-				.sort(
-					(a, b) =>
-						new Date(a.authDateTime).getTime() - new Date(b.authDateTime).getTime()
-				);
-			const inTimes = latestDateEvents
+			const dayEvents = [...group.events].sort(
+				(a, b) => new Date(a.authDateTime).getTime() - new Date(b.authDateTime).getTime()
+			);
+			const inTimes = dayEvents
 				.filter((event) => event.direction === 'IN')
 				.map((event) => formatManilaTime(event.authDateTime));
-			const outTimes = latestDateEvents
+			const outTimes = dayEvents
 				.filter((event) => event.direction === 'OUT')
 				.map((event) => formatManilaTime(event.authDateTime));
 
@@ -722,7 +715,13 @@ export function AttendancePage() {
 				key: groupKey,
 				personName: group.personName,
 				cardNo: group.cardNo,
-				date: formatManilaDate(new Date(group.latestAuthMs).toISOString()),
+				dateKey: group.dateKey,
+				date: parseYmdToDate(group.dateKey)?.toLocaleDateString('en-PH', {
+					timeZone: 'Asia/Manila',
+					year: 'numeric',
+					month: 'short',
+					day: 'numeric',
+				}) || group.dateKey,
 				timeIn,
 				timeOut,
 				logType,
@@ -731,7 +730,7 @@ export function AttendancePage() {
 		});
 
 		rows.sort((a, b) => {
-			if (b.latestAuthMs !== a.latestAuthMs) return b.latestAuthMs - a.latestAuthMs;
+			if (b.dateKey !== a.dateKey) return b.dateKey.localeCompare(a.dateKey);
 			return a.personName.localeCompare(b.personName);
 		});
 		return rows;
