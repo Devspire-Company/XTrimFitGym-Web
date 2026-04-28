@@ -433,11 +433,6 @@ export function AttendancePage() {
 		pushEvent('mock-2026-04-28-c4-in', c4.personName, c4.cardNo, '2026-04-28', '08:42', 'IN');
 		pushEvent('mock-2026-04-28-c4-out', c4.personName, c4.cardNo, '2026-04-28', '18:03', 'OUT');
 
-		// Apr 29: Steph + 2 clients, TIME-IN only
-		pushEvent('mock-2026-04-29-steph-in', 'Steph Boarding', coachCardNo, '2026-04-29', '07:53', 'IN');
-		pushEvent('mock-2026-04-29-c2-in', c2.personName, c2.cardNo, '2026-04-29', '08:14', 'IN');
-		pushEvent('mock-2026-04-29-c4-in', c4.personName, c4.cardNo, '2026-04-29', '08:37', 'IN');
-
 		return rows;
 	}, [useAttendanceMockData, membersUsersData, coachesUsersData]);
 
@@ -912,7 +907,7 @@ export function AttendancePage() {
 
 	const totalPages = Math.ceil(totalCount / recordsPerPage);
 	const showBiometricDisconnectedNotice =
-		!useAttendanceMockData && !subscriptionLoading && !subscriptionConnected;
+		useAttendanceMockData || (!subscriptionLoading && !subscriptionConnected);
 
 	const applyTodayRange = () => {
 		const today = getTodayYmdManila();
@@ -1244,11 +1239,14 @@ export function AttendancePage() {
 							</div>
 							<div>
 								<p className="text-xs font-semibold text-[#FCA5A5]">
-									Biometric connection unavailable
+									{useAttendanceMockData
+										? 'Mock attendance mode is active'
+										: 'Biometric connection unavailable'}
 								</p>
 								<p className="text-xs text-[var(--text-secondary)]">
-									Connect the biometric device to access real-time attendance logs.
-									Date filtering and export will reflect live scans once connected.
+									{useAttendanceMockData
+										? 'Live biometric logs are disabled for now. Attendance records shown here are temporary mock data for UI/date-filter/export testing.'
+										: 'Connect the biometric device to access real-time attendance logs. Date filtering and export will reflect live scans once connected.'}
 								</p>
 							</div>
 						</div>
