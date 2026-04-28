@@ -181,6 +181,10 @@ function displayCoachName(user: AttendanceRosterUser): string {
 		.trim();
 }
 
+function buildMockIso(ymd: string, time24: string): string {
+	return new Date(`${ymd}T${time24}:00+08:00`).toISOString();
+}
+
 async function tryRegisterInterFont(doc: jsPDF): Promise<boolean> {
 	try {
 		const regularUrl =
@@ -218,6 +222,7 @@ export function AttendancePage() {
 	const [subscriptionConnected, setSubscriptionConnected] = useState(false);
 	const [, setLastUpdateTime] = useState<Date | null>(null);
 	const recordsPerPage = 50;
+	const useAttendanceMockData = true; // Temporary UI demo mode for attendance revisions
 	const currentUser = useAppSelector((s) => s.auth.user);
 	const [logReportDownload] = useMutation(LOG_REPORT_DOWNLOAD);
 	const appendLocalExportLog = (fileName: string) => {
@@ -315,6 +320,7 @@ export function AttendancePage() {
 
 	// Always fetch today's count for the stat; independent of the list date filter
 	const { data: dataToday } = useQuery(GET_ATTENDANCE_RECORDS, {
+		skip: useAttendanceMockData,
 		variables: {
 			filter: todayFilter,
 			pagination: { limit: 1, offset: 0 },
@@ -338,8 +344,114 @@ export function AttendancePage() {
 		}
 	);
 
+	const mockAttendanceRecords = useMemo<AttendanceRecord[]>(() => {
+		if (!useAttendanceMockData) return [];
+
+		const members = membersUsersData?.getUsers || [];
+		const coaches = coachesUsersData?.getUsers || [];
+		const fallbackClientNames = [
+			'Ashley Quicho',
+			'Kfif Kvkc Kckc',
+			'MIRANDA Quicho',
+			'Xandra Malicay',
+			'Felixandra Malicay',
+			'Felix xandra',
+			'Pia Pendergat',
+		];
+
+		const resolveMember = (index: number) => {
+			const member = members[index];
+			const fallbackName = fallbackClientNames[index] || `Mock Client ${index + 1}`;
+			const memberName =
+				member && [member.firstName, member.middleName, member.lastName].filter(Boolean).join(' ').trim()
+					? [member.firstName, member.middleName, member.lastName].filter(Boolean).join(' ').trim()
+					: fallbackName;
+			return {
+				personName: memberName,
+				cardNo:
+					member?.attendanceId != null && String(member.attendanceId).trim() !== ''
+						? String(member.attendanceId).trim()
+						: `MOCK-MEMBER-${index + 1}`,
+			};
+		};
+
+		const coachCardNo =
+			coaches[0]?.attendanceId != null && String(coaches[0]?.attendanceId).trim() !== ''
+				? String(coaches[0]?.attendanceId).trim()
+				: 'MOCK-COACH-STEPH';
+
+		const rows: AttendanceRecord[] = [];
+		const pushEvent = (
+			id: string,
+			personName: string,
+			cardNo: string,
+			ymd: string,
+			time24: string,
+			direction: 'IN' | 'OUT'
+		) => {
+			const authDateTime = buildMockIso(ymd, time24);
+			const authDate = new Date(authDateTime).toLocaleDateString('en-CA', {
+				timeZone: 'Asia/Manila',
+			});
+			const authTime = new Date(authDateTime).toLocaleTimeString('en-PH', {
+				timeZone: 'Asia/Manila',
+				hour: '2-digit',
+				minute: '2-digit',
+				second: '2-digit',
+				hour12: false,
+			});
+			rows.push({
+				id,
+				personName,
+				cardNo,
+				direction,
+				authDateTime,
+				authDate,
+				authTime,
+				deviceName: 'UI-Mock Device',
+				deviceSerNum: 'MOCK-SN-001',
+			});
+		};
+
+		const c0 = resolveMember(0);
+		const c1 = resolveMember(1);
+		const c2 = resolveMember(2);
+		const c3 = resolveMember(3);
+		const c4 = resolveMember(4);
+
+		// Apr 27: Steph + 3 clients, with IN/OUT
+		pushEvent('mock-2026-04-27-steph-in', 'Steph Boarding', coachCardNo, '2026-04-27', '07:55', 'IN');
+		pushEvent('mock-2026-04-27-steph-out', 'Steph Boarding', coachCardNo, '2026-04-27', '18:02', 'OUT');
+		pushEvent('mock-2026-04-27-c0-in', c0.personName, c0.cardNo, '2026-04-27', '08:10', 'IN');
+		pushEvent('mock-2026-04-27-c0-out', c0.personName, c0.cardNo, '2026-04-27', '17:28', 'OUT');
+		pushEvent('mock-2026-04-27-c1-in', c1.personName, c1.cardNo, '2026-04-27', '08:23', 'IN');
+		pushEvent('mock-2026-04-27-c1-out', c1.personName, c1.cardNo, '2026-04-27', '17:40', 'OUT');
+		pushEvent('mock-2026-04-27-c2-in', c2.personName, c2.cardNo, '2026-04-27', '08:31', 'IN');
+		pushEvent('mock-2026-04-27-c2-out', c2.personName, c2.cardNo, '2026-04-27', '17:48', 'OUT');
+
+		// Apr 28: Steph + 4 clients, with IN/OUT
+		pushEvent('mock-2026-04-28-steph-in', 'Steph Boarding', coachCardNo, '2026-04-28', '07:58', 'IN');
+		pushEvent('mock-2026-04-28-steph-out', 'Steph Boarding', coachCardNo, '2026-04-28', '18:07', 'OUT');
+		pushEvent('mock-2026-04-28-c1-in', c1.personName, c1.cardNo, '2026-04-28', '08:11', 'IN');
+		pushEvent('mock-2026-04-28-c1-out', c1.personName, c1.cardNo, '2026-04-28', '17:35', 'OUT');
+		pushEvent('mock-2026-04-28-c2-in', c2.personName, c2.cardNo, '2026-04-28', '08:20', 'IN');
+		pushEvent('mock-2026-04-28-c2-out', c2.personName, c2.cardNo, '2026-04-28', '17:44', 'OUT');
+		pushEvent('mock-2026-04-28-c3-in', c3.personName, c3.cardNo, '2026-04-28', '08:33', 'IN');
+		pushEvent('mock-2026-04-28-c3-out', c3.personName, c3.cardNo, '2026-04-28', '17:56', 'OUT');
+		pushEvent('mock-2026-04-28-c4-in', c4.personName, c4.cardNo, '2026-04-28', '08:42', 'IN');
+		pushEvent('mock-2026-04-28-c4-out', c4.personName, c4.cardNo, '2026-04-28', '18:03', 'OUT');
+
+		// Apr 29: Steph + 2 clients, TIME-IN only
+		pushEvent('mock-2026-04-29-steph-in', 'Steph Boarding', coachCardNo, '2026-04-29', '07:53', 'IN');
+		pushEvent('mock-2026-04-29-c2-in', c2.personName, c2.cardNo, '2026-04-29', '08:14', 'IN');
+		pushEvent('mock-2026-04-29-c4-in', c4.personName, c4.cardNo, '2026-04-29', '08:37', 'IN');
+
+		return rows;
+	}, [useAttendanceMockData, membersUsersData, coachesUsersData]);
+
 	// Initial data fetch; poll so list updates automatically without pressing Refresh
 	const { data, loading, error, refetch } = useQuery(GET_ATTENDANCE_RECORDS, {
+		skip: useAttendanceMockData,
 		variables: {
 			filter,
 			pagination: {
@@ -358,6 +470,20 @@ export function AttendancePage() {
 
 	// Update records when query data arrives. With date filter: use query result only. Without: merge so subscription updates aren't lost.
 	useEffect(() => {
+		if (useAttendanceMockData) {
+			const fromMock = selectedRange
+				? mockAttendanceRecords.filter((record) => {
+						const dateKey = getDateKeyManila(record.authDateTime);
+						return dateKey >= selectedRange.startDate && dateKey <= selectedRange.endDate;
+					})
+				: mockAttendanceRecords;
+			const sorted = [...fromMock].sort(
+				(a, b) => new Date(b.authDateTime).getTime() - new Date(a.authDateTime).getTime()
+			);
+			setRecords(sorted);
+			setTotalCount(sorted.length);
+			return;
+		}
 		if (!data?.getAttendanceRecords) return;
 		const fromQuery = data.getAttendanceRecords.records;
 		const queryTotal = data.getAttendanceRecords.totalCount;
@@ -375,13 +501,13 @@ export function AttendancePage() {
 			});
 		}
 		setTotalCount(queryTotal);
-	}, [data, selectedRange]);
+	}, [data, selectedRange, useAttendanceMockData, mockAttendanceRecords]);
 
 	// Real-time subscription for new records
 	const { error: subscriptionError, loading: subscriptionLoading } = useSubscription(
 		ATTENDANCE_RECORD_ADDED,
 		{
-			skip: false, // Always subscribe, don't wait for initial data
+			skip: useAttendanceMockData,
 			onData: ({ data: subData, error: subError }: { data?: unknown; error?: Error }) => {
 				if (subError) {
 					setSubscriptionConnected(false);
@@ -413,7 +539,7 @@ export function AttendancePage() {
 
 	// Also subscribe to batch updates
 	const { error: batchError } = useSubscription(ATTENDANCE_UPDATED, {
-		skip: false, // Always subscribe
+		skip: useAttendanceMockData,
 		onData: ({ data: subData, error: subError }: { data?: { data?: { attendanceUpdated?: AttendanceRecord[] } }; error?: Error }) => {
 			if (subError) {
 				setSubscriptionConnected(false);
@@ -658,6 +784,7 @@ export function AttendancePage() {
 	}, [mobileCoachCalendarMonth]);
 
 	const { data: mobileCoachMonthData } = useQuery(GET_ATTENDANCE_RECORDS, {
+		skip: useAttendanceMockData,
 		variables: {
 			filter: mobileCoachMonthRange,
 			pagination: { limit: 5000, offset: 0 },
@@ -685,7 +812,9 @@ export function AttendancePage() {
 			return false;
 		};
 
-		const sourceRecords = mobileCoachMonthData?.getAttendanceRecords?.records || filteredRecords;
+		const sourceRecords = useAttendanceMockData
+			? mockAttendanceRecords
+			: mobileCoachMonthData?.getAttendanceRecords?.records || filteredRecords;
 		for (const record of sourceRecords) {
 			const personName = record.personName || '';
 			const cardNo =
@@ -713,7 +842,15 @@ export function AttendancePage() {
 			.sort((a, b) => a.label.localeCompare(b.label));
 
 		return { byCoach, coachOptions };
-	}, [coachesUsersData, filteredRecords, coachAttendanceIds, coachNameCandidates, mobileCoachMonthData]);
+	}, [
+		coachesUsersData,
+		filteredRecords,
+		coachAttendanceIds,
+		coachNameCandidates,
+		mobileCoachMonthData,
+		useAttendanceMockData,
+		mockAttendanceRecords,
+	]);
 
 	useEffect(() => {
 		if (coachRecordsByDay.coachOptions.length === 0) {
@@ -778,7 +915,9 @@ export function AttendancePage() {
 	}, [selectedCoachCalendarKey, coachRecordsByDay.byCoach, mobileCoachCalendarMonth, selectedCoachCalendarDate]);
 
 	// Today's records count: always current day from API, not affected by list date filter
-	const todaysRecordsCount = dataToday?.getAttendanceRecords?.totalCount ?? 0;
+	const todaysRecordsCount = useAttendanceMockData
+		? mockAttendanceRecords.filter((record) => getDateKeyManila(record.authDateTime) === todayStr).length
+		: dataToday?.getAttendanceRecords?.totalCount ?? 0;
 
 	const totalPages = Math.ceil(totalCount / recordsPerPage);
 
@@ -845,19 +984,24 @@ export function AttendancePage() {
 			logType: string;
 		};
 
-		const exportSourceRows =
-			roleFilter === 'coach'
-				? coachRecords
-				: roleFilter === 'client'
-					? clientRecords
-					: [...coachRecords, ...clientRecords, ...otherRecords];
-		const exportRows: ExportRow[] = exportSourceRows.map((row) => ({
-			member: row.personName,
-			date: row.date,
-			timeIn: row.timeIn === '—' ? '-' : row.timeIn,
-			timeOut: row.timeOut === '—' ? '-' : row.timeOut,
-			logType: row.logType,
-		}));
+		const formatExportRows = (
+			rows: Array<{ personName: string; date: string; timeIn: string; timeOut: string; logType: string }>
+		): ExportRow[] =>
+			rows.map((row) => ({
+				member: row.personName,
+				date: row.date,
+				timeIn: row.timeIn === '—' ? '-' : row.timeIn,
+				timeOut: row.timeOut === '—' ? '-' : row.timeOut,
+				logType: row.logType,
+			}));
+		const shouldShowCoaches = roleFilter !== 'client';
+		const shouldShowClients = roleFilter !== 'coach';
+		const coachExportRows = formatExportRows(coachRecords);
+		const clientExportRows = formatExportRows(clientRecords);
+		const exportRows = [
+			...(shouldShowCoaches ? coachExportRows : []),
+			...(shouldShowClients ? clientExportRows : []),
+		];
 		const exportedByLabel = [currentUser?.firstName, currentUser?.lastName]
 			.filter(Boolean)
 			.join(' ')
@@ -887,21 +1031,58 @@ export function AttendancePage() {
 		);
 		doc.text(`Exported by: ${exportedByLabel}`, 14, 52);
 
-		autoTable(doc, {
-			startY: 58,
-			head: [['Member', 'Date', 'Time In', 'Time Out', 'Log Type']],
-			body: exportRows.map((r) => [
-				r.member,
-				r.date,
-				r.timeIn,
-				r.timeOut,
-				r.logType,
-			]),
-			styles: { fontSize: 8 },
-			headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
-			alternateRowStyles: { fillColor: [245, 245, 248] },
-			margin: { left: 14, right: 14 },
-		});
+		let nextY = 58;
+		if (shouldShowCoaches) {
+			doc.setFontSize(11);
+			doc.setFont(interReady ? 'Inter' : 'helvetica', 'bold');
+			doc.text('Coaches', 14, nextY);
+			autoTable(doc, {
+				startY: nextY + 3,
+				head: [['Coach', 'Date', 'Time In', 'Time Out', 'Log Type']],
+				body: (coachExportRows.length > 0
+					? coachExportRows
+					: [
+							{
+								member: 'No coach records',
+								date: '-',
+								timeIn: '-',
+								timeOut: '-',
+								logType: '-',
+							},
+						]
+				).map((r) => [r.member, r.date, r.timeIn, r.timeOut, r.logType]),
+				styles: { fontSize: 8 },
+				headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
+				alternateRowStyles: { fillColor: [245, 245, 248] },
+				margin: { left: 14, right: 14 },
+			});
+			nextY = ((doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || nextY + 12) + 8;
+		}
+		if (shouldShowClients) {
+			doc.setFontSize(11);
+			doc.setFont(interReady ? 'Inter' : 'helvetica', 'bold');
+			doc.text('Clients', 14, nextY);
+			autoTable(doc, {
+				startY: nextY + 3,
+				head: [['Client', 'Date', 'Time In', 'Time Out', 'Log Type']],
+				body: (clientExportRows.length > 0
+					? clientExportRows
+					: [
+							{
+								member: 'No client records',
+								date: '-',
+								timeIn: '-',
+								timeOut: '-',
+								logType: '-',
+							},
+						]
+				).map((r) => [r.member, r.date, r.timeIn, r.timeOut, r.logType]),
+				styles: { fontSize: 8 },
+				headStyles: { fillColor: [249, 197, 19], textColor: [20, 20, 20] },
+				alternateRowStyles: { fillColor: [245, 245, 248] },
+				margin: { left: 14, right: 14 },
+			});
+		}
 		doc.save(filename);
 		appendLocalExportLog(filename);
 		try {
@@ -969,7 +1150,7 @@ export function AttendancePage() {
 		}).catch(() => {});
 	};
 
-	if (loading && !data) {
+	if (!useAttendanceMockData && loading && !data) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
 				<div className="text-center">
@@ -982,7 +1163,7 @@ export function AttendancePage() {
 
 	// With errorPolicy: 'all', GraphQL field errors still set `error` but `data` may be a non-empty object
 	// (e.g. { getAttendanceRecords: null }). `error && !data` would miss that and show an empty page.
-	if (error && !loading && !data?.getAttendanceRecords) {
+	if (!useAttendanceMockData && error && !loading && !data?.getAttendanceRecords) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
 				<div className="text-center">
