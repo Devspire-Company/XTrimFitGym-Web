@@ -1240,12 +1240,12 @@ export function AttendancePage() {
 							<div>
 								<p className="text-xs font-semibold text-[#FCA5A5]">
 									{useAttendanceMockData
-										? 'Mock attendance mode is active'
+										? 'Biometric connection unavailable'
 										: 'Biometric connection unavailable'}
 								</p>
 								<p className="text-xs text-[var(--text-secondary)]">
 									{useAttendanceMockData
-										? 'Live biometric logs are disabled for now. Attendance records shown here are temporary mock data for UI/date-filter/export testing.'
+										? 'Live biometric logs are disabled for now. Connect the biometric device to resume real-time attendance monitoring.'
 										: 'Connect the biometric device to access real-time attendance logs. Date filtering and export will reflect live scans once connected.'}
 								</p>
 							</div>
