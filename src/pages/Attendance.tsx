@@ -1240,8 +1240,8 @@ export function AttendancePage() {
 							<div>
 								<p className="text-xs font-semibold text-[#FCA5A5]">Biometric connection unavailable</p>
 								<p className="text-xs text-[var(--text-secondary)]">
-									Connect the biometric device to access real-time attendance logs.
-									Date filtering and export will reflect live scans once connected.
+									Live biometric logs are disabled for now. Connect the biometric device to
+									resume real-time attendance monitoring.
 								</p>
 							</div>
 						</div>
