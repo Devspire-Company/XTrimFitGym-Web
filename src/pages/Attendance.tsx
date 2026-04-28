@@ -11,6 +11,7 @@ import {
 	CheckCircle2,
 	XCircle,
 	CalendarDays,
+	WifiOff,
 } from 'lucide-react';
 import { ExportDownloadDropdown } from '@/components/ExportDownloadDropdown';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -910,6 +911,8 @@ export function AttendancePage() {
 		: dataToday?.getAttendanceRecords?.totalCount ?? 0;
 
 	const totalPages = Math.ceil(totalCount / recordsPerPage);
+	const showBiometricDisconnectedNotice =
+		!useAttendanceMockData && !subscriptionLoading && !subscriptionConnected;
 
 	const applyTodayRange = () => {
 		const today = getTodayYmdManila();
@@ -1233,6 +1236,24 @@ export function AttendancePage() {
 
 			{/* Filters */}
 			<div className="bg-[var(--bg-secondary)] rounded-lg p-4 space-y-4">
+				{showBiometricDisconnectedNotice ? (
+					<div className="rounded-xl border border-[rgba(239,68,68,0.36)] bg-[rgba(239,68,68,0.1)] px-3 py-2.5">
+						<div className="flex items-start gap-2">
+							<div className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.18)]">
+								<WifiOff className="h-3.5 w-3.5 text-[#F87171]" />
+							</div>
+							<div>
+								<p className="text-xs font-semibold text-[#FCA5A5]">
+									Biometric connection unavailable
+								</p>
+								<p className="text-xs text-[var(--text-secondary)]">
+									Connect the biometric device to access real-time attendance logs.
+									Date filtering and export will reflect live scans once connected.
+								</p>
+							</div>
+						</div>
+					</div>
+				) : null}
 				<div className="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_minmax(160px,1fr)_auto] gap-3">
 					{/* Search */}
 					<div className="w-full flex items-center gap-2 px-3 py-2.5 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-[12px] text-[var(--text-primary)] text-sm transition-all duration-300 focus-within:border-[var(--primary-yellow)] focus-within:ring-2 focus-within:ring-[rgba(249,197,19,0.1)]">
