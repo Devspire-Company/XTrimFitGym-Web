@@ -929,6 +929,20 @@ export function AttendancePage() {
 		setRangeEndDate(end);
 	};
 
+	const todayRangePreset = useMemo(() => {
+		const today = getTodayYmdManila();
+		return { start: today, end: today };
+	}, [todayStr]);
+	const last7DaysPreset = useMemo(() => getLastNDaysRangeYmd(7), [todayStr]);
+	const thisMonthPreset = useMemo(() => getThisMonthRangeYmd(), [todayStr]);
+
+	const isTodayPresetActive =
+		rangeStartDate === todayRangePreset.start && rangeEndDate === todayRangePreset.end;
+	const isLast7DaysPresetActive =
+		rangeStartDate === last7DaysPreset.start && rangeEndDate === last7DaysPreset.end;
+	const isThisMonthPresetActive =
+		rangeStartDate === thisMonthPreset.start && rangeEndDate === thisMonthPreset.end;
+
 	const handleExportPdf = async () => {
 		const now = new Date();
 		const doc = new jsPDF({ orientation: 'landscape' });
@@ -1280,21 +1294,33 @@ export function AttendancePage() {
 							<button
 								type="button"
 								onClick={applyTodayRange}
-								className="rounded-lg border border-[rgba(249,197,19,0.3)] bg-[rgba(249,197,19,0.08)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-primary)] transition hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.16)] hover:text-[var(--primary-yellow)]"
+								className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition ${
+									isTodayPresetActive
+										? 'border border-[rgba(249,197,19,0.3)] bg-[rgba(249,197,19,0.08)] text-[var(--text-primary)] hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.16)] hover:text-[var(--primary-yellow)]'
+										: 'border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.03)] text-[var(--text-secondary)] hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)] hover:text-[var(--primary-yellow)]'
+								}`}
 							>
 								Today
 							</button>
 							<button
 								type="button"
 								onClick={applyLast7DaysRange}
-								className="rounded-lg border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] transition hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)] hover:text-[var(--primary-yellow)]"
+								className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition ${
+									isLast7DaysPresetActive
+										? 'border border-[rgba(249,197,19,0.3)] bg-[rgba(249,197,19,0.08)] text-[var(--text-primary)] hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.16)] hover:text-[var(--primary-yellow)]'
+										: 'border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.03)] text-[var(--text-secondary)] hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)] hover:text-[var(--primary-yellow)]'
+								}`}
 							>
 								Last 7 days
 							</button>
 							<button
 								type="button"
 								onClick={applyThisMonthRange}
-								className="rounded-lg border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] transition hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)] hover:text-[var(--primary-yellow)]"
+								className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition ${
+									isThisMonthPresetActive
+										? 'border border-[rgba(249,197,19,0.3)] bg-[rgba(249,197,19,0.08)] text-[var(--text-primary)] hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.16)] hover:text-[var(--primary-yellow)]'
+										: 'border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.03)] text-[var(--text-secondary)] hover:border-[var(--primary-yellow)] hover:bg-[rgba(249,197,19,0.08)] hover:text-[var(--primary-yellow)]'
+								}`}
 							>
 								This month
 							</button>
