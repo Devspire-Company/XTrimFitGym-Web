@@ -96,15 +96,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
 	return btoa(binary);
 }
 
-function formatManilaDate(iso: string): string {
-	return new Date(iso).toLocaleDateString('en-PH', {
-		timeZone: 'Asia/Manila',
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-	});
-}
-
 function formatManilaTime(iso: string): string {
 	return new Date(iso).toLocaleTimeString('en-PH', {
 		timeZone: 'Asia/Manila',
